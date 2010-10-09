@@ -1,0 +1,92 @@
+Base URL: http://gstore.unm.edu
+
+Datasets /apps/{app_id}/datasets
+
+    Spatial discovery:
+
+    GET /apps/{app_id}/datasets.json
+
+        Parameters:
+
+            limit: (integer) maximum number of results. Default is 30.
+
+            order_by: (string) Sorting criterion. Default: geo_relevance.
+
+            dir: (string) Sorting direction. Default: desc (descending order).
+
+            start: (integer) Starting index for result set pagination. Default: 0.
+
+            end: (integer) Ending index for result set pagination. Default: 30.
+
+            county: (string) Name of the county to restrict geographic extent of search.
+
+            quad: (integer) Identifier of the USGS Quad to restrict geographic extent of search.
+
+            gnis: (integer) Identifier of the Geographic Names Information System (GNIS) place to restrict extent of search.
+
+            bbox: (list of float) Array of UTM coordinates defining a bounding box of the form: S,W,E,N.
+
+            category: (string) Dataset Category name to filter results. 
+
+
+Formats available for download:
+
+    /apps/{app_id}/datasets/{dataset_id}.{format}
+
+        dataset_id: (integer) Any valid dataset id.
+
+        format: (string) 
+
+            Vector Datasets:
+
+                zip (original source zipped),
+
+                shp: ESRI Shapefile
+
+                gml: Geographic Markup Language
+
+                kml: Keyhole Markup Language
+
+                json: Geographic Javascript Object Notation
+
+                csv: Comma separated values (no geometries included)
+
+                xls: Excel sheet (no geometries included)
+
+            Raster Datasets: ecw, sid, jpg, etc.
+
+            Other: zip or external url redirection.
+
+Metadata 
+
+    /apps/{app_id}/datasets/{dataset_id}/metadata/{dataset_id}.{format}
+        format: (string) xml, txt, htm
+
+Javascript Client Mapper:
+
+    /apps/{app_id}/datasets/{dataset_id}/mapper
+
+Services:
+
+    OGC WMS capabilities:
+
+        /apps/{app_id}/datasets/{dataset_id}/services/ogc/wms?VERSION=1.1.1&SERVICE=WMS&REQUEST=GetCapabilities
+
+    OGC WFS capabilities: (If dataset's taxonomy is Vector)
+
+        /apps/{app_id}/datasets/{dataset_id}/services/ogc/wfs?VERSION=1.0.0&SERVICE=WFS&REQUEST=GetCapabilities
+
+    OGC WCS capabilities: (If dataset's taxonomy is Raster)
+
+        /apps/{app_id}/datasets/{dataset_id}/services/ogc/wcs?SERVICE=WCS&REQUEST=GetCapabilities
+
+External Mapping Services:
+
+    Google Maps:
+
+        GET http://maps.google.com/maps?q=http://gstore.umn.edu/gstore/apps/{app_id}/datasets/{dataset_id}.kml
+
+    Bing Maps (limited to 2Mb files only):
+
+        GET http://www.bing.com/maps/?mapurl=http://gstore.unm.edu/apps/{app_id}/datasets/{dataset_id}.kml
+ 

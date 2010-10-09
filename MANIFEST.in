@@ -1,0 +1,3 @@
+include gstore/config/deployment.ini_tmpl
+recursive-include gstore/public *
+recursive-include gstore/templates *
