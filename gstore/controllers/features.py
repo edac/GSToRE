@@ -5,14 +5,14 @@ from pylons.controllers.util import abort, redirect
 
 from sqlalchemy.sql import func
 
-from rgis2.lib.base import BaseController, render
+from gstore.lib.base import BaseController, render
 
-from rgis2.model.shapes import ShapesVector
-from rgis2.model import meta
-from rgis2.model.shapes_util import *
-from rgis2.model.geobase import DatasetFootprint
-from rgis2.model.cached import load_dataset
-from rgis2.model.postgis import Spatial
+from gstore.model.shapes import ShapesVector
+from gstore.model import meta
+from gstore.model.shapes_util import *
+from gstore.model.geobase import Dataset
+from gstore.model.cached import load_dataset
+from gstore.model.postgis import Spatial
 
 import osgeo.ogr as ogr
 import osgeo.osr as osr
@@ -39,13 +39,12 @@ class FeaturesController(BaseController):
         lon = request.params.get('lon')
         lat = request.params.get('lat')
         tolerance = request.params.get('tolerance',1000)
-
-        start = request.params.get('start')
-        end = request.params.get('end')
-
+        
         epsg = request.params.get('epsg', SRID)
         epsg = int(epsg)
         limit = request.params.get('limit')
+        offset = request.params.get('offset', 0)
+
         d = load_dataset(dataset_id)
 
         if bbox:
@@ -79,18 +78,15 @@ class FeaturesController(BaseController):
         else:
             limit = 30
 
-        if start and start.isdigit():
-            offset = int(start)*limit
-            query = query.offset(offset)
-        else:
-            offset = 0
+        total = query.count()
 
-        query = query.limit(limit)
+        query = query.limit(limit).offset(offset)
         query = query.add_column(func.astext(func.centroid(ShapesVector.geom)))
-
         results = query.all()
     
         response.headers['Content-Type'] = 'application/json'
+        meta.Session.close()
+
         if results is None:
             return ''
         else:
@@ -109,8 +105,8 @@ class FeaturesController(BaseController):
                     properties[att.name] = vector.values[att.array_id-1]
                     
                 features.append(M.to_geojson(geom = g, properties = properties))
-
-            return simplejson.dumps({'totalRecords': len(results), 'type': 'FeatureCollection', 'features': features })
+        
+            return simplejson.dumps({'totalRecords': total, 'type': 'FeatureCollection', 'features': features })
 
     def create(self):
         """POST /datasets/features: Create a new item"""

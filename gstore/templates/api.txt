@@ -16,8 +16,8 @@ Search resources:
 
         query: (string) Keywords to search within the description of the resource.
 
-        sort: (string) Sorting criterion: lastupdate (default), description, 
-                    theme, subtheme, groupname, geo_relevance.  
+        sort: (string) Sorting criterion: lastupdate (default), description,  
+                    theme, subtheme, groupname, georelevance.  
 
         dir: (string) Sorting direction. Default: desc (descending order).
 

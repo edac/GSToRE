@@ -53,11 +53,13 @@ class TileIndexDataset(object):
 
         field_defn = ogr.FieldDefn("location", ogr.OFTString)
         lyr.CreateField(field_defn)
+        #field_defn = ogr.FieldDefn("download_url", ogr.OFTString)
+        #lyr.CreateField(field_defn)
         for row in index:
-            if row.location is None:
-                print row
             feat = ogr.Feature(lyr.GetLayerDefn())
             feat.SetField('location', str(row.location))
+            #feat.SetField('download_url', 'http://gstore.unm.edu/apps/%(app_id)s/datasets/%(id)s.%(format)s')
+
             # set the MBR (minimum bounding rectangle)
             mbr = ogr.CreateGeometryFromWkb(row.geom.decode('hex'))
             feat.SetGeometry(mbr)

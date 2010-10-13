@@ -265,7 +265,7 @@ class Dataset(Base):
         if cls.taxonomy == 'vector':
             services.append('wms')
             services.append('wfs')
-        elif cls.taxonomy == 'geoimage':
+        elif cls.taxonomy in ['geoimage', 'rtindex', 'vtindex']:
             services.append('wms')
             services.append('wcs')
             pass

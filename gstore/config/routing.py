@@ -38,7 +38,9 @@ def make_map(config):
         name_prefix = 'metadata_')
     # Dataset-vector features resource
     map.resource('feature', 'features',
-        parent_resource = dict(member_name='dataset', collection_name='datasets'))
+        path_prefix = '/apps/:app_id/datasets/:dataset_id',
+        name_prefix = 'feature_')
+        #parent_resource = dict(member_name='dataset', collection_name='datasets'))
 
     # Dataset categories
     map.connect('datasets/categories', controller='datasets', action='categories')
