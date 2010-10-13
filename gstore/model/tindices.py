@@ -14,7 +14,7 @@ from osgeo.gdalconst import *
 
 import zipfile, tempfile
 
-from shapes_util import transform_bbox, bbox_to_polygon
+from shapes_util import transform_bbox, bbox_to_polygon, reproject_geom
 
 __all__ = ['RasterDataset']
 
@@ -40,34 +40,70 @@ class TileIndexDataset(object):
 
     def write_shapefile_from_index(self, index, destination_path, overwrite = True):
         """
-        index: list(list(r.location, r.geom))
+        index: list(list(r.location, r.geom, r.dataset_id))
         destination_path: string target file name for the shapefile
         overwrite: bool Ok to overwrite in case the destination path already exists.
+
+        Usage: 
+        >>> d = meta.Session.query(Dataset).get(100157)
+        >>> r =  RasterTileIndexDataset(d)
+        >>> r.write_shapefile_from_index(r.get_index_from_bundle(), '/tmp/naip2009rtindex.shp')
         """
         if os.path.isfile(destination_path) and overwrite == False:
             raise Exception('Shapefile already exists. Set parameter overwrite = True to ovewrite')
+
+        # Geometries are always stored in Geographic projection and the original projection of the 
+        # datasets in the mosaics may be different.
+        sr = osr.SpatialReference()
+        sr.SetWellKnownGeogCS('WGS84')
+        
+        orig_sr = osr.SpatialReference()
+        orig_sr.ImportFromEPSG(self.dataset.orig_epsg)
+
         drv = ogr.GetDriverByName('ESRI Shapefile')
         ds = drv.CreateDataSource(destination_path)
     
         lyr = ds.CreateLayer(str(self.dataset.basename), None, ogr.wkbPolygon)
 
-        field_defn = ogr.FieldDefn("location", ogr.OFTString)
-        lyr.CreateField(field_defn)
-        #field_defn = ogr.FieldDefn("download_url", ogr.OFTString)
-        #lyr.CreateField(field_defn)
+        # Location to the source file for MapServer access
+        field_defn1 = ogr.FieldDefn("location", ogr.OFTString)
+        lyr.CreateField(field_defn1)
+
+        # Additional field to provide users with direct download links to 
+        # first available format
+        field_defn2 = ogr.FieldDefn("download", ogr.OFTString)
+        lyr.CreateField(field_defn2)
+
         for row in index:
             feat = ogr.Feature(lyr.GetLayerDefn())
             feat.SetField('location', str(row.location))
-            #feat.SetField('download_url', 'http://gstore.unm.edu/apps/%(app_id)s/datasets/%(id)s.%(format)s')
+            feat.SetField(
+                'download', 
+                str('http://gstore.unm.edu/apps/%(app_id)s/datasets/%(id)s.%(format)s') % { 
+                    'id': row.dataset_id, 
+                    'format': 'ecw',
+                    'app_id': self.dataset.apps_cache[0]
+            })
 
-            # set the MBR (minimum bounding rectangle)
+            # Set the MBR (minimum bounding rectangle) geometry
             mbr = ogr.CreateGeometryFromWkb(row.geom.decode('hex'))
+            if self.dataset.orig_epsg != SRID:
+                if reproject_geom(mbr, sr, orig_sr):
+                    raise Exception('Can not reproject geometry from %s to WGS84' % self.dataset.orig_epsg)
+        
             feat.SetGeometry(mbr)
             lyr.CreateFeature(feat)
             feat.Destroy()
 
         # Flush to disk
         ds = None  
+            
+        # Write prj file
+
+        prj_file = open('%s.prj' % destination_path , 'w')
+        orig_sr.MorphToESRI()
+        prj_file.write(orig_sr.ExportToWkt())
+        prj_file.close()
             
          
     def _get_index_from_bundle(self, file_format):
@@ -89,7 +125,8 @@ class TileIndexDataset(object):
         # ToDO: Use SQLAlchemy ORM!
         res = meta.Session.execute("""
             SELECT source.location AS location,
-                   datasets.geom AS geom
+                   datasets.geom AS geom,
+                   datasets.id AS dataset_id
               FROM source, datasets,  datasets_sources 
              WHERE source.id = datasets_sources.source_id
                AND datasets.id = datasets_sources.dataset_id  

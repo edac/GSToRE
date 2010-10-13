@@ -85,7 +85,7 @@ class SearchController(BaseController):
         """ 
         if app_id not in APPS:
             abort(404)
-        what = kw.get('what', '')
+        what = kw.get('layer', '')
 
         # Pagination related parameters
         limit = 25
