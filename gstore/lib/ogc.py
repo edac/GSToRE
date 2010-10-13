@@ -408,7 +408,7 @@ END
         (mapfilename, mapcontent) = self.getMapfile()
         wms_request = {}
 
-        params = [ 'REQUEST', 'SERVICE', 'LAYERS', 'SRS', 'BBOX', 'VERSION', 'FORMAT', 'WIDTH', 'HEIGHT', 'EXCEPTIONS', 'MAXEXTENT', 'TRANSPARENT', 'DISPLAYOUTSIDEMAXEXTENT', 'SINGLETILE', 'STYLES', 'EXCEPTIONS']
+        params = [ 'REQUEST', 'SERVICE', 'LAYERS', 'SRS', 'BBOX', 'VERSION', 'FORMAT', 'WIDTH', 'HEIGHT', 'EXCEPTIONS', 'MAXEXTENT', 'TRANSPARENT', 'DISPLAYOUTSIDEMAXEXTENT', 'SINGLETILE', 'STYLES', 'EXCEPTIONS', 'QUERY_LAYERS', 'FEATURE_COUNT','INFO_FORMAT', 'FEATURE_COUNT', 'X', 'Y', 'SERVICENAME']
         # Be ready for clients that switch from UPPER to lower keys in WMS requests
         for param in params:
             if req_params.has_key(param.lower()):
@@ -435,8 +435,6 @@ END
         cmd = """/usr/lib/cgi-bin/mapserv "%s" """ % QUERY_STRING
         res = commands.getstatusoutput(cmd)
 
-        print cmd 
-    
         if res[0] != 0:
             return (None, None)
             
@@ -489,7 +487,7 @@ END
         (mapfilename, mapcontent) = self.getMapfile()
         wfs_request = {}
 
-        params = [ 'BBOX','REQUEST', 'SERVICE', 'TYPENAME', 'VERSION', 'MAXFEATURES', 'TYPENAME', 'VERSION', 'MAXFEATURES', 'OUTPUTFORMAT', 'PROPERTYNAME','SRSNAME','TIME']
+        params = [ 'BBOX','REQUEST', 'SERVICE', 'TYPENAME', 'VERSION', 'MAXFEATURES', 'TYPENAME', 'VERSION', 'MAXFEATURES', 'OUTPUTFORMAT', 'PROPERTYNAME','SRSNAME','TIME', 'QUERY_LAYERS', 'FEATURE_COUNT','INFO_FORMAT', 'FEATURE_COUNT', 'X', 'Y', 'SERVICENAME']
 
         # Be ready for clients that switch from UPPER to lower keys in WMS requests
         for param in params:
