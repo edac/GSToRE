@@ -1,37 +1,68 @@
 Base URL: http://gstore.unm.edu
 
-Datasets /apps/{app_id}/datasets
+    In all requests an application must be specified:
 
-    Spatial discovery:
+    GET /apps/{app_id}/
 
-    GET /apps/{app_id}/datasets.json
+    app_id: (string) Registered GSTORE Application. Example: rgis.
 
-        Parameters:
+Search resources:
 
-            limit: (integer) maximum number of results. Default is 30.
+    GET /apps/{app_id}/search/{resource}.json
+    
+    resource: (string) Available values: datasets, dataset_categories, geolookup.
 
-            order_by: (string) Sorting criterion. Default: geo_relevance.
+    Parameters:
 
-            dir: (string) Sorting direction. Default: desc (descending order).
+        query: (string) Keywords to search within the description of the resource.
 
-            start: (integer) Starting index for result set pagination. Default: 0.
+        sort: (string) Sorting criterion: lastupdate (default), description, 
+                    theme, subtheme, groupname, geo_relevance.  
 
-            end: (integer) Ending index for result set pagination. Default: 30.
+        dir: (string) Sorting direction. Default: desc (descending order).
 
-            county: (string) Name of the county to restrict geographic extent of search.
+        limit: (integer) maximum number of results. Default is 25.
 
-            quad: (integer) Identifier of the USGS Quad to restrict geographic extent of search.
+        offset: (integer) Starting index for result set pagination. Default: 0.
 
-            gnis: (integer) Identifier of the Geographic Names Information System (GNIS) place to restrict extent of search.
+        box: (list of float) Array of coordinates defining a bounding box of the form:
+             S,W,E,N. A valid epsg parameter must be provided. If the EPSG code is 
+            not provided the 4326 is assumed.
 
-            bbox: (list of float) Array of UTM coordinates defining a bounding box of the form: S,W,E,N.
+        epsg: (integer) EPSG projection coordinates code.
 
-            category: (string) Dataset Category name to filter results. 
+    Searchable resources ({resource} variable):
+ 
+    Datasets: 
+
+        GET /apps/{app_id}/search/datasets.json
+
+    Dataset_categories:
+
+        Distinct dataset categories listed as: '{theme} - {subtheme} - {groupname}'
+        
+        GET /apps/{app_id}/search/dataset_categories.json
+
+    Geo-lookups:
+
+        Additional reference vector layers like counties, GNIS, quads, etc.
+        The layer's features must be present in the application's geolookup table.
+
+        GET /apps/{app_id}/search/geolookups.json?layer={layer_name}
+
+        Additional parameters:
+
+            what: Layer name specified by string value. Example:
+
+                GET /apps/rgis/search/geolookups.json?layer=nm_gnis&query=Mesa
+        
+        category: (string) Dataset Category name to filter results. 
+
 
 
 Formats available for download:
 
-    /apps/{app_id}/datasets/{dataset_id}.{format}
+    GET /apps/{app_id}/datasets/{dataset_id}.{format}
 
         dataset_id: (integer) Any valid dataset id.
 
@@ -56,6 +87,33 @@ Formats available for download:
             Raster Datasets: ecw, sid, jpg, etc.
 
             Other: zip or external url redirection.
+
+Features by dataset for vector based datasets:
+
+    /apps/{app_id}/datasets/{dataset_id}/features.{format}
+
+        dataset_id: (integer) Any valid dataset id.
+
+        format: (string) 
+
+            json: GeoJSON
+
+            gml: Geographic Markup Language
+
+            kml: Keyhole Markup Language
+
+        Parameters:
+            gid: (integer) relative id of the feature for 
+                the given dataset.
+ 
+            box: Bounding box (see above definition). 
+        
+            time: Number of seconds after January 1, 1970 00:00:00 GMT. Single timestamp.
+
+            start_time: Number of seconds after January 1, 1970 00:00:00 GMT. Start of time range, see end_time below.
+            
+            end_time: Number of seconds after January 1, 1970 00:00:00 GMT. End of time range, see start_time above.
+        
 
 Metadata 
 

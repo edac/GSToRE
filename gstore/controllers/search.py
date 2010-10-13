@@ -53,7 +53,7 @@ def prepare_box(box, epsg_from, epsg_to):
 
 class SearchController(BaseController):
     
-    def index(self, app_id, what):
+    def index(self, app_id, resource):
         """
         kw  dict:   Usually a copy of request.params.
         app_id string:  Application identifier.
@@ -65,26 +65,44 @@ class SearchController(BaseController):
 
         response.headers['Content-Type'] = 'application/json; charset=utf-8'
 
-        if what == 'datasets':
+        if resource == 'datasets':
             callback = kw.get("callback", None) 
             results = self.search_datasets(app_id, kw)
             if callback:
                 return "%s(%s)" % (callback, json.dumps(results) )
             else:
                 return json.dumps(results)
-        elif what == 'categories':
+        elif resource == 'dataset_categories':
             return json.dumps(self.search_datasets_categories(app_id, kw))
         else:
-            return json.dumps(self.search_geolookups(app_id, what, kw))
+            return json.dumps(self.search_geolookups(app_id, kw))
 
         
-    def search_geolookups(self, app_id, what, kw):
+    def search_geolookups(self, app_id, kw):
         """
         kw  dict:   Usually a copy of request.params.
         app_id string:  Application identifier.
         """ 
         if app_id not in APPS:
             abort(404)
+        what = kw.get('what', '')
+
+        # Pagination related parameters
+        limit = 25
+        offset = 0
+        direction = None
+
+        if kw.has_key('limit'):
+            limit = kw['limit']
+
+        if kw.has_key('offset'):
+            offset = kw['offset']
+
+        if kw.has_key('dir'):
+            if kw['dir'].upper() == 'ASC':
+                direction = 1
+            else:
+                direction = 0
 
         if kw.has_key('query'):
             query = kw['query']
@@ -97,8 +115,8 @@ class SearchController(BaseController):
 
         results = meta.Session.query(GeoLookup.box, GeoLookup.description).\
             filter(GeoLookup.description.ilike('%'+query+'%')).\
-            filter(GeoLookup.what == what).\
-            filter("'%s' = ANY(app_ids)" % app_id).all()
+            filter(GeoLookup.what.ilike(what)).\
+            filter("'%s' = ANY(app_ids)" % app_id).limit(limit).offset(offset).all()
     
         meta.Session.close()
 
@@ -160,7 +178,7 @@ class SearchController(BaseController):
             query = kw['query'].replace('+','%')
 
         # Pagination related parameters
-        limit = 10
+        limit = 25
         offset = 0
         direction = None
 
@@ -193,7 +211,7 @@ class SearchController(BaseController):
         epsg = kw.get('epsg', SRID)
         epsg = int(epsg)
 
-        log.debug(kw.get('box'))
+        #log.debug(kw.get('box'))
         if kw.has_key('box'):
             box = convert_string_box_numeric(kw['box'])
         else:
@@ -214,7 +232,7 @@ class SearchController(BaseController):
         #                contain distinct theme, subtheme and groupnames categories. 
         #                This is applicable to feed tree nodes in the browse search view.
         categories = kw.get('categories', False)
-
+        node = kw.get('node', [])
 
         # We have to assign variables to these categorical fields for being able to 
         # modify them as distinct in the query if the categories = True is passed. 
@@ -254,8 +272,20 @@ class SearchController(BaseController):
             elif len(levels) == 2:
                 cat = D.c.groupname.distinct().label('text')
         elif categories:
-            cat = D.c.theme.distinct().label('text')    
- 
+            node = list(node.split('__|__'))
+            if node[0] != 'root':
+                if len(node) == 1:
+                    filters.append(D.c.theme.ilike(node[0]))
+                    cat = D.c.subtheme.distinct().label('text')
+                elif len(node) == 2:
+                    filters.append(D.c.theme.ilike(node[0]))
+                    filters.append(D.c.subtheme.ilike(node[1]))
+                    cat = D.c.groupname.distinct().label('text') 
+                else:
+                    cat = 'NULL';
+            else:       
+                node = [] 
+                cat = D.c.theme.distinct().label('text')    
         # Target columns
         if cat is None:
             C = [
@@ -268,9 +298,12 @@ class SearchController(BaseController):
                 D.c.taxonomy, 
                 D.c.dateadded
             ]
-            res = meta.Session.query(*C).order_by(orderby)
+            res = meta.Session.query(*C)
             if search_box is not None:
                 res = res.add_column(func.geo_relevance(D.c.geom, search_box).label('geo_relevance'))
+                res = res.order_by('geo_relevance DESC ')
+            # Geo-relevance always has priority in order
+            res = res.order_by(orderby)
         else:
             res = meta.Session.query(cat)
 
@@ -278,18 +311,25 @@ class SearchController(BaseController):
             res = res.filter(f)
     
         res_list = []
-        log.debug('LEVELS %s' % levels) 
+
         # don't limit/offset results when we are looking for distinct categories
         if categories:
-            results = res.all()
-            for category in results:
-                d = {
-                    'text': category.text,
-                    'leaf': False,
-                    'id': '__|__'.join(levels or [category.text])
-                }
-                res_list.append(d)
-            total = len(results)
+            if cat != 'NULL':
+                results = res.all()
+                log.debug(len(node))
+                for category in results:
+                    d = {
+                        'text': category.text,
+                        'leaf': False, 
+                        'id': '__|__'.join(node +  [category.text])
+                    }
+                    if len(node) == 2:
+                        d['cls'] = 'folder'
+                        d['leaf'] = True
+                    res_list.append(d)
+
+            # ExtJS Tree only accepts lists as JSON
+            return res_list            
 
         else:
             total = res.count()
@@ -318,4 +358,4 @@ class SearchController(BaseController):
 
                 res_list.append(d)
 
-        return {'total': total, 'results': res_list}
+            return {'total': total, 'results': res_list}

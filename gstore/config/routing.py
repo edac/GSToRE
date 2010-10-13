@@ -58,7 +58,7 @@ def make_map(config):
         conditions=dict(method=['GET']))
 
     # Search controller
-    map.connect('/apps/{app_id}/search/{what}.json', controller='search', action='index')
+    map.connect('/apps/{app_id}/search/{resource}.json', controller='search', action='index')
 
     # Root controller
     map.connect('/', controller='index', action='index')
