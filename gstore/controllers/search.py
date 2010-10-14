@@ -162,6 +162,7 @@ class SearchController(BaseController):
         kw  dict:   Usually a copy of request.params.
         app_id string:  Application identifier.
         """ 
+
         if app_id not in APPS:
             abort(404)
 
@@ -232,7 +233,7 @@ class SearchController(BaseController):
         #                contain distinct theme, subtheme and groupnames categories. 
         #                This is applicable to feed tree nodes in the browse search view.
         categories = kw.get('categories', False)
-        node = kw.get('node', [])
+        node = kw.get('node', 'root')
 
         # We have to assign variables to these categorical fields for being able to 
         # modify them as distinct in the query if the categories = True is passed. 
