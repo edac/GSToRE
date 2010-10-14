@@ -314,7 +314,20 @@ END
                 'BASE_URL' : self.app_config.get('BASE_URL')
             }
             self.layers = None
-        if self.taxonomy == "geoimage":   
+        if self.taxonomy == "geoimage": 
+            # TODO
+            # Ugly class addition to handle DEM 1-band tiffs. Fix this!
+            if self.basename[-5:] == '__DEM':
+                CLASS = """
+                    CLASS
+                        STYLE
+                            COLORRANGE 0 0 0 255 255 255
+                            DATARANGE -100 3000
+                        END
+                    END
+                    """ 
+            else:
+                CLASS = "" 
             LAYERS = """
             LAYER                                                                                    
                 NAME "%(basename)s"
@@ -344,8 +357,8 @@ END
                 DATA "%(location)s"
                 TYPE raster #*#
                 STATUS off
-                #PROCESSING "BANDS=3,2,1"
                 PROCESSING "DITHER=YES"
+                %(CLASS)s
                 EXTENT %(extent)s
                 DUMP TRUE #*# 
                 CLASS 
@@ -357,6 +370,7 @@ END
                     'epsg': self.projection,
                     'description': self.title,
                     'dateadded': self.dateadded,
+                    'CLASS': CLASS,
                     'title': self.title,
                     'extent' : ' '.join([str(b) for b in self.extent]),
                     'location': self.source,
