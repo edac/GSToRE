@@ -16,7 +16,7 @@ class OGC:
                Object.basename
         """
         self.app_config = app_config
-        self.app_config['BASE_URL'] = 'http://gstore.unm.edu'
+        self.app_config['BASE_URL'] = 'http://gstore.unm.edu/apps/%s' % app_id
         self.source = None
 
         if layers == 'base':
