@@ -28,6 +28,8 @@ import zipfile, tempfile, os, re
 import osgeo.osr as osr
 import osgeo.ogr as ogr
 
+import shutil
+
 log = logging.getLogger(__name__)
 
 SRID = int(config['SRID'])
@@ -117,10 +119,8 @@ class DatasetsController(BaseController):
                 url = src.location
                 if urlparse.urlparse(url).scheme in ['file','']:
                     response.headers['Content-Type'] = 'application/x-zip-compressed'
-                    f = open(url,'r')
-                    content = f.read()
-                    f.close()
-                    return content
+                    with open(url,'r') as f:
+                        shutil.copyfileobj(f, response)
                 else:
                     redirect(url)
         

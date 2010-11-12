@@ -67,7 +67,6 @@ class BinaryGisElement(GisElement, expression.Function):
 
         else:
             self.spatial_reference = None
-            print 'ye'
             self.ogr = ogr.CreateGeometryFromWkb(desc)
 
         self.desc = desc
