@@ -1,3 +1,5 @@
+from __future__ import with_statement
+
 import logging
 import simplejson
 
@@ -119,7 +121,8 @@ class DatasetsController(BaseController):
                 url = src.location
                 if urlparse.urlparse(url).scheme in ['file','']:
                     response.headers['Content-Type'] = 'application/x-zip-compressed'
-                    with open(url,'r') as f:
+                    print url
+                    with open(str(url), 'r') as f:
                         shutil.copyfileobj(f, response)
                 else:
                     redirect(url)
