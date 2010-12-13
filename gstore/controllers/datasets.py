@@ -245,8 +245,8 @@ class DatasetsController(BaseController):
             else: 
                 abort(404)
   
-    def mapper(self, id):
-            
+    def mapper(self, app_id, id):
+
         wms_req_params = 'VERSION=1.1.1&SERVICE=WMS&REQUEST=GetCapabilities'
         wfs_req_params = 'VERSION=1.0.0&SERVICE=WFS&REQUEST=GetCapabilities'
         dataset = load_dataset(id)
@@ -263,10 +263,10 @@ class DatasetsController(BaseController):
             ds = VectorTileIndexDataset(dataset) 
         else:
             ds = None
- 
+
         if ds is None:
             abort(404)
- 
+
         if dataset.taxonomy == 'vector':
             (feature_attributes, grid_columns) = dataset.get_attributes()
         else:
@@ -312,6 +312,7 @@ class DatasetsController(BaseController):
 
         c.Layers = simplejson.dumps(layers)
         c.Description = simplejson.dumps(description)
+        c.AppId = simplejson.dumps(app_id)
         c.rgispage = {'breadcrumb': []}
 
-        return render('mapper.html')     
+        return render('mapper.html')
