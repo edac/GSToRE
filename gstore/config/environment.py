@@ -65,6 +65,6 @@ def load_environment(global_conf, app_conf):
         config['BASE_URL'] = config['BASE_URL_DEMO']
     else:   
         # Not in production yet
-        config['BASE_URL'] = config['BASE_URL_BETA']
+        config['BASE_URL'] = config['BASE_URL_PROD']
 
     return config

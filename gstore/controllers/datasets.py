@@ -281,10 +281,10 @@ class DatasetsController(BaseController):
         }]
         metadata_xml = [{
             'title': 'XML',
-            'text': config.get('BASE_URL') + '/apps/%s/datasets/%(id)s/metadata/%(id)s.xml' %  { 'app_id': app_id, 'id': dataset.id}
+            'text': config.get('BASE_URL') + '/apps/%(app_id)s/datasets/%(id)s/metadata/%(id)s.xml' %  { 'app_id': app_id, 'id': dataset.id}
         },{
             'title': 'TXT',
-            'text': config.get('BASE_URL') + '/apps/%s/datasets/%(id)s/metadata/%(id)s.txt' %  {'app_id': app_id, 'id': dataset.id}
+            'text': config.get('BASE_URL') + '/apps/%(app_id)s/datasets/%(id)s/metadata/%(id)s.txt' %  {'app_id': app_id, 'id': dataset.id}
         },{
             'title': 'HTML',
             'text': config.get('BASE_URL') + '/apps/%(app_id)s/datasets/%(id)s/metadata/%(id)s.html' %  {'app_id': app_id, 'id': dataset.id}
