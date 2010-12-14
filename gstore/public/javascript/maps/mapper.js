@@ -151,7 +151,7 @@ var setToolbar = function() {
 	);
 	toolbar.addControl(
         new OpenLayers.Control.ZoomBox({
-            out: true,
+            //out: true,
             title: 'Zoom out: click in the map or use the left mouse button and drag to create a rectangle'
         }), {
             iconCls: 'zoomout',
@@ -241,16 +241,11 @@ var setToolbar = function() {
 			}
 		);
 
-		mapSearcher.activate();
+		//mapSearcher.activate();
 
 		addSeparator(toolbar);
-		toolbar.add(
-			new Ext.Toolbar.Button({
-				text : 'Attributes',
-				//iconCls: 'x-add-node',
-				id : 'rbtn',
-				tooltip: 'View feature\'s attributes results in the grid below',
-				handler: function (){
+		toolbar.add({
+			handler: function (){
 					var g = Ext.getCmp('searchgrid');
 					if(g.collapsed){
 						g.expand();
@@ -261,14 +256,23 @@ var setToolbar = function() {
 						this.setText('View Attributes');
 						
 					}
-						
-				}
-			})
-		);
+				}, 
+			text : 'Attributes',
+			//iconCls: 'x-add-node',
+			id : 'rbtn',
+			tooltip: 'View feature\'s attributes results in the grid below',
+			toggleGroup: 'map'
+		});
+
 	}
 	else{ 
 		pokieGrid = null;
 	}
+	addSeparator(toolbar);
+	toolbar.add([
+		{xtype : 'tbfill'}, 
+		'Map preview for: <a  "id: '+ Description.id + '"> ' + Description.title + '</a>'
+	]);
 }
 
 
