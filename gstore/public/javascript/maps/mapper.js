@@ -743,6 +743,9 @@ Ext.onReady(function() {
 		map.zoomToExtent(layerExtent);	
 	}
 
+	viewport.doLayout();
+
+
 var switchFormatOnZoom = function() {
     // Map listeners
 
