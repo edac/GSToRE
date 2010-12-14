@@ -496,7 +496,7 @@ Ext.onReady(function() {
     vectorLayer = new OpenLayers.Layer.Vector("vector", {
  	          styleMap: new OpenLayers.StyleMap({
  	              'default': new OpenLayers.Style({
- 	                  'externalGraphic': '../../images/AQUA.png',
+ 	                  'externalGraphic': '/images/AQUA.png',
  	                  'graphicWidth': 20,
  	                  'graphicHeight': 20,
  	                  'graphicYOffset': -20,

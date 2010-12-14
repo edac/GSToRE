@@ -50,7 +50,7 @@ var buildToolbar =  function () {
 			configurable: false
 		});
     toolbar.autoHeight = false;
-    toolbar.height = 25;
+    toolbar.height = 30;
 }
 
 var getGrid = function(){
@@ -489,7 +489,7 @@ Ext.onReady(function() {
     vectorLayer = new OpenLayers.Layer.Vector("vector", {
  	          styleMap: new OpenLayers.StyleMap({
  	              'default': new OpenLayers.Style({
- 	                  'externalGraphic': '../../images/AQUA.png',
+ 	                  'externalGraphic': '/images/AQUA.png',
  	                  'graphicWidth': 20,
  	                  'graphicHeight': 20,
  	                  'graphicYOffset': -20,
@@ -730,8 +730,8 @@ Ext.onReady(function() {
 
 	viewport = new Ext.Viewport({
 		layout: 'border',
-		height: 610,
-		width: 610,
+		height: 600,
+		width: 600,
 		renderTo: 'content',
 		items: viewport_regions 
 	});
@@ -789,6 +789,7 @@ var switchFormatOnZoom = function() {
 }
 
 	switchFormatOnZoom();
+	
 	return 1;
 
 });
