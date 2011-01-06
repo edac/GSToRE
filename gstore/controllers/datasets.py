@@ -39,22 +39,17 @@ MAP_EPSG = int(config['MAP_EPSG'])
 FORMATS_PATH = config.get('FORMATS_PATH', '/tmp')
 
 def ziplist(zipfilename, filelist):
-    def clean_dir(dir, remove_dir = False):
-        if not os.path.isdir(dir):
-            return False
-
-        for file in os.listdir(dir):
-            os.unlink(os.path.join(dir, file))
-        if remove_dir:
-            os.rmdir(dir)
-
     def clean_tempdir(tempdir, remove_dir = False):
         """
         Clean temporary files in the relative 'tempdir' directory.
         """
-        while '/' == tempdir[0]:
-            tempdir = tempdir[1:]
-        clean_dir(tempdir, remove_dir)
+        # Ed 1/6/2011 jbrown:  No long necessarily a relative directory.  This
+        # handles the fact that most things are stored in /tmp/
+
+        #while '/' == tempdir[0]:
+        #    tempdir = tempdir[1:]
+        #clean_dir(tempdir, remove_dir)
+        shutil.rmtree(tempdir)
 
     # filelist: [(path, filename, content = None)]
     tempdir = tempfile.mkdtemp()
