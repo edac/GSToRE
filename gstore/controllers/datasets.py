@@ -17,7 +17,7 @@ from gstore.model import meta
 from gstore.model.tindices import VectorTileIndexDataset, RasterTileIndexDataset
 from gstore.model.rasters import RasterDataset
 from gstore.model.shapes import VectorDataset
-from gstore.model.cached import load_dataset 
+from gstore.model.cached import load_dataset
 from gstore.model.shapes_util import bbox_to_polygon, transform_to, transform_bbox
 
 from gstore.lib.ogc import OGC
@@ -25,7 +25,7 @@ from gstore.lib.tiles import wsgi_tilecache as tilecache
 
 from urllib2 import urlparse
 import simplejson
-import zipfile, tempfile, os, re 
+import zipfile, tempfile, os, re
 
 import osgeo.osr as osr
 import osgeo.ogr as ogr
@@ -50,7 +50,7 @@ def ziplist(zipfilename, filelist):
 
     def clean_tempdir(tempdir, remove_dir = False):
         """
-        Clean temporary files in the relative 'tempdir' directory. 
+        Clean temporary files in the relative 'tempdir' directory.
         """
         while '/' == tempdir[0]:
             tempdir = tempdir[1:]
@@ -114,7 +114,7 @@ class DatasetsController(BaseController):
         dataset = load_dataset(id)
         if format not in dataset.formats:
             abort(404)
-    
+
         if dataset.sources_ref:
             src = dataset.sources_ref[0]
             if format == 'zip' or dataset.taxonomy not in ['geoimage', 'vector']:
@@ -126,7 +126,7 @@ class DatasetsController(BaseController):
                         shutil.copyfileobj(f, response)
                 else:
                     redirect(url)
-        
+
 
         response.headers['Content-Type'] = 'application/x-zip-compressed'
         if format == 'xls':
@@ -142,7 +142,7 @@ class DatasetsController(BaseController):
             response.headers['Content-Disposition'] = 'attachment; filename=%s' % filename
             basepath = os.path.join(FORMATS_PATH, str(dataset.id))
             basepath = os.path.join(basepath, format)
-            filename = os.path.join(basepath, filename) 
+            filename = os.path.join(basepath, filename)
             if not os.path.isfile(filename):
                 vd = VectorDataset(dataset)
                 vd.write_vector_format(format, FORMATS_PATH)
@@ -150,7 +150,7 @@ class DatasetsController(BaseController):
             contents = tf.read()
             tf.close()
             return contents
-  
+
         # url('dataset', id=ID)
 
     def edit(self, id, format='html'):
@@ -162,10 +162,10 @@ class DatasetsController(BaseController):
     def services(self, app_id, id, service_type, service):
         # OGC Bunch
         kargs = self._get_method_args()
-        params = request.params 
+        params = request.params
 
 
-        if service_type == 'ogc': 
+        if service_type == 'ogc':
             if id == 'base':
                 if service == 'wms':
                     myogc = OGC(app_id, config, 'base')
@@ -186,8 +186,8 @@ class DatasetsController(BaseController):
 
                 else:
                     abort(404)
-            
-            elif id.isdigit():       
+
+            elif id.isdigit():
                 dataset = load_dataset(id)
 
                 if dataset is None:
@@ -200,7 +200,7 @@ class DatasetsController(BaseController):
                         if not os.path.isfile(ds.shapefile):
                             ds.write_vector_format('shp', FORMATS_PATH)
                     elif dataset.taxonomy == 'geoimage':
-                        ds = RasterDataset(dataset) 
+                        ds = RasterDataset(dataset)
                     elif dataset.taxonomy == 'rtindex':
                         ds = RasterTileIndexDataset(dataset)
                     elif dataset.taxonomy == 'vtindex':
@@ -242,9 +242,9 @@ class DatasetsController(BaseController):
 
                     else:
                         abort(404)
-            else: 
+            else:
                 abort(404)
-  
+
     def mapper(self, app_id, id):
 
         wms_req_params = 'VERSION=1.1.1&SERVICE=WMS&REQUEST=GetCapabilities'
@@ -256,11 +256,11 @@ class DatasetsController(BaseController):
         elif dataset.taxonomy == 'vector':
             ds = VectorDataset(dataset)
         elif dataset.taxonomy == 'geoimage':
-            ds = RasterDataset(dataset) 
+            ds = RasterDataset(dataset)
         elif dataset.taxonomy == 'rtindex':
-            ds = RasterTileIndexDataset(dataset) 
+            ds = RasterTileIndexDataset(dataset)
         elif dataset.taxonomy == 'vtindex':
-            ds = VectorTileIndexDataset(dataset) 
+            ds = VectorTileIndexDataset(dataset)
         else:
             ds = None
 
@@ -273,11 +273,11 @@ class DatasetsController(BaseController):
             (feature_attributes, grid_columns) = (None, None)
 
         services = [{
-            'title' : 'WMS', 
+            'title' : 'WMS',
             'text' : config.get('BASE_URL') + '/apps/%s/datasets/%s/services/ogc/wms?%s' % (app_id, dataset.id, wms_req_params)
         }, {
-            'text' : config.get('BASE_URL') + '/apps/%s/datasets/%s/services/ogc/wfs?%s' % (app_id, dataset.id, wfs_req_params), 
-            'title':'WFS' 
+            'text' : config.get('BASE_URL') + '/apps/%s/datasets/%s/services/ogc/wfs?%s' % (app_id, dataset.id, wfs_req_params),
+            'title':'WFS'
         }]
         metadata_xml = [{
             'title': 'XML',
@@ -291,23 +291,23 @@ class DatasetsController(BaseController):
         }]
 
         layers = [{
-            'layer' : dataset.basename, 
-            'id' : dataset.id, 
-            'title' : dataset.description , 
-            'feature_attributes' : feature_attributes, 
-            'grid_columns' : grid_columns,  
+            'layer' : dataset.basename,
+            'id' : dataset.id,
+            'title' : dataset.description ,
+            'feature_attributes' : feature_attributes,
+            'grid_columns' : grid_columns,
             #'maxExtent' : dataset.get_extent(SRID)
             'maxExtent': dataset.get_box()
         }]
-        description = { 
-            'what' : 'dataset', 
-            'title' : dataset.description, 
-            'id' : dataset.id , 
-            'singleTile' : False, 
-            'layers' : [dataset.basename], 
+        description = {
+            'what' : 'dataset',
+            'title' : dataset.description,
+            'id' : dataset.id ,
+            'singleTile' : False,
+            'layers' : [dataset.basename],
             'services' : services,
-            'metadata': metadata_xml, 
-            'taxonomy': dataset.taxonomy 
+            'metadata': metadata_xml,
+            'taxonomy': dataset.taxonomy
         }
 
         c.Layers = simplejson.dumps(layers)
