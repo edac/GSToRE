@@ -111,7 +111,9 @@ class DatasetsController(BaseController):
             abort(404)
 
         if dataset.sources_ref:
-            src = dataset.sources_ref[0]
+            for src in dataset.sources_ref:
+                if src.active:
+                    break
             if format == 'zip' or dataset.taxonomy not in ['geoimage', 'vector']:
                 url = src.location
                 if urlparse.urlparse(url).scheme in ['file','']:

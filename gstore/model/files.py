@@ -25,7 +25,8 @@ source_table = Table('source', Base.metadata,
     Column('is_external', Boolean, default = False),
     Column('extension', String(3)),
     Column('zipgroup', String),
-    Column('orig_epsg', Integer)
+    Column('orig_epsg', Integer),
+    Column('active', Boolean)
 )
 
 class FileSource(object):
