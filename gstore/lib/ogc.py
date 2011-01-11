@@ -19,6 +19,7 @@ class OGC:
         #self.app_config['BASE_URL'] = 'http://gstore.unm.edu/apps/%s' % app_id
         #self.app_config['BASE_URL'] = 'http://gstore.unm.edu/apps/%s' % app_id
         self.source = None
+        self.app_id = app_id
 
         if layers == 'base':
             self.basename = 'base'
@@ -188,9 +189,9 @@ MAP
     METADATA
       "wms_srs" "EPSG:4326 EPSG:4269 EPSG:4267 EPSG:26913 EPSG:26912 EPSG:26914 EPSG:26713 EPSG:26712 EPSG:26714"
       "ows_contactposition" "Analyst/Programmer"
-      "WFS_ONLINERESOURCE"  "%(BASE_URL)s/datasets/%(id)s/services/ogc/wfs"
-      "WMS_ONLINERESOURCE"  "%(BASE_URL)s/datasets/%(id)s/services/ogc/wms"
-      "WCS_ONLINERESOURCE"  "%(BASE_URL)s/datasets/%(id)s/services/ogc/wcs" #*#
+      "WFS_ONLINERESOURCE"  "%(BASE_URL)s/apps/%(app_id)s/datasets/%(id)s/services/ogc/wfs"
+      "WMS_ONLINERESOURCE"  "%(BASE_URL)s/apps/%(app_id)s/datasets/%(id)s/services/ogc/wms"
+      "WCS_ONLINERESOURCE"  "%(BASE_URL)s/apps/%(app_id)s/datasets/%(id)s/services/ogc/wcs" #*#
       "WMS_ABSTRACT"    "WMS service for RGIS Dataset(s) %(TITLE)s"
       "ows_stateorprovince" "NM"
       "ows_contactvoicetelephone"   "(505) 277-3622 x239"
@@ -306,7 +307,8 @@ END
                 ) 
             self.mapfile = self.mapfile % { 
                 'LAYERS' : LAYERS, 
-                'TITLE' : self.title, 
+                'TITLE' : self.title,
+                'app_id': self.app_id, 
                 'MAP_EPSG' : self.app_config.get('MAP_EPSG'),
                 'SHAPES_PATH' : self.app_config.get('SHAPES_PATH'),
                 'EXTENT' : ' '.join([str(b) for b in self.extent]),
