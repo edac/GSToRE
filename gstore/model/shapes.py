@@ -4,7 +4,7 @@ from pylons import config
 
 from sqlalchemy import *
 from sqlalchemy.orm import mapper, relation, column_property, synonym
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
 
 from sqlalchemy.dialects.postgresql import ARRAY as ARRAY
 
@@ -690,11 +690,8 @@ def PromoteVectorDataset(sourcepath, dataset, session, load_data = True, **kw):
         if prjfile and not os.path.isfile(prjfile):
             return (2, 'No prj file present')
 
-            
-        pf = open(prjfile, 'r')
-        prj = pf.read()
-        pf.close()
-        dataset.orig_epsg = get_code_from_wkt(prj)
+        dataset.orig_epsg = kw.get('orig_epsg') 
+
         if dataset.orig_epsg == -1:
             return (3, 'Projection not present')
  
