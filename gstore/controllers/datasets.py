@@ -118,9 +118,9 @@ class DatasetsController(BaseController):
                 url = src.location
                 if urlparse.urlparse(url).scheme in ['file','']:
                     response.headers['Content-Type'] = 'application/x-zip-compressed'
-                    print url
                     with open(str(url), 'r') as f:
-                        shutil.copyfileobj(f, response)
+                        shutil.copyfileobj(f, response) 
+                    return
                 else:
                     redirect(url)
 

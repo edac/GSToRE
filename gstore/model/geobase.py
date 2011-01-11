@@ -131,6 +131,10 @@ class Dataset(Base):
         return (attrs, grid_columns)
 
     def get_filename(self, format, compressed = False):
+
+        if format == 'zip':
+            return self.sources_ref[0].location
+
         if compressed:
             if format == 'kml':
                 format = 'kmz'
