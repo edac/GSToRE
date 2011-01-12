@@ -388,6 +388,7 @@ END
                 'MAP_EPSG' : self.app_config.get('MAP_EPSG'),
                 'BASE_URL' : self.app_config.get('BASE_URL'),
                 'SHAPES_PATH' : self.app_config.get('SHAPES_PATH'),
+                 'app_id': self.app_id, 
                 'id' : self.id,
                 'EXTENT' : ' '.join([str(b) for b in self.extent]),
                 'LAYERS' : LAYERS
