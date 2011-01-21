@@ -9,6 +9,8 @@ from pylons.wsgiapp import PylonsApp
 from routes.middleware import RoutesMiddleware
 
 from gstore.config.environment import load_environment
+from gstore.lib.debugging import LoggingMiddleware
+
 
 def make_app(global_conf, full_stack=True, static_files=True, **app_conf):
     """Create a Pylons WSGI application and return it
@@ -65,4 +67,8 @@ def make_app(global_conf, full_stack=True, static_files=True, **app_conf):
         static_app = StaticURLParser(config['pylons.paths']['static_files'])
         app = Cascade([static_app, app])
     app.config = config
+
+    # Debbuging middleware
+    if config.get('MODWSGI_DEBUG'):
+        app = LoggingMiddleware(app, '/tmp/wsgi')
     return app

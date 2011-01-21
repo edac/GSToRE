@@ -6,5 +6,3 @@ from paste.deploy import loadapp
 
 application = loadapp('config:/var/gstore/production.ini')
 
-#added by HB
-sys.stdout = sys.stderr

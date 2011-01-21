@@ -120,26 +120,26 @@ class DatasetsController(BaseController):
                     response.headers['Content-Type'] = 'application/x-zip-compressed'
                     with open(str(url), 'r') as f:
                         shutil.copyfileobj(f, response) 
-                    return
+                    return 
                 else:
                     redirect(url)
 
 
-        response.headers['Content-Type'] = 'application/x-zip-compressed'
         if format == 'xls':
             compressed = False
         else:
             compressed = True
         filename = dataset.get_filename(format, compressed =compressed)
         if dataset.taxonomy != 'vector':
-            response.headers['Content-Disposition'] = 'attachment; filename=%s.zip' % dataset.get_filename(format)
+            response.headers['Content-Type'] = 'application/x-zip-compressed'
+            response.headers['Content-Disposition'] = str('attachment; filename=%s.zip' % dataset.get_filename(format))
             filelist = dataset.clip_zip(format)
             return ziplist(filename, filelist)
         else:
-            response.headers['Content-Disposition'] = 'attachment; filename=%s' % filename
+            response.headers['Content-Disposition'] = str('attachment; filename=%s' % filename)
             basepath = os.path.join(FORMATS_PATH, str(dataset.id))
             basepath = os.path.join(basepath, format)
-            filename = os.path.join(basepath, filename)
+            filename = str(os.path.join(basepath, filename))
             if not os.path.isfile(filename):
                 vd = VectorDataset(dataset)
                 vd.write_vector_format(format, FORMATS_PATH)
