@@ -69,6 +69,6 @@ def make_app(global_conf, full_stack=True, static_files=True, **app_conf):
     app.config = config
 
     # Debbuging middleware
-    if config.get('MODWSGI_DEBUG'):
+    if config.get('MODWSGI_DEBUG') != 'false':
         app = LoggingMiddleware(app, '/tmp/wsgi')
     return app
