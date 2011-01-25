@@ -142,7 +142,7 @@ External Mapping Services:
 
     Google Maps:
 
-        GET http://maps.google.com/maps?q=http://gstore.umn.edu/gstore/apps/{app_id}/datasets/{dataset_id}.kml
+        GET http://maps.google.com/maps?q=http://gstore.umn.edu/apps/{app_id}/datasets/{dataset_id}.kml
 
     Bing Maps (limited to 2Mb files only):
 
