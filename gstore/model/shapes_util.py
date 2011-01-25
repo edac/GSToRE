@@ -33,13 +33,13 @@ def bbox_to_polygon(env):
     return ogr.CreateGeometryFromWkt(wkt)
 
 # Adapted from Ribot's gdaltools.py 
-def transform_bbox(inbbox, s_srs, t_srs) : 
+def transform_bbox(inbbox, s_srs, t_srs): 
     """returns a bbox (array of 4 doubles) transformed from the source srs (s_srs) 
        to the target srs (t_srs). 
     """ 
     bbox = [0.0, 0.0, 0.0, 0.0] 
  
-    if bbox is None or s_srs is None or t_srs is None : 
+    if inbbox is None or s_srs is None or t_srs is None : 
         raise Exception, "Invalid input parameters" 
  
     osrError = 0 

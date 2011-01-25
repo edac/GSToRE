@@ -294,7 +294,7 @@ class DatasetsController(BaseController):
             'feature_attributes' : feature_attributes,
             'grid_columns' : grid_columns,
             #'maxExtent' : dataset.get_extent(SRID)
-            'maxExtent': dataset.get_box()
+            'maxExtent': dataset.get_box(dataset.orig_epsg, SRID)
         }]
         description = {
             'what' : 'dataset',

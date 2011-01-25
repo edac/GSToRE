@@ -15,6 +15,8 @@ from files import Resource, source_table
 
 from osgeo import ogr
 
+from shapes_util import transform_bbox 
+
 Base = declarative_base()
 
 __all__ = ['Dataset', 'Bundle', 'DatasetFootprint', 'spatial_ref_sys']
@@ -100,10 +102,14 @@ class Dataset(Base):
     def get_extent(self, from_epsg = None, to_epsg = None, format='array'):
         return self.geom.ogr.GetEnvelope()
 
-    def get_box(self, from_epsg = None, to_epsg = None, format = 'array'):
-        # self.box is an array of Decimal coming from a PGArray numeric[]
-        return [float(l) for l in self.box]
-            
+    def get_box(self, from_epsg, to_epsg, format = 'array'):
+        # self.box is an array of Decimal coming from a PGArray numeric[] and it is always in geographic projection
+        inbbox = [float(l) for l in self.box]
+        if to_epsg == SRID:
+            return inbbox
+        else:
+            return transform_bbox(inbbox, from_epsg, to_epsg)            
+
     def get_attributes(self):
         # From a JSON serializable list
         attrs = []

@@ -29,7 +29,6 @@ class OGC:
             raise Exception('layers must have at least one layer not ' + str(len(layers)))
         # Any bundle (or just 1 dataset) must have same taxonomy
         self.taxonomy = layers[0].dataset.taxonomy
-        self.extent = layers[0].dataset.box
         self.id = layers[0].dataset.id
         self.map_output_format = """ 
             """
@@ -40,20 +39,22 @@ class OGC:
             self.title = layers[0].dataset.basename 
             self.basename = layers[0].dataset.basename
 
-        if self.taxonomy == 'geoimage':
+        
+        if self.taxonomy == 'vector':
+            self.extent = layers[0].dataset.get_box(-1,int(app_config.get('SRID'))) 
+        elif self.taxonomy == 'geoimage':
             ds = layers[0]
             self.basename = ds.dataset.basename
             self.source = ds.filename
+            if not self.source:
+                raise Exception('geoimage seems to be missing tif file')
             self.projection = ds.dataset.orig_epsg
             self.theme = ds.dataset.theme
             self.subtheme = ds.dataset.subtheme
             self.groupname = ds.dataset.groupname
             self.dateadded = ds.dataset.dateadded
+            self.extent = layers[0].dataset.get_box(int(app_config.get('SRID')), layers[0].dataset.orig_epsg)
             ds = None
-
-        
-            if not self.source and self.taxonomy == 'geoimage':
-                raise Exception('geoimage seems to be missing tif file')
 
         self.layers = layers
         self.mapfile = """
@@ -183,9 +184,9 @@ MAP
   END
 
   WEB
-    IMAGEPATH "/clusterdata/rgis2/tmp/"
-    IMAGEURL "/clusterdata/rgis2/tmp/"
-    TEMPLATE "/clusterdata/rgis2/tmp/client.html"
+    IMAGEPATH "/clusterdata/gstore/tmp/"
+    IMAGEURL "/clusterdata/gstore/tmp/"
+    TEMPLATE "/clusterdata/gstore/tmp/client.html"
     METADATA
       "wms_srs" "EPSG:4326 EPSG:4269 EPSG:4267 EPSG:26913 EPSG:26912 EPSG:26914 EPSG:26713 EPSG:26712 EPSG:26714"
       "ows_contactposition" "Analyst/Programmer"
@@ -231,6 +232,7 @@ END
     PROJECTION
       "init=epsg:4326"
     END
+    PROCESSING "CLOSE_CONNECTION=DEFER"
     METADATA
       "wms_srs" "epsg:4326"
       "layer_title" "%(basename)s"
@@ -336,7 +338,8 @@ END
                 NAME "%(basename)s"
                 PROJECTION
                     "init=epsg:%(epsg)s"
-                END # PROJECTION  
+                END # PROJECTION 
+                PROCESSING "CLOSE_CONNECTION=DEFER" 
                 METADATA 
                     ows_abstract "%(description)s" #wms_abstract
                     ows_keywordlist "%(theme)s %(subtheme)s %(groupname)s" #wms_keywordlist
@@ -406,7 +409,7 @@ END
 
     def getMapfile(self):
         if self.basename == 'base':
-            return ('/clusterdata/rgis2/maps/base/base.map','')
+            return ('/clusterdata/gstore/maps/base/base.map','')
 
         mapFilename = self.app_config.get('MAPS_PATH') + '/%s.map' % self.basename
 
@@ -451,6 +454,7 @@ END
         #print QUERY_STRING 
         
         cmd = """/usr/lib/cgi-bin/mapserv "%s" """ % QUERY_STRING
+        #print cmd
         res = commands.getstatusoutput(cmd)
 
         if res[0] != 0:
