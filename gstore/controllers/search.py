@@ -216,7 +216,6 @@ class SearchController(BaseController):
                  
         start_time = coerce_timestamp(kw.get('start_time'))
         end_time = coerce_timestamp(kw.get('end_time'))
-        print start_time, end_time 
         t_filter = get_time_filter(D.c.dateadded, start_time, end_time) 
 
         if t_filter is not None:
