@@ -195,6 +195,33 @@ class SearchController(BaseController):
             else:
                 direction = 0
 
+        def coerce_timestamp(t):
+            if t is None:
+                return None
+            try:
+                nt = float(t)  
+            except:
+                nt = None
+            return nt
+
+        def get_time_filter(column, start_time, end_time):
+            t_filter = None
+            if start_time is not None and end_time is None:
+                t_filter = column >= func.to_timestamp(start_time)
+            elif start_time is None and end_time is not None:
+                t_filter = column < func.to_timestamp(end_time)
+            elif start_time is not None and end_time is not None and start_time < end_time:
+                t_filter = and_(column >= func.to_timestamp(start_time), column < func.to_timestamp(end_time))
+            return t_filter
+                 
+        start_time = coerce_timestamp(kw.get('start_time'))
+        end_time = coerce_timestamp(kw.get('end_time'))
+        print start_time, end_time 
+        t_filter = get_time_filter(D.c.dateadded, start_time, end_time) 
+
+        if t_filter is not None:
+            filters.append(t_filter)
+
         # Sorting related parameters
         orderby = None
 

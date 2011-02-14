@@ -912,9 +912,8 @@ class VectorDataset(object):
                 values = "{" + ",".join(values) + "}"
                 dest.write('\t'.join([ str(ftr.GetFID()), str(self.dataset.id), geom.ExportToWkb().encode('hex'), values]) + '\n') 
             dest.write('\.\n\nCOMMIT;')
-                       
-
-        dest.close()
+            dest.close()
+            D.Destroy()
 
         return 0                
 
@@ -970,6 +969,7 @@ class VectorDataset(object):
             L.CreateFeature(new_feature)
             new_feature.Destroy()
 
+        meta.Session.expunge_all()
         # Since cached shapefiles are MapServer data sources we create a spatial index, (.qix) file
         if format == 'shp':
             vectorfile.ExecuteSQL('CREATE SPATIAL INDEX ON %s '% self.basename)
@@ -1035,7 +1035,6 @@ class VectorDataset(object):
             os.rmdir(os.path.join(temp_basepath, '%s.csv' % self.basename))
         os.rmdir(temp_basepath)
 
-        meta.Session.close()
  
         return (0, 'Success')
     
@@ -1077,6 +1076,8 @@ class VectorDataset(object):
 
         filename = self.dataset.get_filename('xls')
         wb.save(os.path.join(basepath, filename))
+
+        meta.Session.expunge_all()
 
         return (0, 'Success')
 

@@ -31,6 +31,10 @@ Search resources:
 
         epsg: (integer) EPSG projection coordinates code.
 
+        start_time: (float) Number of seconds before or after January 1, 1970 00:00:00 GMT. Start of creation time range, see end_time below.
+        
+        end_time: (float) Number of seconds before or after January 1, 1970 00:00:00 GMT. End of creation time range, see start_time above.
+
     Searchable resources ({resource} variable):
  
     Datasets: 
@@ -110,9 +114,9 @@ Features by dataset for vector based datasets:
         
             time: Number of seconds after January 1, 1970 00:00:00 GMT. Single timestamp.
 
-            start_time: Number of seconds after January 1, 1970 00:00:00 GMT. Start of time range, see end_time below.
+            start_time: (float) Number of seconds before or after January 1, 1970 00:00:00 GMT. Start of creation time range, see end_time below.
             
-            end_time: Number of seconds after January 1, 1970 00:00:00 GMT. End of time range, see start_time above.
+            end_time: (float) Number of seconds before or after January 1, 1970 00:00:00 GMT. End of creation time range, see start_time above.
         
 
 Metadata 

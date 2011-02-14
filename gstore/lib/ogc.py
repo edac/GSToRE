@@ -241,6 +241,7 @@ END
       "wms_encoding"    "UTF-8"
       "wms_title"   "%(basename)s"
       "gml_include_items" "all"
+      "gml_featureid"         "FID" ## REQUIRED
     END
     STATUS ON
     DATA %(shapefile)s 
