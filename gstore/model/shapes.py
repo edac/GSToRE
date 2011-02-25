@@ -3,16 +3,7 @@ import meta
 from pylons import config
 
 from sqlalchemy import *
-from sqlalchemy.orm import mapper, relation, column_property, synonym
 from sqlalchemy.sql import func, text
-
-from sqlalchemy.dialects.postgresql import ARRAY as ARRAY
-
-from sqlalchemy.ext.declarative import declarative_base
-
-import shapely
-from postgis import GISColumn, Geometry, Spatial
-from geobase import Dataset, spatial_ref_sys
 
 import os
 import re
@@ -29,17 +20,13 @@ from osgeo import ogr
 import zlib
 import zipfile, tempfile
 
-from shapely.wkb import loads
-
-from shapes_util import *
-
-#Base = declarative_base()
-Base = meta.Base
+from geoutils import *
 
 SRID = int(config.get('SRID', 4326))
 FORMATS_PATH = config.get('FORMATS_PATH', '/tmp')
 
-__ALL__ = ['VectorDataset', 'ShapesAttribute', 'CreateVectorDataset']
+__ALL__ = ['VectorDataset', 'ShapesAttribute', 'ShapesVector',
+           'CreateVectorDataset', 'spatial_ref_sys', 'shapes_table', 'shapes_attributes']
 
 def decode_field(str, decoder):
     try: 
@@ -64,49 +51,6 @@ def value_to_string(v):
 
     return None
 
-def clean_string(s):
-    """Strip non printable characters from string."""
-    return re.compile('[%s]' % re.escape(''.join(map(unichr, range(0,32) + range(127,160))))).sub('',s)
-
-def extractall(zipped_file_path, destination_path):
-    """
-    zipped: ZipFile instance
-    destination_path: Distination path in file system. It should exist.
-    """
-    src = open(zipped_file_path, 'rb')
-    zipped = zipfile.ZipFile(src)
-    # extract_all function new in Python 2.6 
-    if hasattr(zipped, 'extract_all'):
-        zipped.extractall(destination_path)
-    else:
-        # Adapted from http://stackoverflow.com/questions/339053/how-do-you-unzip-very-large-files-in-python/339506#339506 
-        for m in zipped.infolist():
-            # Examine the header
-            # print m.filename, m.header_offset, m.compress_size, repr(m.extra), repr(m.comment)
-            src.seek(m.header_offset)
-            src.read(30) # Good to use struct to unpack this.
-            nm = src.read(len(m.filename))
-            if len(m.extra) > 0:
-                ex = src.read(len(m.extra))
-            if len(m.comment) > 0: 
-                cm = src.read(len(m.comment)) 
-
-            # Build a decompression object
-            decomp = zlib.decompressobj(-15)
-
-            # This can be done with a loop reading blocks
-            out = open( os.path.join(destination_path, m.filename), "wb")
-            result = decomp.decompress(src.read(m.compress_size))
-            out.write(result)
-            result = decomp.flush()
-            out.write(result)
-            # end of the loop
-            out.close()
-
-    zipped.close()
-    src.close()
-
-    return 0        
 
 def unzip(file_input_path, output_path = 'tmp'):
 	"""
@@ -187,16 +131,10 @@ def check_ogrtype_value(ogr_type, value):
     else:
         return True
         
-def dbgeomtype_to_ogrwkbformat(dbgeomtype):
+def postgistype_to_ogrwkbformat(postgistype):
     """
-    Map database geometry string types to OGR format types
-    select distinct(geomtype) from datasets;
-      geomtype  
-    ------------
-     LINESTRING
-     POINT
-     POLYGON
-
+    Mapping of Postgis geometry types identifiers 
+     to OGR format types
     """
     types = { 
         'POINT': ogr.wkbPoint,
@@ -213,9 +151,9 @@ def dbgeomtype_to_ogrwkbformat(dbgeomtype):
         '3D POINT': ogr.wkbPoint25D,
         '3D POLYGON': ogr.wkbPolygon25D
     }
-    return types.get(dbgeomtype, ogr.wkbUnknown)
+    return types.get(postgistype, ogr.wkbUnknown)
 
-def ogrwkbformat_to_dbgeomtype(ogrformat):
+def ogrwkbformat_to_postgistype(ogrformat):
     types = {   
         ogr.wkbPoint : 'POINT',
         ogr.wkbLineString: 'LINESTRING',
@@ -224,7 +162,6 @@ def ogrwkbformat_to_dbgeomtype(ogrformat):
         ogr.wkbMultiLineString: 'MULTILINESTRING',
         ogr.wkbMultiPolygon: 'MULTIPOLYGON',
         ogr.wkbGeometryCollection: 'GEOMETRYCOLLECTION',
-        # Collapsing 2D to 3D for now
         ogr.wkbLineString25D: '3D LINESTRING',
         ogr.wkbMultiLineString25D: '3D MULTILINESTRING',
         ogr.wkbMultiPoint25D: '3D MULTIPOINT',
@@ -247,21 +184,30 @@ vector_formats = {
 }
 
 # SQLAlchemy Tables 
+spatial_ref_sys = Table(
+    'spatial_ref_sys', 
+    meta.Base.metadata,
+    Column('srid', Integer, primary_key=True),
+    Column('auth_name', String),    
+    Column('auth_srid', Integer),   
+    Column('srtext', String),
+    Column('proj4text', String)
+) 
 
 shapes_table = Table(
     'shapes',
-    Base.metadata,
+    meta.Base.metadata,
     Column('gid', Integer, primary_key=True),
-    Column('dataset_id', Integer, ForeignKey(Dataset.id)),
+    Column('dataset_id', Integer, ForeignKey('datasets.id')),
     Column('values', String),
     Column('geom', String)
 )
 
 shapes_attributes = Table(
     'features_attributes', 
-    Base.metadata,
+    meta.Base.metadata,
     Column('id', Integer, primary_key = True),
-    Column('dataset_id', Integer, ForeignKey(Dataset.id)),
+    Column('dataset_id', Integer, ForeignKey('datasets.id')),
     Column('name', String),
     Column('array_id', Integer),
     Column('orig_name', String),
@@ -287,21 +233,7 @@ class ShapesAttribute(object):
             fd.SetJustify(self.ogr_justify)
             return fd
             
-mapper(ShapesAttribute, shapes_attributes,
-    properties = {
-        'dataset' : 
-            relation(
-                Dataset,
-                primaryjoin = shapes_attributes.c.dataset_id == Dataset.id,
-#                foreign_keys = [shapes_attributes.c.dataset_id],
-                backref = 'attributes_ref',
-                lazy = True
-            )
-    }
-)
-
-
-class ShapesVector(Spatial):
+class ShapesVector(object):
    
     def get_definitions(self, classname = 'FeatureDefinitions'):
         if classname == 'FeatureDefinitions':
@@ -330,31 +262,6 @@ class ShapesVector(Spatial):
     
         return properties
              
-
-mapper(
-    ShapesVector, 
-    shapes_table, 
-    properties = {
-        #'geom': GISColumn('geom', Geometry(2)),
-        'geom': GISColumn('geom', Geometry()),
-        'dataset': 
-            relation(
-                Dataset,
-                primaryjoin = shapes_table.c.dataset_id == Dataset.id,
-                foreign_keys = [shapes_table.c.dataset_id],
-                backref = 'shapes',
-                lazy = True
-            )
-        ,
-        'properties': 
-            relation(
-                ShapesAttribute, 
-                primaryjoin = shapes_table.c.dataset_id == shapes_attributes.c.dataset_id,
-                foreign_keys = [shapes_attributes.c.dataset_id],
-                lazy = True
-            )
-    }
-)
 
 
 class Feature(object):   
@@ -595,7 +502,6 @@ def ogrfeature_to_shapes(ogrfeature, decoder, properties, attach_properties = Tr
         We could have used the following but it is slow plus we want to 
         recover the exact same string back into its original OGR type, from the string 
         that OGR originally produced.
-        >>> values.append(value_to_string(ogrfeature.GetField(att.array_id - 1)))
     NOTES:
         - Admin client code should provide the right encoding of the DBF file 
         otherwise the data will be saved with garbled or non printable characters.
@@ -603,9 +509,7 @@ def ogrfeature_to_shapes(ogrfeature, decoder, properties, attach_properties = Tr
         is true.
     """
     s = ShapesVector()
-    #s.geom = loads(ogrfeature.GetGeometryRef().ExportToWkb())
     ogr_geom = ogrfeature.GetGeometryRef()
-    #s.geom = ogr_geom.ExportToWkb().encode('hex')
     s.geom = ogr_geom
     s.gid = ogrfeature.GetFID()
 
@@ -773,9 +677,8 @@ def PromoteVectorDataset(sourcepath, dataset, session, load_data = True, **kw):
             
             of.Destroy()
     
-    print dataset.feature_count     
     # Update important dataset attributes
-    dataset.geomtype = ogrwkbformat_to_dbgeomtype(geomtype)
+    dataset.geomtype = ogrwkbformat_to_postgistype(geomtype)
    
     for shp in shapes:
         shp.dataset_id = dataset.id
@@ -802,10 +705,10 @@ def PromoteVectorDataset(sourcepath, dataset, session, load_data = True, **kw):
 class VectorDataset(object):
     is_mappable = True
 
-    def __init__(self, dataset):
+    def __init__(self, dataset, session):
         if dataset.taxonomy != 'vector':
             raise Exception('Dataset not vector compatible')
-    
+        self.Session = session
         self.dataset = dataset
         self.projection = osr.SpatialReference()
         self.projection.SetWellKnownGeogCS('WGS84')
@@ -825,7 +728,7 @@ class VectorDataset(object):
         return self.dataset.geom.wkt
     
     def get_ogr_wkb_format(self):
-        return dbgeomtype_to_ogrwkbformat(self.dataset.geomtype)
+        return postgistype_to_ogrwkbformat(self.dataset.geomtype)
 
     def get_ogr_vector_driver(self, format):
         """
@@ -844,7 +747,7 @@ class VectorDataset(object):
         }
 
     def get_geomtype_from_shapes(self):
-        s = meta.Session.query(shapes_table).filter(shapes_table.c.dataset_id == self.dataset.id).limit(1).first()
+        s = self.session.query(shapes_table).filter(shapes_table.c.dataset_id == self.dataset.id).limit(1).first()
 
         return s.geom.geom_type.upper()
 
@@ -884,7 +787,6 @@ class VectorDataset(object):
             # The source is always a zipped shapefile and is the first entry in the sources_ref list
             temp_basepath =  tempfile.mkdtemp()
             zipped_shapefile = self.dataset.sources_ref[0].location
-            #extractall(zipped_shapefile, temp_basepath)
             unzip(zipped_shapefile, temp_basepath)       
             decoder = get_decoder(encoding)    
     
@@ -944,7 +846,7 @@ class VectorDataset(object):
             temp_filename = temp_basepath
 
         vectorfile = driver.CreateDataSource(str(temp_filename))
-        prj4 = meta.Session.query(spatial_ref_sys.c.proj4text).filter(spatial_ref_sys.c.srid == SRID).first()
+        prj4 = self.Session.query(spatial_ref_sys.c.proj4text).filter(spatial_ref_sys.c.srid == SRID).first()
         spatialReference = osr.SpatialReference()
         spatialReference.SetFromUserInput(str(prj4.proj4text))
 
@@ -954,10 +856,10 @@ class VectorDataset(object):
         for field in fields:
             L.CreateField(field)
         
-        for shape in meta.Session.query(ShapesVector).filter(ShapesVector.dataset_id == self.dataset.id).all():   
+        for shape in self.Session.query(ShapesVector).filter(ShapesVector.dataset_id == self.dataset.id).all():   
             new_feature = ogr.Feature(L.GetLayerDefn())
             if format not in ['csv']:
-                geom = shape.geom.ogr.Clone()
+                geom = ogr.CreateGeometryFromWkb(shape.geom.decode('hex'))
                 new_feature.SetGeometry(geom)
                 geom.Destroy()
             new_feature.SetFID(shape.gid)
@@ -969,7 +871,7 @@ class VectorDataset(object):
             L.CreateFeature(new_feature)
             new_feature.Destroy()
 
-        meta.Session.expunge_all()
+        self.Session.expunge_all()
         # Since cached shapefiles are MapServer data sources we create a spatial index, (.qix) file
         if format == 'shp':
             vectorfile.ExecuteSQL('CREATE SPATIAL INDEX ON %s '% self.basename)
@@ -1053,7 +955,7 @@ class VectorDataset(object):
                 x += 1
 
         y = 1
-        for row in meta.Session.query(shapes_table.c.values).filter(shapes_table.c.dataset_id == self.dataset.id).all():   
+        for row in self.Session.query(shapes_table.c.values).filter(shapes_table.c.dataset_id == self.dataset.id).all():   
             x = 0
             for value in row.values:
                 att = self.properties_ref[x]  
@@ -1077,7 +979,7 @@ class VectorDataset(object):
         filename = self.dataset.get_filename('xls')
         wb.save(os.path.join(basepath, filename))
 
-        meta.Session.expunge_all()
+        self.Session.expunge_all()
 
         return (0, 'Success')
 

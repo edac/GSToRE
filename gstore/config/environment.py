@@ -31,11 +31,10 @@ def load_environment(global_conf, app_conf):
     config['routes.map'] = make_map(config)
     config['pylons.app_globals'] = app_globals.Globals(config)
     config['pylons.h'] = gstore.lib.helpers
-    
+   
     # Setup cache object as early as possible
     import pylons
     pylons.cache._push_object(config['pylons.app_globals'].cache)
-    
 
     # Create the Mako TemplateLookup, with the default auto-escaping
     config['pylons.app_globals'].mako_lookup = TemplateLookup(

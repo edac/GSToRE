@@ -1,20 +1,15 @@
 import meta
 from pylons import config
 
-from sqlalchemy import *
-from sqlalchemy.orm import mapper, relation
-
-from geobase import Dataset, spatial_ref_sys
+from gstore.model import Dataset, spatial_ref_sys
 
 import osgeo.osr as osr
 from osgeo import gdal as gdal
 from osgeo.gdalconst import *
 
-import shapely
-
 import zipfile, tempfile
 
-from shapes_util import transform_bbox, bbox_to_polygon
+from geoutils import transform_bbox, bbox_to_polygon
 
 __all__ = ['RasterDataset']
 
@@ -56,6 +51,8 @@ class RasterDataset(object):
                     spatial_ref_sys.c.proj4text == s.ExportToProj4()).first()
             if auth_srid:
                 srid = auth_srid.auth_srid
+            meta.Session.close()
+
         return srid
     
     def set_srid(self, srid):
@@ -75,7 +72,7 @@ class RasterDataset(object):
         
         http://trac.osgeo.org/gdal/browser/trunk/gdal/apps/gdalinfo.c#L680
         
-        return a Polygon shapely object to mimic DatasetFootprint. See set_envelope
+        return a Polygon geometry to mimic DatasetFootprint. See set_envelope
         """
         (minX, we, r1, maxY, r2, ns) = self.geoimage.GetGeoTransform()
         xsize = self.geoimage.RasterXSize

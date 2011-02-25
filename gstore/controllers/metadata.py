@@ -4,7 +4,6 @@ from pylons import config, request, response, session, tmpl_context as c
 from pylons.controllers.util import abort, redirect
 
 from gstore.lib.base import BaseController, render
-from gstore.model.cached import load_dataset
 from lxml import etree
 
 log = logging.getLogger(__name__)
@@ -51,7 +50,7 @@ class MetadataController(BaseController):
     def show(self, dataset_id, id, format='html'):
         """GET /metadata/id: Show a specific item"""
 
-        d = load_dataset(dataset_id)
+        d = self.load_dataset(dataset_id)
         if d and d.metadata_xml:
             if format == 'txt':
                 content_type = 'text'

@@ -3,7 +3,7 @@ from pylons import config
 
 from sqlalchemy import *
 
-from geobase import Dataset, spatial_ref_sys
+from gstore.model import Dataset, spatial_ref_sys
 
 import os
 import osgeo.osr as osr
@@ -14,7 +14,7 @@ from osgeo.gdalconst import *
 
 import zipfile, tempfile
 
-from shapes_util import transform_bbox, bbox_to_polygon, reproject_geom
+from geoutils import transform_bbox, bbox_to_polygon, reproject_geom
 
 __all__ = ['RasterDataset']
 

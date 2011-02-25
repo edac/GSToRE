@@ -7,23 +7,23 @@ from sqlalchemy.sql import func
 
 from gstore.lib.base import BaseController, render
 
-from gstore.model.shapes import ShapesVector
 from gstore.model import meta
-from gstore.model.shapes_util import *
-from gstore.model.geobase import Dataset
-from gstore.model.cached import load_dataset
-from gstore.model.postgis import Spatial
+from gstore.model.geoutils import *
+from gstore.model import Dataset, ShapesVector
 
 import osgeo.ogr as ogr
 import osgeo.osr as osr
 
-import simplejson
+import json
+import shutil
+
+try:
+    from cStringIO import StringIO
+except:
+    from StringIO import StringIO
 
 SRID = int(config['SRID'])
 log = logging.getLogger(__name__)
-
-class Marker(Spatial):
-    pass
 
 class FeaturesController(BaseController):
     """REST Controller styled on the Atom Publishing Protocol"""
@@ -45,7 +45,7 @@ class FeaturesController(BaseController):
         limit = request.params.get('limit')
         offset = request.params.get('offset', 0)
 
-        d = load_dataset(dataset_id)
+        d = self.load_dataset(dataset_id)
 
         if bbox:
             bbox = map(float, bbox.split(','))
@@ -71,42 +71,58 @@ class FeaturesController(BaseController):
             search_point = func.GeomFromText(point.ExportToWkt())
             query = query.filter(func.st_dwithin(ShapesVector.geom, search_point, tolerance))                    
 
+        # User defined limit
         if limit and limit.isdigit():
             limit = int(limit)
-            if limit > 30:
-                limit = 30
+            query = query.limit(limit)
         else:
+            # Set initial row count limit for streaming
             limit = 30
 
         total = query.count()
 
-        query = query.limit(limit).offset(offset)
-        query = query.add_column(func.astext(func.centroid(ShapesVector.geom)))
-        results = query.all()
-    
-        response.headers['Content-Type'] = 'application/json'
-        meta.Session.close()
-
-        if results is None:
-            return ''
-        else:
+        query = query.offset(offset)
+        query = query.add_column(func.asewkt(ShapesVector.geom))
+   
+        if total:
+            response.headers['Content-Type'] = 'application/json'
             features = []
-            M = Marker()
+            def stream_geojson():
+                row_chunk_size = limit 
+                newoffset = offset
+                i = 1
+                yield """{'totalRecords': %s, 'type': 'FeatureCollection', 'features': [""" % total
+                while newoffset < total:
+                    avg_sizes = []
+                    for result in query.offset(newoffset).limit(row_chunk_size):
+                        vector = result[0]
+                        geom_wkt = result[1]
+                        properties = {}
+                        g = ogr.CreateGeometryFromWkt(geom_wkt)
+                        if epsg and epsg != SRID:
+                            transform_to(g, SRID, epsg)
 
-            for result in results:
-                vector = result[0]
-                centroid_wkt = result[1]
-                properties = {}
-                g = ogr.CreateGeometryFromWkt(centroid_wkt)
-                if epsg and epsg != SRID:
-                    transform_to(g, SRID, epsg)
+                        for att in d.attributes_ref:
+                            properties[att.name] = vector.values[att.array_id-1]
+                        if i == total:
+                            st = "%s"
+                        else:
+                            st = "%s, "                          
+                        gj =  st % json.dumps(to_geojson(g.ExportToWkt(), properties = properties))
+                        i += 1
+                        avg_sizes.append(len(gj))
+                        yield gj
 
-                for att in d.attributes_ref:
-                    properties[att.name] = vector.values[att.array_id-1]
-                    
-                features.append(M.to_geojson(geom = g, properties = properties))
-        
-            return simplejson.dumps({'totalRecords': total, 'type': 'FeatureCollection', 'features': features })
+                    newoffset += row_chunk_size
+                    max_batch_size = min(avg_sizes) * row_chunk_size
+                    if max_batch_size < 100000:
+                        row_chunk_size = int(100000.0/min(avg_sizes))
+                yield "]}"
+
+            return stream_geojson()
+
+        else:
+            return
 
     def create(self):
         """POST /datasets/features: Create a new item"""

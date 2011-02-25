@@ -5,19 +5,15 @@ import re
 
 from pylons import request, response, config
 from pylons.controllers.util import abort
-from pylons.decorators.cache import beaker_cache
+from pylons.decorators import jsonify
 
 from sqlalchemy import select, func, and_
 
 from gstore.lib.base import BaseController
 from gstore.model import meta
-from gstore.model.geobase import Dataset, GeoLookup
-from gstore.model.shapes_util import transform_bbox, bbox_to_polygon
+from gstore.model import Dataset, GeoLookup
+from gstore.model.geoutils import transform_bbox, bbox_to_polygon
 
-try:
-    import json
-except:
-    import simplejson as json
 
 log = logging.getLogger(__name__)
 
@@ -52,7 +48,8 @@ def prepare_box(box, epsg_from, epsg_to):
     return bbox
 
 class SearchController(BaseController):
-    
+   
+    @jsonify 
     def index(self, app_id, resource):
         """
         kw  dict:   Usually a copy of request.params.
@@ -66,17 +63,12 @@ class SearchController(BaseController):
         response.headers['Content-Type'] = 'application/json; charset=utf-8'
 
         if resource == 'datasets':
-            callback = kw.get("callback", None) 
-            results = self.search_datasets(app_id, kw)
-            if callback:
-                return "%s(%s)" % (callback, json.dumps(results) )
-            else:
-                return json.dumps(results)
+            total, results = self.search_datasets(app_id, kw)
+            return dict(total = total, results =results)
         elif resource == 'dataset_categories':
-            return json.dumps(self.search_datasets_categories(app_id, kw))
+            return self.search_datasets_categories(app_id, kw)
         else:
-            return json.dumps(self.search_geolookups(app_id, kw))
-
+            return self.search_geolookups(app_id, kw)
         
     def search_geolookups(self, app_id, kw):
         """
@@ -116,10 +108,8 @@ class SearchController(BaseController):
         results = meta.Session.query(GeoLookup.box, GeoLookup.description).\
             filter(GeoLookup.description.ilike('%'+query+'%')).\
             filter(GeoLookup.what.ilike(what)).\
-            filter("'%s' = ANY(app_ids)" % app_id).limit(limit).offset(offset).all()
+            filter("'%s' = ANY(app_ids)" % app_id).limit(limit).offset(offset)
     
-        meta.Session.close()
-
         return dict(results = [{'text': r.description, 'box': prepare_box(r.box, SRID, epsg)} for r in results ])
 
 
@@ -142,21 +132,17 @@ class SearchController(BaseController):
         if query == '':
             return json.dumps(dict(results = empty))
 
-        th = Dataset.__table__.c.theme
-        st = Dataset.__table__.c.subtheme
-        gn = Dataset.__table__.c.groupname
+        th = Dataset.theme
+        st = Dataset.subtheme
+        gn = Dataset.groupname
         
         cat = (th + ' - ' + st + ' - ' + gn).label('category') 
-        results = meta.Session.query(cat).filter(Dataset.__table__.c.inactive == False).\
+        results = meta.Session.query(cat).filter(Dataset.inactive == False).\
             filter("'%s' = ANY(apps_cache)" % app_id).\
-            filter((th + st + gn).ilike('%'+query+'%')).distinct().all()
-        meta.Session.close()
+            filter((th + st + gn).ilike('%'+query+'%')).distinct()
     
-        return dict(results = empty + [{'text': r.category } for r in results ])
+        return dict(results = empty + [{'text': r.category } for r in results])
 
-
-    # this cache needs to be done by query parameter
-    #@beaker_cache(expire=3600)
     def search_datasets(self, app_id, kw):
         """
         kw  dict:   Usually a copy of request.params.
@@ -169,8 +155,7 @@ class SearchController(BaseController):
         res_list = []
         filters = []
 
-        # Let's query the table directly
-        D = Dataset.__table__
+        D = Dataset
 
         # Simple keyword query search
         query = ''
@@ -216,7 +201,7 @@ class SearchController(BaseController):
                  
         start_time = coerce_timestamp(kw.get('start_time'))
         end_time = coerce_timestamp(kw.get('end_time'))
-        t_filter = get_time_filter(D.c.dateadded, start_time, end_time) 
+        t_filter = get_time_filter(D.dateadded, start_time, end_time) 
 
         if t_filter is not None:
             filters.append(t_filter)
@@ -232,7 +217,7 @@ class SearchController(BaseController):
             else:
                 o = kw['sort']
             if o in ['description', 'theme', 'subtheme', 'groupname', 'dateadded']:
-                orderby = getattr(D.c, o)
+                orderby = getattr(D, o)
 
         # Spatial query parameters
         epsg = kw.get('epsg', SRID)
@@ -253,7 +238,7 @@ class SearchController(BaseController):
             search_box = func.GeomFromText(box.ExportToWkt())
             search_box = func.setsrid(search_box, -1)
 
-            filters.append(func.intersects(D.c.geom, search_box))
+            filters.append(func.intersects(D.geom, search_box))
 
         #categories bool: Flag to indicate whether the dictionary result should only 
         #                contain distinct theme, subtheme and groupnames categories. 
@@ -263,76 +248,84 @@ class SearchController(BaseController):
 
         # We have to assign variables to these categorical fields for being able to 
         # modify them as distinct in the query if the categories = True is passed. 
-        theme = D.c.theme   
-        subtheme = D.c.subtheme
-        groupname = D.c.groupname
+        theme = D.theme   
+        subtheme = D.subtheme
+        groupname = D.groupname
 
         filters.append("'%s' = ANY(apps_cache)" % app_id)
 
         if orderby is not None:
             if direction:
-                orderby = orderby.asc()
+                orderby_nongeo = orderby.asc()
             else:
-                orderby = orderby.desc()
+                orderby_nongeo = orderby.desc()
         else:
-            orderby = D.c.dateadded.desc()
+            orderby_nongeo = D.dateadded.desc()
 
         if query:
-            filters.append(D.c.description.ilike('%'+query+'%'))
+            filters.append(D.description.ilike('%'+query+'%'))
    
         # Filling up tree node with categories, applying distinct
         levels = [] 
         if kw.has_key('theme') and kw['theme']:
             levels.append(kw['theme'])
-            filters.append(D.c.theme.ilike(levels[0]))
+            filters.append(D.theme.ilike(levels[0]))
             if kw.has_key('subtheme') and kw['subtheme']:
                 levels.append(kw['subtheme'])
-                filters.append(D.c.subtheme.ilike(levels[1]))
+                filters.append(D.subtheme.ilike(levels[1]))
                 if kw.has_key('groupname') and kw['groupname']:
                     levels.append(kw['groupname'])
-                    filters.append(D.c.groupname.ilike(levels[2]))
+                    filters.append(D.groupname.ilike(levels[2]))
 
         cat = None
         if levels and categories:
             if len(levels) == 1:
-                cat = D.c.subtheme.distinct().label('text')
+                cat = D.subtheme.distinct().label('text')
             elif len(levels) == 2:
-                cat = D.c.groupname.distinct().label('text')
+                cat = D.groupname.distinct().label('text')
         elif categories:
             node = list(node.split('__|__'))
             if node[0] != 'root':
                 if len(node) == 1:
-                    filters.append(D.c.theme.ilike(node[0]))
-                    cat = D.c.subtheme.distinct().label('text')
+                    filters.append(D.theme.ilike(node[0]))
+                    cat = D.subtheme.distinct().label('text')
                 elif len(node) == 2:
-                    filters.append(D.c.theme.ilike(node[0]))
-                    filters.append(D.c.subtheme.ilike(node[1]))
-                    cat = D.c.groupname.distinct().label('text') 
+                    filters.append(D.theme.ilike(node[0]))
+                    filters.append(D.subtheme.ilike(node[1]))
+                    cat = D.groupname.distinct().label('text') 
                 else:
                     cat = 'NULL';
             else:       
                 node = [] 
-                cat = D.c.theme.distinct().label('text')    
+                cat = D.theme.distinct().label('text')    
         # Target columns
         if cat is None:
             C = [
-                D.c.id, 
-                D.c.description,
-                D.c.theme, D.c.subtheme, D.c.groupname, 
-                D.c.box, 
-                D.c.has_metadata_cache.label('has_metadata'), 
-                D.c.formats_cache.label('formats'), 
-                D.c.taxonomy, 
-                D.c.dateadded
+                D.id, 
+                D.description,
+                D.theme, D.subtheme, D.groupname, 
+                D.box, 
+                D.has_metadata_cache.label('has_metadata'), 
+                D.formats.label('formats'), 
+                D.taxonomy, 
+                D.dateadded
             ]
             res = meta.Session.query(*C)
+    
             if search_box is not None:
-                res = res.add_column(func.geo_relevance(D.c.geom, search_box).label('geo_relevance'))
-                res = res.order_by('geo_relevance DESC ')
-            # Geo-relevance always has priority in order
-            res = res.order_by(orderby)
+                res = res.add_column(func.geo_relevance(D.geom, search_box).label('geo_relevance'))
+                if orderby is not None:
+                    res = res.order_by(orderby_nongeo)
+                    res = res.order_by('geo_relevance DESC ')
+                else:
+                    res = res.order_by('geo_relevance DESC ')
+                    # Geo-relevance has priority in order
+                    res = res.order_by(orderby_nongeo)
+            else:
+                res = res.order_by(orderby_nongeo)
+                
         else:
-            res = meta.Session.query(cat)
+            res = meta.Session.query(cat).order_by('text ASC')
 
         for f in filters:
             res = res.filter(f)
@@ -342,9 +335,7 @@ class SearchController(BaseController):
         # don't limit/offset results when we are looking for distinct categories
         if categories:
             if cat != 'NULL':
-                results = res.all()
-                log.debug(len(node))
-                for category in results:
+                for category in res:
                     d = {
                         'text': category.text,
                         'leaf': False, 
@@ -356,17 +347,17 @@ class SearchController(BaseController):
                     res_list.append(d)
 
             # ExtJS Tree only accepts lists as JSON
-            return res_list            
+            return None, res_list            
 
         else:
             total = res.count()
-            results = res.limit(limit).offset(offset).all()
-            for dataset in results:
+            res = res.limit(limit).offset(offset)
+            for dataset in res:
                 if search_box is not None:
                     geo_relevance = dataset.geo_relevance
                 else:
                     geo_relevance = 0
-                d = { 
+                res_list.append({ 
                     'text': dataset.description, 
                     'categories': '__|__'.join([dataset.theme, dataset.subtheme, dataset.groupname]),
                     'config': { 
@@ -381,8 +372,6 @@ class SearchController(BaseController):
                     'lastupdate': dataset.dateadded.strftime('%d%m%D')[4:],
                     'id': dataset.id,
                     'gr': float(geo_relevance)
-                }
+                })
 
-                res_list.append(d)
-
-            return {'total': total, 'results': res_list}
+            return total, res_list

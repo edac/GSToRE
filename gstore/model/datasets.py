@@ -1,106 +1,75 @@
-import os
 import meta
 
 from sqlalchemy import *
-from sqlalchemy.orm import mapper, relation, backref, column_property
-from sqlalchemy.sql import or_
-from sqlalchemy.ext.declarative import declarative_base
 
-from pylons import config, cache
+from pylons import config
 
 from BeautifulSoup import BeautifulStoneSoup
 
-from postgis import GISColumn, Geometry, Spatial
-from files import Resource, source_table
+from geoutils import transform_bbox 
 
-from osgeo import ogr
 
-from shapes_util import transform_bbox 
-
-Base = declarative_base()
-
-__all__ = ['Dataset', 'Bundle', 'DatasetFootprint', 'spatial_ref_sys']
+__all__ = ['datasets_table', 'Dataset', 'bundles_table', 'Bundle', 'geolookups_table', 'GeoLookup', \
+            'mapfile_templates_table', 'SpatialReference', 'MapfileTemplate']
 
 
 SRID = int(config.get('SRID', 4326))
 
 FORMATS_PATH = config.get('FORMATS_PATH', '/tmp')
 
-spatial_ref_sys = Table('spatial_ref_sys', Base.metadata,
-    Column('srid', Integer, primary_key=True),
-    Column('auth_name', String),    
-    Column('auth_srid', Integer),   
-    Column('srtext', String),
-    Column('proj4text', String)
-) 
     
-mapfile_template = Table('mapfile_template', Base.metadata, 
+mapfile_templates_table = Table('mapfile_template', meta.Base.metadata, 
     Column('id', Integer, primary_key=True),
     Column('description', String),
     Column('taxonomy', String),
     Column('xml', String)
 )
 
-class Dataset(Base):
+datasets_table = Table('datasets', meta.Base.metadata, 
+    Column('id', Integer, primary_key=True),
+    Column('description', String),
+    Column('taxonomy', String),
+    Column('feature_count', Integer),
+    Column('abstract', String),
+    Column('dateadded', TIMESTAMP, default="now()"),
+    Column('basename', String),
+    Column('theme', String),
+    Column('subtheme', String),
+    Column('groupname', String),
+    Column('old_idnum', Integer),
+    Column('box', String),
+    Column('orig_epsg', String),
+    Column('geom', String),
+    Column('geomtype', String),
+    Column('formats_cache', String),
+    Column('inactive', Boolean, default=False),
+    Column('metadata_xml', Text),
+    Column('mapfile_template_id', Integer, ForeignKey('mapfile_template.id')),
+    Column('has_metadata_cache', Boolean),
+    Column('apps_cache', String),
+    Column('bundle_id', Integer, ForeignKey('bundles.id'))
+)
+
+class SpatialReference(object):
+    pass
+ 
+class MapfileTemplate(object):
+    pass
+
+class Dataset(object):
     """
-        Column     |            Type             |                       Modifiers                       
-    ---------------+-----------------------------+-------------------------------------------------------
-     id            | integer                     | not null default nextval('datasets_id_seq'::regclass)
-     extent        | character varying(75)       | 
-     description   | character varying(200)      | 
-     taxonomy      | character varying(50)       | not null default 'vector'::character varying
-     feature_count | integer                     | 
-     abstract      | text                        | 
-     dateadded     | timestamp without time zone | not null default now()
-     metadata_xml  | text                     | 
-     basename      | character varying(100)      | 
-     old_idnum     | integer                     | 
-     geom          | geometry                    | 
     """
-    __tablename__ = 'datasets'
-    id = Column(Integer, primary_key=True)
-    description = Column(String)
-    extent = Column(String)
-    taxonomy = Column(String)
-    feature_count = Column(Integer)
-    abstract = Column(String)
-    dateadded = Column(TIMESTAMP, default="now()")
-    basename = Column(String)
-    theme = Column(String)
-    subtheme = Column(String)
-    groupname = Column(String)
-    old_idnum = Column(Integer)
-    #geom = Column('geom', Geometry(config['SRID']))
-    geom = GISColumn(Geometry(2))
-    orig_epsg = Column(Integer)
-    geomtype = Column(String)
-    box = Column(String)
-    formats = Column('formats_cache',String)
-    inactive = Column(Boolean, default=False)
-    metadata_xml = Column('metadata_xml', Text)
-    mapfile_template_id = Column(Integer, ForeignKey('mapfile_template.id'))
-    bundles_ref = relation('Bundle', secondary = Table('datasets_bundles', Base.metadata, 
-                                Column('dataset_id', Integer, ForeignKey('datasets.id')),
-                                Column('bundle_id', Integer, ForeignKey('bundles.id'))
-                                ), lazy = True, backref = backref('datasets', order_by=id))
-    sources_ref = relation(Resource, secondary = Table('datasets_sources', Base.metadata,
-                                Column('source_id', Integer, ForeignKey(Resource.id)),
-                                Column('dataset_id', Integer, ForeignKey('datasets.id'))
-                                ), lazy = False, backref = backref('datasets'))
-    has_metadata_cache = Column(Boolean)
-    apps_cache = Column(String)
-    bundle_id = Column(Integer, ForeignKey('bundles.id')) 
 
     def __init__(self, basename, metadata_xml = None):
         self.basename = basename
         if metadata_xml:
             self.metadata_xml = metadata_xml
 
+    def __unicode__(self):
+        return self.__repr__()
+
     def __repr__(self):
         return "<Dataset(%s, %s)>" % (self.taxonomy, self.basename)
-
-    def get_extent(self, from_epsg = None, to_epsg = None, format='array'):
-        return self.geom.ogr.GetEnvelope()
 
     def get_box(self, from_epsg, to_epsg, format = 'array'):
         # self.box is an array of Decimal coming from a PGArray numeric[] and it is always in geographic projection
@@ -164,28 +133,6 @@ class Dataset(Base):
 
         return filelist
 
-    def update_attributes_from_metadata(self, xml = None):
-        if xml is None:
-            if self.metadata_xml:
-                xml = self.metadata_xml
-        if xml:
-            soup = BeautifulStoneSoup(xml)
-            attrs = soup.findAll('attr')
-            met_attrs = {}
-            for att in attrs:
-                label = att.find('attrlabl')
-                description = att.find('attrdef')
-                if label and description:
-                    label = label.contents
-                    description = description.contents
-                    if label and description:
-                        description = description[0].replace('\r\n','')
-                        met_attrs[label[0]] = description
-            if self.attributes_ref:
-                for attr in self.attributes_ref:
-                    if attr.orig_name in met_attrs.keys():
-                        attr.description = met_attrs[attr.orig_name]   
- 
     def get_formats(self):
         formats = {}
         for source in self.sources_ref:
@@ -255,20 +202,31 @@ class Dataset(Base):
         return tools
                 
 
-#- end of Dataset(Base)
+#- end of Dataset(object)
+bundles_table = Table('bundles', meta.Base.metadata,  
+    Column('id', Integer, primary_key=True),
+    Column('description', String),
+    Column('type', String),
+    Column('long_description', Text),
+    Column('parent_id', Integer)
+)
 
-class Bundle(Base):
-    __tablename__ = 'bundles'
-    id = Column(Integer, primary_key=True)
-    description = Column(String)
-    type = Column(String)
-    long_description = Column(Text)
-    parent_id = Column(Integer)
-#    datasets = relation('Dataset', secondary = Table('datasets_bundles', Base.metadata,        
-#                                Column('dataset_id', Integer, ForeignKey('datasets.id')),
-#                                Column('bundle_id', Integer, ForeignKey('bundles.id'))
-#                                ) , backref = backref('bundles_ref', order_by=id), lazy= False)
-        
+class Bundle(object):
+    """
+          Column      |          Type          |                      Modifiers                       
+    ------------------+------------------------+------------------------------------------------------
+     id               | integer                | not null default nextval('bundles_id_seq'::regclass)
+     description      | character varying(200) | 
+     long_description | text                   | 
+     type             | character varying(50)  | not null default 'other'::character varying
+     parent_id        | integer                | 
+    Indexes:
+        "bundles_pkey" PRIMARY KEY, btree (id)
+        "bundle_description_type" UNIQUE, btree (description, type)
+    Check constraints:
+        "valid_bundle_type" CHECK (type::text = ANY (ARRAY['app'::character varying, 'edac_defined'::character varying, 'user_defined'::character varying, 'cart'::character varying, 'vtindex'::character varying, 'rtindex'::character varying]::text[]))
+
+    """        
     def __init__(self, description, type, long_description, parent_id):
         self.description = description
         self.type = type
@@ -278,10 +236,19 @@ class Bundle(Base):
     def __repr__(self):
         return "<Bundle('%s','%s')>" % (self.description, self.type)
 
+geolookups_table = Table('geolookups', meta.Base.metadata, 
+    Column('id', Integer, primary_key = True),
+    Column('description', String),
+    Column('box', String),
+    Column('geom', String),
+    Column('box_geom', String),
+    Column('extra_attributes', String),
+    Column('what', String),
+    Column('app_ids', String)
+) 
 
-class GeoLookup(Base):
+class GeoLookup(object):
     """
-    geolookups;
           Column      |        Type         |                        Modifiers                         
     ------------------+---------------------+----------------------------------------------------------
      gid              | integer             | not null default nextval('geolookups_gid_seq'::regclass)
@@ -293,13 +260,4 @@ class GeoLookup(Base):
      what             | character varying   | 
      app_ids          | character varying[] | 
     """
-    __tablename__ = 'geolookups'
-
-    id = Column(Integer, primary_key=True)
-    description = Column(String)
-    box = Column(String)
-    geom = GISColumn(Geometry(2))
-    box_geom = GISColumn(Geometry(2))
-    extra_attributes = Column(String)
-    what = Column(String)
-    app_ids = Column(String)
+    pass

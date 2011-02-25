@@ -1,24 +1,18 @@
-# Copyright (c) 2010 University of New Mexico - Earth Data Analysis Center
-# Author: Renzo Sanchez-Silva renzo@edac.unm.edu
-# See LICENSE.txt for details.
-
 import os
 import new
 import meta
 from pylons import config
 
 from sqlalchemy import *
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import mapper, relation, backref, synonym
 
 import zipfile, tempfile
 
 from urlparse import urlparse
 
-#Base = declarative_base()
-Base = meta.Base
 
-source_table = Table('source', Base.metadata,
+__all__ = ['Resource', 'sources_table', 'datasets_sources_table'] 
+
+sources_table = Table('source', meta.Base.metadata,
     Column('id', Integer, primary_key=True),
     Column('location', String),
     Column('type', String, default = 'file'),
@@ -28,6 +22,12 @@ source_table = Table('source', Base.metadata,
     Column('orig_epsg', Integer),
     Column('active', Boolean)
 )
+
+datasets_sources_table = Table('datasets_sources', meta.Base.metadata,
+    Column('source_id', Integer, ForeignKey('source.id')),
+    Column('dataset_id', Integer, ForeignKey('datasets.id'))
+)
+
 
 class FileSource(object):
     def __init__(self, location, zipgroup = None):
@@ -72,13 +72,5 @@ class FileSource(object):
 
 Resource = new.classobj('Resource', (FileSource,), {})    
     
-mapper(
-    Resource,
-    source_table,
-    properties = {
-        'location': synonym('_url', map_column = True)
-    } 
-)
-
 
 

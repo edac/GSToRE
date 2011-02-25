@@ -9,7 +9,7 @@ from pylons import config
 from pylons.templating import render_mako as render
 from pylons.decorators import jsonify
 
-from gstore.lib.base import BaseController, BaseController
+from gstore.lib.base import BaseController
 
 from sqlalchemy.sql import func
 
@@ -17,8 +17,7 @@ from gstore.model import meta
 from gstore.model.tindices import VectorTileIndexDataset, RasterTileIndexDataset
 from gstore.model.rasters import RasterDataset
 from gstore.model.shapes import VectorDataset
-from gstore.model.cached import load_dataset
-from gstore.model.shapes_util import bbox_to_polygon, transform_to, transform_bbox
+from gstore.model.geoutils import bbox_to_polygon, transform_to, transform_bbox
 
 from gstore.lib.ogc import OGC
 from gstore.lib.tiles import wsgi_tilecache as tilecache
@@ -31,6 +30,7 @@ import osgeo.osr as osr
 import osgeo.ogr as ogr
 
 import shutil
+
 
 log = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ class DatasetsController(BaseController):
 
     def show(self, app_id, id, format='html'):
         """GET /apps/app_id:/datasets/id: Show a specific item"""
-        dataset = load_dataset(id)
+        dataset = self.load_dataset(id)
         if format not in dataset.formats:
             abort(404)
 
@@ -141,7 +141,7 @@ class DatasetsController(BaseController):
             basepath = os.path.join(basepath, format)
             filename = str(os.path.join(basepath, filename))
             if not os.path.isfile(filename):
-                vd = VectorDataset(dataset)
+                vd = VectorDataset(dataset, meta.Session)
                 vd.write_vector_format(format, FORMATS_PATH)
             tf = open(filename, 'r')
             contents = tf.read()
@@ -185,7 +185,7 @@ class DatasetsController(BaseController):
                     abort(404)
 
             elif id.isdigit():
-                dataset = load_dataset(id)
+                dataset = self.load_dataset(id)
 
                 if dataset is None:
                     abort(404)
@@ -193,7 +193,7 @@ class DatasetsController(BaseController):
                     if dataset is None:
                         abort(404)
                     elif dataset.taxonomy == 'vector':
-                        ds = VectorDataset(dataset)
+                        ds = VectorDataset(dataset, meta.Session)
                         if not os.path.isfile(ds.shapefile):
                             ds.write_vector_format('shp', FORMATS_PATH)
                     elif dataset.taxonomy == 'geoimage':
@@ -246,12 +246,12 @@ class DatasetsController(BaseController):
 
         wms_req_params = 'VERSION=1.1.1&SERVICE=WMS&REQUEST=GetCapabilities'
         wfs_req_params = 'VERSION=1.0.0&SERVICE=WFS&REQUEST=GetCapabilities'
-        dataset = load_dataset(id)
+        dataset = self.load_dataset(id)
 
         if dataset is None:
             abort(404)
         elif dataset.taxonomy == 'vector':
-            ds = VectorDataset(dataset)
+            ds = VectorDataset(dataset, meta.Session)
         elif dataset.taxonomy == 'geoimage':
             ds = RasterDataset(dataset)
         elif dataset.taxonomy == 'rtindex':
@@ -293,7 +293,6 @@ class DatasetsController(BaseController):
             'title' : dataset.description ,
             'feature_attributes' : feature_attributes,
             'grid_columns' : grid_columns,
-            #'maxExtent' : dataset.get_extent(SRID)
             'maxExtent': dataset.get_box(dataset.orig_epsg, SRID)
         }]
         description = {
