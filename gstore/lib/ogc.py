@@ -211,7 +211,7 @@ MAP
       "ows_keywordlist" "RGIS, New Mexico"
       "ows_ACCESSCONSTRAINTS"   "none"
       "ows_addresstype" "Mailing address"
-      "wms_server_version"  "1.1.1"
+      "wms_server_version"  "1.3.0"
       "ows_city"    "Albuquerque"
       "ows_title"   "RGIS Dataset"
       "wcs_label" "imagery_wcs_%(basename)s" #*#
@@ -430,7 +430,7 @@ END
         (mapfilename, mapcontent) = self.getMapfile()
         wms_request = {}
 
-        params = [ 'REQUEST', 'SERVICE', 'LAYERS', 'SRS', 'BBOX', 'VERSION', 'FORMAT', 'WIDTH', 'HEIGHT', 'EXCEPTIONS', 'MAXEXTENT', 'TRANSPARENT', 'DISPLAYOUTSIDEMAXEXTENT', 'SINGLETILE', 'STYLES', 'EXCEPTIONS', 'QUERY_LAYERS', 'FEATURE_COUNT','INFO_FORMAT', 'FEATURE_COUNT', 'X', 'Y', 'SERVICENAME']
+        params = [ 'REQUEST', 'SERVICE', 'LAYERS', 'CRS', 'SRS', 'BBOX', 'VERSION', 'FORMAT', 'WIDTH', 'HEIGHT', 'EXCEPTIONS', 'MAXEXTENT', 'TRANSPARENT', 'DISPLAYOUTSIDEMAXEXTENT', 'SINGLETILE', 'STYLES', 'EXCEPTIONS', 'QUERY_LAYERS', 'FEATURE_COUNT','INFO_FORMAT', 'FEATURE_COUNT', 'X', 'Y', 'SERVICENAME']
         # Be ready for clients that switch from UPPER to lower keys in WMS requests
         for param in params:
             if req_params.has_key(param.lower()):
@@ -476,7 +476,7 @@ END
         (mapfilename, mapcontent) = self.getMapfile()
         wcs_request = {}
 
-        params = ['SERVICE', 'VERSION', 'REQUEST', 'COVERAGE', 'CRS', 'BBOX', 'TIME', 'WIDTH', 'HEIGHT', 'RESX', 'RESY', 'FORMAT', 'RESPONSE_CRS', 'IDENTIFIER', 'BOUNDINGBOX', 'GRIDBASECRS', 'GRIDCS', 'GridType', 'GridOrigin', 'GridOffsets', 'RangeSubset']
+        params = ['SERVICE', 'VERSION', 'REQUEST', 'COVERAGE', 'SRS', 'CRS', 'BBOX', 'TIME', 'WIDTH', 'HEIGHT', 'RESX', 'RESY', 'FORMAT', 'RESPONSE_CRS', 'IDENTIFIER', 'BOUNDINGBOX', 'GRIDBASECRS', 'GRIDCS', 'GridType', 'GridOrigin', 'GridOffsets', 'RangeSubset']
 
         # Be ready for clients that switch from UPPER to lower keys in WMS requests
         for param in params:
@@ -510,7 +510,7 @@ END
         (mapfilename, mapcontent) = self.getMapfile()
         wfs_request = {}
 
-        params = [ 'BBOX','REQUEST', 'SERVICE', 'TYPENAME', 'VERSION', 'MAXFEATURES', 'TYPENAME', 'VERSION', 'MAXFEATURES', 'OUTPUTFORMAT', 'PROPERTYNAME','SRSNAME','TIME', 'QUERY_LAYERS', 'FEATURE_COUNT','INFO_FORMAT', 'FEATURE_COUNT', 'X', 'Y', 'SERVICENAME']
+        params = [ 'BBOX','REQUEST', 'SERVICE', 'TYPENAME', 'VERSION', 'MAXFEATURES', 'TYPENAME', 'VERSION', 'MAXFEATURES', 'OUTPUTFORMAT', 'PROPERTYNAME','SRSNAME','TIME', 'QUERY_LAYERS', 'FEATURE_COUNT','INFO_FORMAT', 'FEATURE_COUNT', 'X', 'Y', 'SERVICENAME', 'SRS', 'CRS']
 
         # Be ready for clients that switch from UPPER to lower keys in WMS requests
         for param in params:
