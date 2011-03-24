@@ -11,6 +11,7 @@ from gstore import model
 
 
 class BaseController(WSGIController):
+    streaming_mode = False
     def __call__(self, environ, start_response):
         """Invoke the Controller"""
         # WSGIController.__call__ dispatches to the Controller method
@@ -19,15 +20,5 @@ class BaseController(WSGIController):
         try:
             return WSGIController.__call__(self, environ, start_response)
         finally:
-            model.meta.Session.close()
-
-    def load_dataset(self, dataset_id):
-        @app_globals.cache.region('short_term','datasetsbyid')
-        def fetch_dataset(dataset_id):
-            dataset = model.meta.Session.query(model.Dataset).get(dataset_id)
-            if dataset.taxonomy == 'vector':
-                assert(len(dataset.attributes_ref) > 0)
-            return dataset
-
-        return fetch_dataset(dataset_id)
-
+            if not self.streaming_mode:
+                model.meta.Session.close()

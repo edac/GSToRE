@@ -29,6 +29,14 @@ Search resources:
              S,W,E,N. A valid epsg parameter must be provided. If the EPSG code is 
             not provided the 4326 is assumed.
 
+        or:
+            lat: (float) Latitude in the specified projection.
+
+            lon: (float) Latitude in the specified projection.
+            
+            tolerance: (float) Geographic (EPSG:4326) distance in meters specifying the 
+                diameter within features will intersect. Default is 1000 meters.
+
         epsg: (integer) EPSG projection coordinates code.
 
         start_time: (float) Number of seconds before or after January 1, 1970 00:00:00 GMT. 
@@ -104,9 +112,11 @@ Features by dataset for vector based datasets:
 
             json: GeoJSON
 
+            kml: Keyhole Markup Language
+
             gml: Geographic Markup Language
 
-            kml: Keyhole Markup Language
+            csv: Comma separated values (no geometries included)
 
         Parameters:
             gid: (integer) relative id of the feature for 
@@ -121,14 +131,34 @@ Features by dataset for vector based datasets:
             
             end_time: (float) Number of seconds before or after January 1, 1970 00:00:00 GMT. 
                        End of creation time range, see start_time above.
-        
+
+* Features extracted from any dataset or list of datasets:       
+ 
+    /apps/{app_id}/features.{format}
+
+        Same as features by datasets with the following additional 
+
+        Parameters:
+            dataset_ids: comma delimited string of integers representing valid datasets.
+                        If this is not provided the search will be global, on all vector
+                        datasets. If limit parameter is provided then the count will limit the 
+                        specified value per each dataset.                
+
+            strip_collection_markup: (any)  Strips all root tags in XML based formats     
+                    and key values for GeoJSON together with the commas separating features.
+                    Each line is a feature in its native format.    
+                    Useful for processing large data streams.
+
+* This request requires sufficient storage capacity and may take a long period of time to complete.
+Make sure you limit the number of results in case you are using a web or GIS desktop client to avoid 
+memory overflow problems.
 
 Metadata 
 
     /apps/{app_id}/datasets/{dataset_id}/metadata/{dataset_id}.{format}
         format: (string) xml, txt, htm
 
-Javascript Client Mapper:
+JavaScript Client Mapper:
 
     /apps/{app_id}/datasets/{dataset_id}/mapper
 

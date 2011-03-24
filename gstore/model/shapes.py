@@ -4,6 +4,7 @@ from pylons import config
 
 from sqlalchemy import *
 from sqlalchemy.sql import func, text
+from hstore import HStore, HStoreColumn
 
 import os
 import re
@@ -24,6 +25,7 @@ from geoutils import *
 
 SRID = int(config.get('SRID', 4326))
 FORMATS_PATH = config.get('FORMATS_PATH', '/tmp')
+YIELD_PER_ROWS = int(config.get('YIELD_PER_ROWS', 100))
 
 __ALL__ = ['VectorDataset', 'ShapesAttribute', 'ShapesVector',
            'CreateVectorDataset', 'spatial_ref_sys', 'shapes_table', 'shapes_attributes']
@@ -198,9 +200,10 @@ shapes_table = Table(
     'shapes',
     meta.Base.metadata,
     Column('gid', Integer, primary_key=True),
-    Column('dataset_id', Integer, ForeignKey('datasets.id')),
-    Column('values', String),
-    Column('geom', String)
+    Column('dataset_id', Integer, ForeignKey('datasets.id'), primary_key=True),
+    HStoreColumn('values', HStore()),
+    Column('geom', String),
+    Column('time', TIMESTAMP)
 )
 
 shapes_attributes = Table(
@@ -253,38 +256,7 @@ class ShapesVector(object):
         elif classname == 'ogr.LayerDefn':
             return self.get_definitions(classname = 'ogr.FeatureDefn')
 
-         
-    def get_json_properties(self):
-        properties = []
-        if self.values:
-            for c in self.get_definitions():
-                properties.append({c.name: self.values[c.array_id-1]})
-    
-        return properties
              
-
-
-class Feature(object):   
-    """ Shapely interface"""
-    def __init__(self, gid, geom={}, properties = None , dataset_id = None):
-        """The geom *must* provide the geometry geo interface."""
-        self.gid = gid
-        self.geom = geom
-        if dataset_id:
-            self.dataset_id = dataset_id
-        if properties:
-            self.properties = properties
-    
-    @property
-    def __geo_interface__(self):
-        return {'type': 'Feature', 'gid': self.gid, 'properties': self.properties, 'geometry': self.geom}
-
-
-class FeatureCollection(list):
-    @property
-    def __geo_interface__(self):    
-       return {'type': 'FeatureCollection', 'features': self} 
-
 
 class FeatureDefinition(object):
     """
@@ -433,12 +405,6 @@ class FeatureDefinitions(object):
         return len(self.container)    
 
 
-def shapes_to_feature(shape_vector):
-    if isinstance(shape_vector, ShapesVector):
-        return Feature(shape_vector.gid,shape_vector.geom.__geo_interface__, shape_vector.get_json_properties())
-    else:
-        raise Exception('Argument not a ShapeVector instance')
-
 def shapes_to_ogrfeature(shape_vector, set_geom = True):
     """
     shape_vector: ShapesVector instance
@@ -455,40 +421,11 @@ def shapes_to_ogrfeature(shape_vector, set_geom = True):
         for field in fields:
             new_feature.SetField(field.GetName(), shape.values[i])
 
+        return new_feature
+
     else:
         raise Exception('Argument not a ShapeVector instance')
 
-    
-    
-def feature_to_shapes(feature, feature_definitions, attach_properties = False):
-    """
-    feature: Feature instance. Must contain id. Dataset_id may not be included but 
-            must be set later. 
-    feature_definitions: instance of FeatureDefinitions
-    """
-    if not isinstance(feature, Feature):
-        raise Exception('feature argument not a Feature instance')
-    else:
-        array_values = [ None for i in feature_definitions]
-        s = ShapesVector()
-        for pdict in feature.properties:
-            key, value = pdict.items()[0]
-            if check_ogrtype_value(feature_definitions[key].get('ogr_type'), value):
-                colmeta = feature_definitions.get(key)
-                array_values[colmeta.get('array_id')-1] = value_to_string(value)
-
-                if attach_attributes:
-                    s.properties = feature_definitions
-            else:
-                raise Exception('Value incompatible with OGR type.')
-        s.values = array_values
-        s.geom = shapely.geometry.asShape(feature.geom)
-        if attach_properties:
-            for f in feature_definitions:
-                s.properties.append(f.get_ref(ShapesAttributes))
-        
-        
-        return s
             
 def ogrfeature_to_shapes(ogrfeature, decoder, properties, attach_properties = True):
     """
@@ -509,55 +446,23 @@ def ogrfeature_to_shapes(ogrfeature, decoder, properties, attach_properties = Tr
         is true.
     """
     s = ShapesVector()
-    ogr_geom = ogrfeature.GetGeometryRef()
-    s.geom = ogr_geom
+    s.geom = ogrfeature.GetGeometryRef().ExportToWkb().encode('hex')
     s.gid = ogrfeature.GetFID()
 
-
-    s.values = []
+    s.values = {}
  
     for att in properties:
         str = ogrfeature.GetFieldAsString(att.array_id - 1)
-        s.values.append(decode_field(str, decoder))
+        #s.values[att.name] = decode_field(str, decoder)
+        s.values[att.name] = str 
 
     if attach_properties:
         s.properties.extend(properties)
 
     return s
 
-def ogrfeature_to_feature(ogrfeature):
-    gid = ogrfeature.GetFID()
-    geom = ogrfeature.GetGeometryRef().ExportToJson()
-    properties = []
-    for i in range(ogrfeature.GetFieldCount()):
-        properties.append({ogrfeature.GetFieldDefnRef(i).GetName(): ogrfeature.GetField(i)})
-    return Feature(gid, geom, properties)
 
-class ShapesVectorCollection():
-    def __init__(self, features=[]):
-        """The features *must* provide the geometry geo interface."""
-        self.features = features
-    @property
-    def __geo_interface__(self):
-        return {'type': 'FeatureCollection', 'features': self.features}
-
-    def __init__(self, contexts):
-        for d in contexts:
-            try:
-                self.contexts.add(shapely.geometry.asShape(d))
-            except ValueError:
-                raise Exception('Context does not provide geo interface')
-    
-        
-class ShapesVectorGroup(object):
-    def __init__(self, vectors):
-        for vector in vectors:
-            if not isinstance(vector, ShapesVector):
-                raise Exception('Found not a ShapesVector type in collection.')
-
-
-    
-def PromoteVectorDataset(sourcepath, dataset, session, load_data = True, **kw):
+def PromoteVectorDatasetFromShapefile(sourcepath, dataset, session, load_data = True, **kw):
     # Open source as read only
     filename = str(sourcepath) # filename may be unicode string
     datasource = ogr.Open(filename)
@@ -654,9 +559,9 @@ def PromoteVectorDataset(sourcepath, dataset, session, load_data = True, **kw):
     # (minX, minY, maxX, maxY) = bbox
     bbox = (env[0], env[2], env[1], env[3])
     if orig_sr is not None:
-        dataset.geom = bbox_to_polygon(transform_bbox(bbox, dataset.orig_epsg, SRID))
+        dataset.geom = bbox_to_polygon(transform_bbox(bbox, dataset.orig_epsg, SRID)).ExportToWkb().encode('hex')
     else:
-        dataset.geom = bbox_to_polygon(bbox)
+        dataset.geom = bbox_to_polygon(bbox).ExportToWkb().encode('hex')
     
     # Map features
     shapes = []
@@ -698,7 +603,152 @@ def PromoteVectorDataset(sourcepath, dataset, session, load_data = True, **kw):
         session.expunge(shp)
     for prp in properties:
         session.expunge(prp)
-    #session.expire(dataset)
+    session.remove()
+
+    return (0, '')
+    
+def PromoteVectorDatasetFromKml(sourcepath, dataset, session, load_data = True, **kw):
+    # Open source as read only
+    filename = str(sourcepath) # filename may be unicode string
+    datasource = ogr.Open(filename)
+    if not datasource:
+        return (1, 'Not a valid OGR data source')
+
+    L = datasource.GetLayer(0)
+
+    session.begin(subtransactions = True, nested = True)
+
+    # The rule here is to set basename to lowercase
+    if not kw.get('basename'):
+        basename = L.GetName().lower()
+    else:
+        basename = kw.get('basename')
+
+    if kw.has_key('basename'):
+        dataset.basename = kw['basename']
+    else:
+        dataset.basename = basename
+
+    # Proj file
+    if kw.has_key('orig_epsg'):
+        dataset.orig_epsg = kw.get('orig_epsg')
+    else:
+        # get it from the prj file that must be there
+        prjfile = None
+        if os.path.isdir(filename):
+            (o, prjfile) = commands.getstatusoutput("find %s -name '*.prj'" % filename)
+        else:
+            # Try basename.shp -> basename.prj
+            prjfile = filename.split('.shp')[0] + '.prj'
+             
+        if prjfile and not os.path.isfile(prjfile):
+            return (2, 'No prj file present')
+
+        dataset.orig_epsg = kw.get('orig_epsg') 
+
+        if dataset.orig_epsg == -1:
+            return (3, 'Projection not present')
+ 
+    decoder = get_decoder(kw.get('encoding'))    
+
+    # Check database constraints here, if you add dataset to the 
+    # session without respecting these it will rollback.
+    dataset.taxonomy = 'vector'
+    dataset.theme = kw.get('theme')
+    dataset.subtheme = kw.get('subtheme')
+    dataset.groupname = kw.get('groupname')
+    formats = kw.get('formats').split(',')
+    if kw.has_key('formats'):
+        dataset.formats = kw.get('formats')
+    else:
+        for format in vector_formats.keys(): 
+            if format not in formats:
+                formats.append(format)
+        dataset.formats = ','.join(formats)
+    dataset.metadata_xml = kw.get('metadata_xml')
+
+    dataset.mapfile_template_id = kw.get('mapfile_template_id')
+
+    # Map field definitions
+    dataset.feature_count = L.GetFeatureCount()
+
+    if dataset.feature_count == 0:
+        return (4, 'No features in shapefile')
+
+    # Assemble the dataset.shapes.properties or, the same, dataset.attributes_ref.
+    FD = FeatureDefinitions([])
+    FD.reset_from(L.GetLayerDefn())
+
+    properties = []
+    
+    for fd in FD:
+        sa = ShapesAttribute()
+        fd.reset_for(sa)
+        properties.append(sa)
+    if len(properties) == 0:
+        return (2, 'No valid attributes')
+
+    # See if we need to reproject. We always store in geographic projection
+    sr = osr.SpatialReference()
+    sr.SetWellKnownGeogCS('WGS84')
+
+    if dataset.orig_epsg != SRID:
+        orig_sr = osr.SpatialReference()
+        orig_sr.ImportFromEPSG(dataset.orig_epsg)
+    else:
+        orig_sr = None
+
+    # Update footprint
+    # MinX, MaxX, MinY, MaxY  OGREnvelope
+    env = L.GetExtent()
+    # (minX, minY, maxX, maxY) = bbox
+    bbox = (env[0], env[2], env[1], env[3])
+    if orig_sr is not None:
+        dataset.geom = bbox_to_polygon(transform_bbox(bbox, dataset.orig_epsg, SRID)).ExportToWkb().encode('hex')
+    else:
+        dataset.geom = bbox_to_polygon(bbox).ExportToWkb().encode('hex')
+    
+    # Map features
+    shapes = []
+    geomtype = L.GetLayerDefn().GetGeomType()
+    if load_data:
+        for i in range(dataset.feature_count):
+            of = L.GetFeature(i)
+            if orig_sr is not None:
+                nf = of.Clone()
+                geom = nf.GetGeometryRef()
+                if reproject_geom(geom, orig_sr, sr):
+                    raise Exception('Can not reproject geometry to WGS84')
+                shapes.append(ogrfeature_to_shapes(nf, decoder, properties))
+                nf.Destroy()
+            else:
+                geom = of.GetGeometryRef()
+                shapes.append(ogrfeature_to_shapes(of, decoder, properties))
+            
+            of.Destroy()
+    
+    # Update important dataset attributes
+    dataset.geomtype = ogrwkbformat_to_postgistype(geomtype)
+   
+    for shp in shapes:
+        shp.dataset_id = dataset.id
+        session.add(shp)
+    for prp in properties:
+        prp.dataset_id = dataset.id
+        session.add(prp)
+ 
+    dataset.shapes = shapes
+    dataset.attributes_ref = properties
+
+    datasource.Destroy()
+
+    session.commit()
+    session.expunge(dataset)
+    for shp in shapes:
+        session.expunge(shp)
+    for prp in properties:
+        session.expunge(prp)
+    session.remove()
 
     return (0, '')
  
@@ -746,13 +796,6 @@ class VectorDataset(object):
             'id' : self.dataset.id,
         }
 
-    def get_geomtype_from_shapes(self):
-        s = self.session.query(shapes_table).filter(shapes_table.c.dataset_id == self.dataset.id).limit(1).first()
-
-        return s.geom.geom_type.upper()
-
-    def get_extent_from_shapes(self):
-        return "SELECT ST_SetSRID(ST_Extent(geom), %s) from shapes where dataset_id = %s" % (SRID, self.dataset.id)
 
     def get_fields(self, format):
         """Create vector file fields iterating over Dataset.attributes_ref """
@@ -778,12 +821,24 @@ class VectorDataset(object):
                 - database, for iterating over the Shapes table keyed by self.dataset.id
         """
         dest = open(destination_filename, 'w')
+        dest.write('BEGIN;\n')
+        dest.write('COPY shapes (gid, dataset_id, geom, values) FROM stdin; \n')
 
         if source == 'database':
-            pass
+            for shape in self.dataset.shapes.yield_per(YIELD_PER_ROWS):
+                values = []
+                for att in self.properties_ref:
+                    value = '"' + shape.values[att.name] + '"'
+                    if not value:
+                        value = 'NULL'
+                    values.append(value)
+                values = "{" + ",".join(values) + "}"
+                dest.write('\t'.join([ str(shape.gid), str(self.dataset.id), shape.geom, values]) + '\n') 
+
         elif source == 'cached':    
             pass
         elif source == 'source':
+
             # The source is always a zipped shapefile and is the first entry in the sources_ref list
             temp_basepath =  tempfile.mkdtemp()
             zipped_shapefile = self.dataset.sources_ref[0].location
@@ -794,10 +849,6 @@ class VectorDataset(object):
             L = D.GetLayerByIndex(0)
             S = L.GetSpatialRef()
             dataset_fields = self.get_fields('sql')
-
-            
-            dest.write('BEGIN;\n')
-            dest.write('COPY shapes (gid, dataset_id, geom, values) FROM stdin; \n')
 
             for i in range(0, L.GetFeatureCount()):
                 ftr = L.GetNextFeature()
@@ -813,9 +864,10 @@ class VectorDataset(object):
                     values.append(value)
                 values = "{" + ",".join(values) + "}"
                 dest.write('\t'.join([ str(ftr.GetFID()), str(self.dataset.id), geom.ExportToWkb().encode('hex'), values]) + '\n') 
-            dest.write('\.\n\nCOMMIT;')
-            dest.close()
             D.Destroy()
+
+        dest.write('\.\n\nCOMMIT;')
+        dest.close()
 
         return 0                
 
@@ -856,7 +908,7 @@ class VectorDataset(object):
         for field in fields:
             L.CreateField(field)
         
-        for shape in self.Session.query(ShapesVector).filter(ShapesVector.dataset_id == self.dataset.id).all():   
+        for shape in self.dataset.shapes: 
             new_feature = ogr.Feature(L.GetLayerDefn())
             if format not in ['csv']:
                 geom = ogr.CreateGeometryFromWkb(shape.geom.decode('hex'))
@@ -955,7 +1007,7 @@ class VectorDataset(object):
                 x += 1
 
         y = 1
-        for row in self.Session.query(shapes_table.c.values).filter(shapes_table.c.dataset_id == self.dataset.id).all():   
+        for row in self.dataset.shapes.values(ShapesVector.values):   
             x = 0
             for value in row.values:
                 att = self.properties_ref[x]  

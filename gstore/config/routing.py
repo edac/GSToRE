@@ -36,14 +36,28 @@ def make_map(config):
     map.resource('metadata', 'metadata',
         path_prefix = '/apps/:app_id/datasets/:dataset_id',
         name_prefix = 'metadata_')
+
+    # list all metadata records
+    map.connect('/apps/{app_id}/metadata.{format}', controller = 'metadata', action = 'index')
+
+    # synch all metadata records in the webdav folder
+    map.connect('/metadata/synch_webdav', controller = 'metadata', action = 'metadata_synch_webdav')   
+    
+    map.connect('/apps/{app_id}/features.{format}', controller = 'features_bundle', action = 'index', dataset_id = None) 
     # Dataset-vector features resource
     map.resource('feature', 'features',
+        controller = 'features_bundle',
         path_prefix = '/apps/:app_id/datasets/:dataset_id',
         name_prefix = 'feature_')
-        #parent_resource = dict(member_name='dataset', collection_name='datasets'))
+
 
     # Dataset categories
     map.connect('datasets/categories', controller='datasets', action='categories')
+
+    # Vector fields schema if any
+    map.connect('/apps/{app_id}/datasets/{id}/schema.{format}', 
+        controller = 'datasets', action = 'schema', 
+        conditions=dict(method=['GET']))
 
     # Dataset-services
     map.connect('/apps/{app_id}/datasets/{id}/services/{service_type}/{service}',
@@ -60,6 +74,7 @@ def make_map(config):
         conditions=dict(method=['GET']))
 
     # Search controller
+    map.connect('/apps/{app_id}/search/datasets.json', controller='search', action='search_datasets')
     map.connect('/apps/{app_id}/search/{resource}.json', controller='search', action='index')
 
     # Root controller

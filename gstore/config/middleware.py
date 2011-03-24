@@ -10,7 +10,6 @@ from routes.middleware import RoutesMiddleware
 from gstore.config.environment import load_environment
 from gstore.lib.debugging import LoggingMiddleware
 
-
 def make_app(global_conf, full_stack=True, static_files=True, **app_conf):
     """Create a Pylons WSGI application and return it
 
@@ -57,7 +56,7 @@ def make_app(global_conf, full_stack=True, static_files=True, **app_conf):
             app = StatusCodeRedirect(app, [400, 401, 403, 404, 500])
 
     # Establish the Registry for this application
-    app = RegistryManager(app)
+    app = RegistryManager(app, global_conf)
 
     if asbool(static_files):
         # Serve static files

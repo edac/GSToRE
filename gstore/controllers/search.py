@@ -14,6 +14,9 @@ from gstore.model import meta
 from gstore.model import Dataset, GeoLookup
 from gstore.model.geoutils import transform_bbox, bbox_to_polygon
 
+from cStringIO import StringIO
+
+import json
 
 log = logging.getLogger(__name__)
 
@@ -48,8 +51,8 @@ def prepare_box(box, epsg_from, epsg_to):
     return bbox
 
 class SearchController(BaseController):
-   
-    @jsonify 
+    streaming_mode = True
+ 
     def index(self, app_id, resource):
         """
         kw  dict:   Usually a copy of request.params.
@@ -136,14 +139,14 @@ class SearchController(BaseController):
         st = Dataset.subtheme
         gn = Dataset.groupname
         
-        cat = (th + ' - ' + st + ' - ' + gn).label('category') 
-        results = meta.Session.query(cat).filter(Dataset.inactive == False).\
+        results = meta.Session.query(Dataset).filter(Dataset.inactive == False).\
             filter("'%s' = ANY(apps_cache)" % app_id).\
-            filter((th + st + gn).ilike('%'+query+'%')).distinct()
+            filter((th + st + gn).ilike('%'+query+'%')).distinct().\
+            values(th, st, gn)
     
-        return dict(results = empty + [{'text': r.category } for r in results])
+        return dict(results = empty + [{'text': r.theme + '-' + r.subtheme + '-' + r.groupname } for r in results])
 
-    def search_datasets(self, app_id, kw):
+    def search_datasets(self, app_id):
         """
         kw  dict:   Usually a copy of request.params.
         app_id string:  Application identifier.
@@ -151,6 +154,8 @@ class SearchController(BaseController):
 
         if app_id not in APPS:
             abort(404)
+
+        kw = request.params
 
         res_list = []
         filters = []
@@ -169,10 +174,10 @@ class SearchController(BaseController):
         direction = None
 
         if kw.has_key('limit'):
-            limit = kw['limit']
+            limit = int(kw['limit'])
 
         if kw.has_key('offset'):
-            offset = kw['offset']
+            offset = int(kw['offset'])
 
         if kw.has_key('dir'):
             if kw['dir'].upper() == 'ASC':
@@ -238,7 +243,7 @@ class SearchController(BaseController):
             search_box = func.GeomFromText(box.ExportToWkt())
             search_box = func.setsrid(search_box, -1)
 
-            filters.append(func.intersects(D.geom, search_box))
+            filters.append(func.st_intersects(D.geom, search_box))
 
         #categories bool: Flag to indicate whether the dictionary result should only 
         #                contain distinct theme, subtheme and groupnames categories. 
@@ -300,20 +305,12 @@ class SearchController(BaseController):
                 cat = D.theme.distinct().label('text')    
         # Target columns
         if cat is None:
-            C = [
-                D.id, 
-                D.description,
-                D.theme, D.subtheme, D.groupname, 
-                D.box, 
-                D.has_metadata_cache.label('has_metadata'), 
-                D.formats.label('formats'), 
-                D.taxonomy, 
-                D.dateadded
-            ]
-            res = meta.Session.query(*C)
-    
+            res = meta.Session.query(D)
+            C = [D.description, D.theme, D.subtheme, D.groupname, D.id, \
+                    D.taxonomy, D.formats, D.box, D.dateadded, D.has_metadata]
+ 
             if search_box is not None:
-                res = res.add_column(func.geo_relevance(D.geom, search_box).label('geo_relevance'))
+                C.append(func.geo_relevance(D.geom, search_box).label('geo_relevance'))
                 if orderby is not None:
                     res = res.order_by(orderby_nongeo)
                     res = res.order_by('geo_relevance DESC ')
@@ -324,18 +321,22 @@ class SearchController(BaseController):
             else:
                 res = res.order_by(orderby_nongeo)
                 
+
         else:
+            C = [cat]
             res = meta.Session.query(cat).order_by('text ASC')
 
         for f in filters:
             res = res.filter(f)
     
+        #res = res.values(*C)
         res_list = []
 
+        response.headers['Content-Type'] = 'application/json'
         # don't limit/offset results when we are looking for distinct categories
         if categories:
             if cat != 'NULL':
-                for category in res:
+                for category in res.values(*C):
                     d = {
                         'text': category.text,
                         'leaf': False, 
@@ -347,31 +348,44 @@ class SearchController(BaseController):
                     res_list.append(d)
 
             # ExtJS Tree only accepts lists as JSON
-            return None, res_list            
+            return json.dumps(dict(total = 0, results = res_list))
 
         else:
             total = res.count()
             res = res.limit(limit).offset(offset)
-            for dataset in res:
-                if search_box is not None:
-                    geo_relevance = dataset.geo_relevance
-                else:
-                    geo_relevance = 0
-                res_list.append({ 
-                    'text': dataset.description, 
-                    'categories': '__|__'.join([dataset.theme, dataset.subtheme, dataset.groupname]),
-                    'config': { 
-                        'id' : dataset.id,
-                        'what' : 'dataset',
-                        'taxonomy': dataset.taxonomy,
-                        'formats' : dataset.formats.split(','),
-                        'services' : Dataset.get_services(dataset),
-                        'tools'	: Dataset.get_tools(dataset)
-                    },
-                    'box': prepare_box(dataset.box, SRID, epsg),
-                    'lastupdate': dataset.dateadded.strftime('%d%m%D')[4:],
-                    'id': dataset.id,
-                    'gr': float(geo_relevance)
-                })
+            #for dataset in res.execution_options(stream_results = True).values(*C):
+            def stream_search_results():
+                i = 1
+                yield """{"total": %s, "results": [""" % total
+                #for dataset in res.yield_per(10).values(*C):
+                for dataset in res.values(*C):
+                    if search_box is not None:
+                        geo_relevance = dataset.geo_relevance
+                    else:
+                        geo_relevance = 0
+                    if i == limit or i == total - offset:
+                        st = "%s\n"
+                    else:
+                        st = "%s, \n"
+                    i += 1
+                    yield st % json.dumps({ 
+                        'text': dataset.description, 
+                        'categories': dataset.theme + '__|__' + dataset.subtheme + '__|__' + dataset.groupname,
+                        'config': { 
+                            'id' : dataset.id,
+                            'what' : 'dataset',
+                            'taxonomy': dataset.taxonomy,
+                            'formats' : dataset.formats.split(','),
+                            'services' : Dataset.get_services(dataset),
+                            'tools'	: Dataset.get_tools(dataset)
+                        },
+                        'box': prepare_box(dataset.box, SRID, epsg),
+                        'lastupdate': dataset.dateadded.strftime('%d%m%D')[4:],
+                        'id': dataset.id,
+                        'gr': float(geo_relevance)
+                    })
+                yield "]}"
+                meta.Session.connection().detach()
+                meta.Session.close()
 
-            return total, res_list
+            return stream_search_results() 

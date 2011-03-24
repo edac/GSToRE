@@ -11,9 +11,10 @@ from pylons.decorators import jsonify
 
 from gstore.lib.base import BaseController
 
+from gstore.model.caching_query import FromCache
 from sqlalchemy.sql import func
 
-from gstore.model import meta
+from gstore.model import meta, Dataset
 from gstore.model.tindices import VectorTileIndexDataset, RasterTileIndexDataset
 from gstore.model.rasters import RasterDataset
 from gstore.model.shapes import VectorDataset
@@ -106,7 +107,10 @@ class DatasetsController(BaseController):
 
     def show(self, app_id, id, format='html'):
         """GET /apps/app_id:/datasets/id: Show a specific item"""
-        dataset = self.load_dataset(id)
+        dataset = meta.Session.query(Dataset).\
+                  options(FromCache('short_term', 'bydatasetid')).\
+                  get(id)
+
         if format not in dataset.formats:
             abort(404)
 
@@ -155,6 +159,11 @@ class DatasetsController(BaseController):
         # url('edit_dataset', id=ID)
 
 
+    # Vector schema URI
+    def schema(self, app_id, id, format):
+        response.headers['Content-Type'] = 'application/xml; charset=utf8'
+        return meta.Session.query(Dataset).options(FromCache('short_term', 'bydatasetid')).get(id).get_schema(format)
+
     # Services
     def services(self, app_id, id, service_type, service):
         # OGC Bunch
@@ -185,7 +194,9 @@ class DatasetsController(BaseController):
                     abort(404)
 
             elif id.isdigit():
-                dataset = self.load_dataset(id)
+                dataset = meta.Session.query(Dataset).\
+                      options(FromCache('short_term', 'bydatasetid')).\
+                      get(id)
 
                 if dataset is None:
                     abort(404)
@@ -246,7 +257,9 @@ class DatasetsController(BaseController):
 
         wms_req_params = 'VERSION=1.1.1&SERVICE=WMS&REQUEST=GetCapabilities'
         wfs_req_params = 'VERSION=1.0.0&SERVICE=WFS&REQUEST=GetCapabilities'
-        dataset = self.load_dataset(id)
+        dataset = meta.Session.query(Dataset).\
+                  options(FromCache('short_term', 'bydatasetid')).\
+                  get(id)
 
         if dataset is None:
             abort(404)
@@ -265,9 +278,9 @@ class DatasetsController(BaseController):
             abort(404)
 
         if dataset.taxonomy == 'vector':
-            (feature_attributes, grid_columns) = dataset.get_attributes()
+            feature_attributes = dataset.get_attributes()
         else:
-            (feature_attributes, grid_columns) = (None, None)
+            feature_attributes = None
 
         services = [{
             'title' : 'WMS',
@@ -292,7 +305,6 @@ class DatasetsController(BaseController):
             'id' : dataset.id,
             'title' : dataset.description ,
             'feature_attributes' : feature_attributes,
-            'grid_columns' : grid_columns,
             'maxExtent': dataset.get_box(dataset.orig_epsg, SRID)
         }]
         description = {

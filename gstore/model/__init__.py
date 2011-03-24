@@ -4,6 +4,7 @@ from sqlalchemy import orm
 from sqlalchemy.orm.query import Query, _generative
 from sqlalchemy.orm.interfaces import MapperOption
 from sqlalchemy.sql import visitors
+from caching_query import RelationshipCache
 
 from gstore.model import meta
 
@@ -23,6 +24,7 @@ orm.mapper(ShapesAttribute, shapes_attributes)
 
 orm.mapper(Dataset, datasets_table, properties={
     'formats': datasets_table.c.formats_cache,
+    'has_metadata': datasets_table.c.has_metadata_cache, 
     'mapfile_template': orm.relation(
         MapfileTemplate,
         backref = 'datasets'
@@ -30,14 +32,13 @@ orm.mapper(Dataset, datasets_table, properties={
     'attributes_ref': orm.relation(
         ShapesAttribute, 
         backref = 'dataset',
-        lazy = True
+        lazy = False
     ),
     'sources_ref': orm.relation(
         Resource,
         secondary = datasets_sources_table, 
         lazy = False, 
-        uselist = True,
-        backref = 'datasets'
+        backref = 'dataset' 
     )
 })
 
@@ -50,7 +51,7 @@ orm.mapper(
                 Dataset,
                 primaryjoin = shapes_table.c.dataset_id == datasets_table.c.id,
                 foreign_keys = [shapes_table.c.dataset_id],
-                backref = 'shapes',
+                backref = orm.backref('shapes', lazy='dynamic'),
                 lazy = True
             )
         ,
@@ -73,3 +74,7 @@ orm.mapper(
         'location': orm.synonym('_url', map_column = True), 
     } 
 )
+
+cache_dataset_bits = RelationshipCache("short_term", "bydatasetid", Dataset.id).\
+    and_(RelationshipCache("short_term", "bydatasetid", ShapesAttribute.dataset_id)).\
+    and_(RelationshipCache("short_term", "bydatasetid", ShapesVector.dataset_id))

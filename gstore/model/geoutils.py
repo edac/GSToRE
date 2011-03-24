@@ -113,7 +113,7 @@ def to_geojson(geom, id = None, properties = {}, as_feature = True):
     if as_feature:
         ret = {'type' : 'Feature', 'geometry': {"type": geomtype, "coordinates": coords} }
     else:
-        ret =  {"type": geomtype, "coordinates": coords}
+        ret =  {'type': geomtype, 'coordinates': coords}
     if properties:
         ret.update({'properties': properties})
     if id:

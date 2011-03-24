@@ -4,13 +4,12 @@ from sqlalchemy import *
 
 from pylons import config
 
-from BeautifulSoup import BeautifulStoneSoup
-
 from geoutils import transform_bbox 
 
 
-__all__ = ['datasets_table', 'Dataset', 'bundles_table', 'Bundle', 'geolookups_table', 'GeoLookup', \
-            'mapfile_templates_table', 'SpatialReference', 'MapfileTemplate']
+__all__ = ['datasets_table', 'Dataset', 'DatasetFootprint',\
+           'bundles_table', 'Bundle', 'geolookups_table', 'GeoLookup', \
+           'mapfile_templates_table', 'SpatialReference', 'MapfileTemplate']
 
 
 SRID = int(config.get('SRID', 4326))
@@ -79,31 +78,52 @@ class Dataset(object):
         else:
             return transform_bbox(inbbox, from_epsg, to_epsg)            
 
-    def get_attributes(self):
-        # From a JSON serializable list
+    def get_light_attributes(self, format = 'kml'):
+        """
+        Translate PG attribute types into KML or Javascript types and 
+        provide column ordering.
+        """
         attrs = []
-        grid_columns = []
         for a in self.attributes_ref:
             if a.name == 'geom':
                 continue 
-            # Translate PG attribute types into EXTJS/Javascript types
             if a.attribute_type == 'double precision':
-                att_type = 'float'
+                if format == 'kml':
+                    att_type = 'double'
+                else:
+                    att_type = 'float'
             elif a.attribute_type == 'integer':
-                #att_type = 'int'
                 att_type = 'int'
             elif a.attribute_type == 'varchar':
                 att_type = 'string'
             else:
                 att_type = 'string'         
 
-            attrs.append( 
-                { 'name' : a.name, 'type' : att_type }
-            )
-            grid_columns.append(
-                { 'header' : a.name, 'dataIndex' : a.name , 'tooltip': a.description, 'sortable' : True }
-            )
-        return (attrs, grid_columns)
+            attrs.append((a.array_id , (a.name, att_type)))
+        
+        attrs.sort()
+
+        return attrs 
+
+    # TODO: implement a full attribute description including
+    # geometry types, field precision, justification, etc.
+    def get_full_attributes(self):
+        pass
+
+    def get_schema(self, format = 'kml'):
+        if format == 'kml': 
+            return """<?xml version="1.0" encoding="UTF-8"?>\n<Schema name="%(name)s" id="%(name)sID">
+            <SimpleField type="string" name="gstore_time"><displayName>GSTORE Time</displayName></SimpleField>
+            <SimpleField type="integer" name="gstore_dataset_id"><displayName>GSTORE Dataset Id</displayName></SimpleField>
+            %(simplefields)s
+        </Schema>""" % {
+        'name': 'gstore_dataset_%s' % self.id,
+        'simplefields': '\n'.join([
+            """<SimpleField type="%(type)s" name="%(name)s"><displayName>%(name)s</displayName></SimpleField>""" %
+                dict(type = att[1][1], name = att[1][0], id = self.id) for att in self.get_light_attributes('kml')
+            ])
+        }
+ 
 
     def get_filename(self, format, compressed = False):
 
@@ -210,6 +230,13 @@ bundles_table = Table('bundles', meta.Base.metadata,
     Column('long_description', Text),
     Column('parent_id', Integer)
 )
+
+    
+class DatasetFootprint(object):
+    """
+    A class that maps a subset of columns of Dataset for efficiency.
+    """
+
 
 class Bundle(object):
     """
