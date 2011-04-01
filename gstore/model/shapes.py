@@ -915,11 +915,8 @@ class VectorDataset(object):
                 new_feature.SetGeometry(geom)
                 geom.Destroy()
             new_feature.SetFID(shape.gid)
-            i = 0
             for field in fields:
-                if i < len(shape.values):
-                    new_feature.SetField(field.GetName(), shape.values[i])
-                i += 1
+                new_feature.SetField(field.GetName(), shape.values.get(field.GetName()))
             L.CreateFeature(new_feature)
             new_feature.Destroy()
 
@@ -944,7 +941,7 @@ class VectorDataset(object):
                 mtd_file = open('%s.shp.xml' % os.path.join(temp_basepath, self.basename), 'w')
                 mtd_file.write(mtd)
                 mtd_file.close()
-
+    
         # append drop temp files, basepath should always have a final directory of name self.basename
         if os.path.split(basepath)[1] != str(self.dataset.id):
             basepath  = os.path.join(basepath, str(self.dataset.id))

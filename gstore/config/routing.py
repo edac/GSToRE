@@ -41,7 +41,9 @@ def make_map(config):
     map.connect('/apps/{app_id}/metadata.{format}', controller = 'metadata', action = 'index')
 
     # synch all metadata records in the webdav folder
-    map.connect('/metadata/synch_webdav', controller = 'metadata', action = 'metadata_synch_webdav')   
+    map.connect('/metadata/synch_webdav', controller = 'metadata', action = 'metadata_synch_webdav',
+        conditions=dict(method=['POST'])
+    )   
     
     map.connect('/apps/{app_id}/features.{format}', controller = 'features_bundle', action = 'index', dataset_id = None) 
     # Dataset-vector features resource

@@ -1,139 +1,84 @@
+<%! import json %>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-  <meta name="generator" content=
-  "HTML Tidy for Linux (vers 25 March 2009), see www.w3.org" />
-  <meta content="text/html; charset=us-ascii" http-equiv=
-  "content-type" py:replace="''" />
+  <title>GSTORE Dataset Mapper Tool - ${c.D.description}</title>
+  <script type="text/javascript" src="http://extjs.cachefly.net/ext-3.2.1/adapter/ext/ext-base.js"></script>
+  <script type="text/javascript" src="http://extjs.cachefly.net/ext-3.2.1/ext-all.js"></script>
+  <link rel="stylesheet" type="text/css" href="http://extjs.cachefly.net/ext-3.2.1/resources/css/ext-all.css" />
+  <link rel="stylesheet" type="text/css" href="/css/style.css" />
 
-  <title>RGIS Map Search Tool</title>
-  <style type="text/css">
-/*<![CDATA[*/
-
-  #map {
-    margin: 0px;
-    width: 630px;
-    height: 630px;
-  }
-
-  #tree {
-    height: 630px;
-    text-align: left;
-  }
-  #content {
-   padding: 0;
-  }
-  .geosearch { 
-    background-image:url(/images/search.gif) !important;
-  }  
-  .x-add-node {
-    background: url(/images/add.gif) no-repeat scroll 0 3px!important;
-  }
-
-
-  /*]]>*/
-  </style>
-
-  <link rel="stylesheet" type="text/css" media="screen" href= "/css/style.css" />
-  <link rel="stylesheet" type="text/css" href= "/javascript/mfbase/ext/resources/css/ext-all.css" />
-  <link rel="stylesheet" type="text/css" href= "/javascript/mfbase/openlayers/theme/default/style.css" />
-
-  <!-- debug mode -->
-  <!--
-  <script type="text/javascript" src="../../javascript/mfbase/release/openlayers/OpenLayers.js"></script>
-  <script type="text/javascript" src="../../javascript/mfbase/mapfish/MapFish.js"></script>
-  -->
-
-<!--
-  <script type="text/javascript" src= "../../javascript/proj4js/proj4js-compressed.js"> </script>
-  <script type="text/javascript" src= "../../javascript/proj4js/defs/EPSG4326.js"> </script>
-  <script type="text/javascript" src= "../../javascript/proj4js/defs/EPSG26913.js"> </script>
-  <script type="text/javascript" src= "../../javascript/mfbase/release/mapfish/MapFish1.2.js"> </script>
-  <script type="text/javascript" src= "../../javascript/maps/rgis_baseurl.js"> </script>
-
-  <script type="text/javascript" src= "../../javascript/mfbase/ext/adapter/ext/ext-base.js"> </script> 
-  <script type="text/javascript" src= "../../javascript/mfbase/ext/ext-all.js"> </script>
-
--->
-
-<!-- localhost:9999 -->
-<!--
-<script src="https://www.google.com/jsapi?key=ABQIAAAAviCv2ihiOgGMOq-g9QKjxxQqGxktpl5jKazhAth9qlTnX3EF3xRUcCo4N3aZ_3dqogPQY6_OkuWnwg" type="text/javascript"></script>
--->
-
-  <script type="text/javascript">
-//<![CDATA[
-  //google.load("ext-core", "3.1.0");   
-   // google has 3.1.0, app uses 3.1.1... sigh
-  //]]>
-  </script>
-
-
-  <script type="text/javascript" src= "/javascript/mfbase/ext/adapter/ext/ext-base.js"> </script> 
-  <script type="text/javascript" src= "/javascript/mfbase/ext/ext-all.js"> </script>
+  <script src="http://www.openlayers.org/api/2.10/OpenLayers.js"></script>
+  <script type="text/javascript" src="/javascript/geoext/1.0/GeoExt.js"></script>
 
   <script type="text/javascript" src= "/javascript/proj4js/proj4js-compressed.js"> </script>
   <script type="text/javascript" src= "/javascript/proj4js/defs/EPSG4326.js"> </script>
   <script type="text/javascript" src= "/javascript/proj4js/defs/EPSG26913.js"> </script>
 
 
-  <script type="text/javascript" src= "/javascript/mfbase/release/mapfish/MapFish1.2.js"> </script>
-  <script type="text/javascript" src= "/javascript/maps/rgis_baseurl.js"> </script>
-
-
-
-
   <script type="text/javascript">
 //<![CDATA[
-    var Layers = ${c.Layers | n};
-    var Description = ${c.Description | n};
-    var AppId = ${c.AppId | n};
+    var Layers = ${json.dumps(c.Layers) | n};
+    var Description = ${json.dumps(c.Description) | n};
+    var AppId = ${json.dumps(c.AppId) | n};
   //]]>
   </script>
   <script type="text/javascript" src= "/javascript/maps/mapper.js"> </script>
-  <style type="text/css">
-/*<![CDATA[*/
-  .x-tree-node-leaf .x-tree-node-icon {
-  background-image:url(/images/p.gif);
-  }
 
-  .x-tree-node-leaf .x-tree-node-icon {
-  background-position:center center;
-  background-repeat:no-repeat;
-  border:0 none;
-  margin:0;
-  padding:0;
-  width: 1px;
-  height: 1px;
-  vertical-align:top;
-  }
-
-  #mapfish_popup_contentDiv table{
-  font-size: 8px;  
-  border-collapse: collapse;
-  }
-  #mapfish_popup_contentDiv table th{
-  border: 1px solid #ccc;
-  border-right-color: #CEF6F5;
-  padding: 2px;
-  font-weight: bold;
-  background-color: #EFFBFB;
-  }
-  #mapfish_popup_contentDiv table td{
-  border: 1px solid #EFF5FB;
-  padding-left: 2px;
-  }
-  /*]]>*/
-  </style>
+<style>
+    #dataset_desc {
+        width: 100%;
+    }
+    #dataset_desc td {
+        text-align: left;
+    }
+    a {
+        text-decoration: none;
+    }
+</style>
 </head>
 
 <body>
-  <div id="content">
-    <div id="map"></div>
-
-    <div id='tree'></div>
-  </div>
+      <div id="description">
+          <table id='dataset_desc'>
+            <tr>
+                <td width="40%"><b>${c.D.description}</b>
+                  <font style='font-size: smaller'>${c.Description['taxonomy_desc']}</font>
+                </td>
+                <td>
+                <div style='float: right'>
+                  <span>Date updated: ${str(c.D.dateadded)[0:-10]} </span>
+                </div>
+                </td>
+            </tr>
+            <tr>
+              <td>Available formats for download
+              </td>
+              <td>
+                    % for met in c.Description['formats']:
+                        <a href="${met['text']}">${met['title']}</a> &nbsp; &nbsp;
+                    % endfor
+              </td>
+            </tr>
+            <tr>
+                <td>Available web services</td>
+                <td>
+                    % for met in c.Description['services']:
+                        <a href="${met['text']}">${met['title']}</a> &nbsp; &nbsp;
+                    % endfor
+                </td>
+            </tr>
+            <tr>
+                <td>Metadata</td>
+                <td>
+                    % for met in c.Description['metadata']:
+                        <a href="${met['text']}">${met['title']}</a> &nbsp; &nbsp;
+                    % endfor
+                </td>
+            </tr>
+        </table>
+      </div>
 </body>
 </html>

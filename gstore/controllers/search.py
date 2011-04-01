@@ -14,8 +14,6 @@ from gstore.model import meta
 from gstore.model import Dataset, GeoLookup
 from gstore.model.geoutils import transform_bbox, bbox_to_polygon
 
-from cStringIO import StringIO
-
 import json
 
 log = logging.getLogger(__name__)
@@ -72,7 +70,8 @@ class SearchController(BaseController):
             return self.search_datasets_categories(app_id, kw)
         else:
             return self.search_geolookups(app_id, kw)
-        
+
+    @jsonify    
     def search_geolookups(self, app_id, kw):
         """
         kw  dict:   Usually a copy of request.params.
@@ -112,7 +111,7 @@ class SearchController(BaseController):
             filter(GeoLookup.description.ilike('%'+query+'%')).\
             filter(GeoLookup.what.ilike(what)).\
             filter("'%s' = ANY(app_ids)" % app_id).limit(limit).offset(offset)
-    
+   
         return dict(results = [{'text': r.description, 'box': prepare_box(r.box, SRID, epsg)} for r in results ])
 
 
@@ -375,7 +374,7 @@ class SearchController(BaseController):
                             'id' : dataset.id,
                             'what' : 'dataset',
                             'taxonomy': dataset.taxonomy,
-                            'formats' : dataset.formats.split(','),
+                            'formats' : Dataset.get_formats(dataset),
                             'services' : Dataset.get_services(dataset),
                             'tools'	: Dataset.get_tools(dataset)
                         },

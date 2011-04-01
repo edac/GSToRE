@@ -111,7 +111,10 @@ class DatasetsController(BaseController):
                   options(FromCache('short_term', 'bydatasetid')).\
                   get(id)
 
-        if format not in dataset.formats:
+        if format == 'kmz':
+            format = 'kml'
+
+        if format not in Dataset.get_formats(dataset):
             abort(404)
 
         if dataset.sources_ref:
@@ -128,12 +131,13 @@ class DatasetsController(BaseController):
                 else:
                     redirect(url)
 
-
         if format == 'xls':
             compressed = False
         else:
             compressed = True
-        filename = dataset.get_filename(format, compressed =compressed)
+
+        filename = dataset.get_filename(format, compressed = compressed)
+
         if dataset.taxonomy != 'vector':
             response.headers['Content-Type'] = 'application/x-zip-compressed'
             response.headers['Content-Disposition'] = str('attachment; filename=%s.zip' % dataset.get_filename(format))
@@ -265,23 +269,36 @@ class DatasetsController(BaseController):
             abort(404)
         elif dataset.taxonomy == 'vector':
             ds = VectorDataset(dataset, meta.Session)
+            taxonomy = 'Vector dataset'
         elif dataset.taxonomy == 'geoimage':
             ds = RasterDataset(dataset)
+            taxonomy = 'Raster image'
         elif dataset.taxonomy == 'rtindex':
             ds = RasterTileIndexDataset(dataset)
+            taxonomy = 'Raster Virtual Mosaic'
         elif dataset.taxonomy == 'vtindex':
             ds = VectorTileIndexDataset(dataset)
+            taxonomy = 'Vector Virtual Mosaic'
         else:
             ds = None
+            taxonomy = 'File'
 
         if ds is None:
             abort(404)
 
         if dataset.taxonomy == 'vector':
-            feature_attributes = dataset.get_attributes()
+            feature_attributes = dataset.get_light_attributes()
         else:
             feature_attributes = None
 
+        formats = []
+        for fmt in Dataset.get_formats(dataset):
+            if fmt == 'kml':
+                fmt = 'kmz'
+            formats.append({
+                'title': fmt,
+                'text':  config.get('BASE_URL') + '/apps/%s/datasets/%s.%s' % (app_id, dataset.id, fmt)
+            })
         services = [{
             'title' : 'WMS',
             'text' : config.get('BASE_URL') + '/apps/%s/datasets/%s/services/ogc/wms?%s' % (app_id, dataset.id, wms_req_params)
@@ -307,6 +324,7 @@ class DatasetsController(BaseController):
             'feature_attributes' : feature_attributes,
             'maxExtent': dataset.get_box(dataset.orig_epsg, SRID)
         }]
+
         description = {
             'what' : 'dataset',
             'title' : dataset.description,
@@ -314,13 +332,16 @@ class DatasetsController(BaseController):
             'singleTile' : False,
             'layers' : [dataset.basename],
             'services' : services,
+            'formats' : formats, 
             'metadata': metadata_xml,
-            'taxonomy': dataset.taxonomy
+            'taxonomy': dataset.taxonomy,
+            'taxonomy_desc': taxonomy
         }
 
-        c.Layers = simplejson.dumps(layers)
-        c.Description = simplejson.dumps(description)
-        c.AppId = simplejson.dumps(app_id)
-        c.rgispage = {'breadcrumb': []}
+        c.D = dataset
+        c.DX = ds
+        c.Layers = layers
+        c.Description = description
+        c.AppId = app_id
 
         return render('mapper.html')

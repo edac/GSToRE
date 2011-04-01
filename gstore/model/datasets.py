@@ -98,8 +98,12 @@ class Dataset(object):
                 att_type = 'string'
             else:
                 att_type = 'string'         
+            if a.description:
+                att_description = a.description
+            else:
+                att_description = a.name
 
-            attrs.append((a.array_id , (a.name, att_type)))
+            attrs.append((a.array_id , (a.name, att_type, att_description)))
         
         attrs.sort()
 
@@ -119,11 +123,13 @@ class Dataset(object):
         </Schema>""" % {
         'name': 'gstore_dataset_%s' % self.id,
         'simplefields': '\n'.join([
-            """<SimpleField type="%(type)s" name="%(name)s"><displayName>%(name)s</displayName></SimpleField>""" %
-                dict(type = att[1][1], name = att[1][0], id = self.id) for att in self.get_light_attributes('kml')
+            """<SimpleField type="%(type)s" name="%(name)s"><displayName>%(desc)s</displayName></SimpleField>""" %
+                dict(type = att[1][1], name = att[1][0], desc = att[1][2], id = self.id) for att in self.get_light_attributes('kml')
             ])
         }
- 
+
+        else:
+            return '' 
 
     def get_filename(self, format, compressed = False):
 
@@ -139,6 +145,7 @@ class Dataset(object):
         return '%s_%s.%s' % (self.basename, self.dateadded.strftime('%m-%d-%y'), format)
 
     def clip_zip(self, format):
+        from gstore.model import Resource
         # filelist: [(path, filename, content = None)]
         filelist = []
         xml_basename = self.basename
@@ -153,22 +160,14 @@ class Dataset(object):
 
         return filelist
 
-    def get_formats(self):
-        formats = {}
-        for source in self.sources_ref:
-            source.get_file_info(source.location)
-            # put here extended format name
-            size = 0
-            if formats.has_key(source.zipgroup):
-                if source.size:
-                    size = source.size
-        
-                formats[source.zipgroup] += size
-            else:
-                formats[source.zipgroup] = size
-        # Do not advertise direct download of file groups (formats) over 20MB
-        return [ f for f in formats.keys() if formats[f] < 20000000]
-            
+    @staticmethod
+    def get_formats(cls):
+        formats = []
+        for fmt in  cls.formats.split(','):
+            formats.append(fmt)
+
+        return formats
+                            
     def set_formats(self):
         self.formats = ','.join(self.get_formats())
 
