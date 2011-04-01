@@ -1,478 +1,69 @@
-html {
-	text-align: center;
-	margin: 0;
-	padding: 0;
-  color: black;
-  font: x-small "Lucida Grande", "Lucida Sans Unicode", geneva, verdana, sans-serif;
-  font-size: 83%;
-}
-
 body {
-	text-align: left;
-	/* 
-  width: 960px;
-  */
-	margin: 0 auto;
-	padding: 0;
-	font-size: 12px;
+    background-color: #CCEBFD;
+    font: 14px/20px "Trebuchet MS", Arial, Helvetica, sans-serif;
+    height:100%;
+    margin:0;
+    max-height: 100%;
+    padding:0;
+    border:none;
 }
-
-a {
-	color: #286571;
+div#page {
+    background-color: #fff;
+    margin: 0px auto;
+    margin-top: 1em;
+    margin-bottom: 1em;
+    min-height: 100%;
+    width: 980px;
+    padding: 5px 10px 10px 10px;
+     -moz-border-radius: 5px; -webkit-border-radius: 5px; border: 1px solid #fff;
 }
-
-/* header */
-.alogo {
-  font-size: 36px;
-  padding-left: 5px;
-  padding-top: 5px;
-  padding-right: 5px;
- 
+div#header {
+    background-color: #499847;
+    padding: 5px 10px 10px 10px;
+     -moz-border-radius: 5px; -webkit-border-radius: 5px; border: 1px solid #fff;
 }
-
-#header {
-  height: 94px;
-  width: 774px;
-  background: transparent URL('../images/strype2_long2.png') repeat-y;
-  border: none;
-  margin: 3px auto 0 auto;
-  color: black;
-}
-
-html>body #header {
-  height: 124px;
-  width: 774px;
-  background: transparent URL('../images/strype2_long2.png') repeat-y;
-  border: none;
-  margin: 3px auto 0 auto;
-  color: black;
-}
-
-
-.breadcrumb {
-  position: relative;
-  top: 3px;
-  height: 15px;
-  left: 10px;
-  text-align: left;
-  padding: 0px;
-  margin: 0;
-}
-.breadcrumb a:visited, .breadcrumb a:active {
-  color: navy;
-}
-
-.breadcrumb a:hover {
-  text-decoration: underline;
-}
-
-/* mainmenu */
-
-.feedback {
-  font-weight: bold;
-}
-
-#powered {
-  text-align: center;
-  padding: 1em;
-}
-#powered p{
-  background-color: #fff;
-}
-#powered img {
-  padding: .5em ;
-
-}
-#powered h1 {
-  text-align: left;
-  font-size: 14pt;
-  font-weight: bold;
-
-}
-
-ul#mainmenu {
-  position:relative;
-  margin: 0;
-  padding: 0 10px;
-  background: url('../images/menubg.png') left top no-repeat;
-  height: 38px;
-}
-
-ul#mainmenu li {
-  list-style-type: none;
-  margin: 0;
-  padding: 0;
-  position: relative;
-/* display: inline; */
-  float: left;
-}
-
-ul#mainmenu li a {
+#header h1 {
   color: #fff;
-  float: left;
-  height: 31px;
-  display: block;
-  line-height: 30px;
-  vertical-align: middle;
-  padding: 0 10px;
-  font-size: 12px;
-  text-decoration: none;
-  background: url('../images/menu-item-border.png') left top no-repeat;
+  font-size: 48px;
+  letter-spacing: -3px;
+}
+#header h2 {
+  color: #fff;
+  font-size: 24;
 }
 
-ul#mainmenu li a:hover, ul#mainmenu li a.active {
-  background: url('../images/menu-item-actibg.png') left top no-repeat;
-}
+div#footer {
+    text-align: center;
+    padding: .25em;
+    background-color: #fff;
+    height: 60px;
+    clear: left;
+    border-top: #222 1px solid;
+}   
 
-ul#mainmenu li.first a {
-  background: none;
+ul {
+    list-style: none;
+    margin: 0;
+    border :none;
 }
-
-ul#mainmenu li.first a:hover, ul#mainmenu li.first a.active {
-  background: url('../images/menu-item-actibg.png') left top no-repeat;
+li { 
+    float: left;
 }
-
-ul#mainmenu li.loginlogout
-{
-    float: right;
-    right: 10px;
+li a {
+    padding: 1em;
+}   
+a:visited {
+    color: black;
+    text-decoration:none;
 }
-
-ul#mainmenu li.loginlogout a:hover
-{
-    background: url('../images/menu-item-border.png') left top no-repeat;
+a:link {
+    color: black;
+    text-decoration:none;
 }
-
-/* Content */
-
-#main_content {
-  color: black;
-  font-size: 110%;
-  background-color: white;
-  width: 774px;
-  margin: 0 auto 1em auto;
-  border: 1px solid #aaa;
-  border-top: 0px solid #aaa;
-/*  padding: 10px;*/
-  clear: both;
+#toplinks ul {
+    display: block;
 }
-
-html>body #main_content {
-  color: black;
-  font-size: 110%;
-  background-color: white;
-  width: 774px;
-  margin: 0 auto 1em auto;
-  border: 1px solid #aaa;
-  border-top: 0px solid #aaa;
-/*  padding: 10px;*/
-  clear: both;
-}
-
-#content {
-/*	margin : 0 10px 10px 10px;*/
-	padding: 5px 10px;
-  
-}
-
-#content .currentpage {
-	margin-top: 0;
-}
-#box { 
-  float:left;
-  text-align: left;
-  background-color: #eeeeee;
-}
-
-html>body #box {
-  float:left;
-  margin-left: 1px;
-  margin-right: 1px;  
-  margin-bottom: 2em;
-  padding: 0;
-  text-align: left;
-  background-color: #eeeeee;
-}
-
-#datasets_content {
-  padding: 1em;
-
-}  
-
-#links a {
-  text-decoration: none;
-  line-height: 1.4em;
-}
-
-
-
-#content_box {
-  padding: 1em;
-  padding-bottom: 0;
-}
-
-#content_box ul {
-  font-family: Verdana, Arial, Helvetica, sans-serif;
-  font-size: 12px;
-  font-style: normal;
-  line-height: 2em;
-  font-weight: normal;
-  font-variant: normal;
-  text-transform: none;
-  color: #006633;
-  list-style-type: square;
-  list-style-position: outside;
-  margin: 6px;
-}
-
-#content_box h1 {
-  color:black;
-  font-weight: normal;
-  font-size: 1.2em;
-  font-family: helvetica, geneva, arial, sans-serif;
-  text-align: center;
-}
-    
-#content_box  p {
-  color:#3b3b3b;
-  font-size: 1em;
-  line-height: 1.3em;
-  font-family: arial, helvetica, sans-serif;
-  text-align: justify;
-  padding-right: 1em;
-}
-
-#content_box  td {
-  text-align: justify;
-  padding-right: 1em;
-}
-
-
-/* Roundy corners */
-#tlc, #trc, #blc, #brc {
-  background-color: transparent;
-  background-repeat: no-repeat;
-}
-
-#tlc {
-  background-image:url(../images/r/tlc.gif);
-  background-position: 0% 0%;
-}
-
-#trc {
-  background-image:url(../images/r/trc.gif);
-  background-position: 100% 0%;
-}
-  
-#blc {
-  background-image:url(../images/r/blc.gif);
-  background-position: 0% 100%;
-}
-
-#brc {
-  background-image:url(../images/r/brc.gif);
-  background-position: 100% 100%;
-}
-
-#tb, #bb {
-  background-color: transparent;
-  background-repeat: repeat-x;
-}
-      
-#tb {
-  background-image:url(../images/r/tb.gif);
-  background-position: 0% 0%;
-}
-
-#bb {
-  background-image:url(../images/r/bb.gif);
-  background-position: 50% 100%;
-}
-  
-#rb {
-  background-image:url(../images/r/r.gif);
-  background-position: 100% 0%;
-  background-repeat: repeat-y;
-}
-
-#lb {
-  background-color: #eeeeee;
-  background-image:url(../images/r/l.gif);
-  background-position: 0% 100%;
-  background-repeat: repeat-y;
-}
-
-
-
-/* Other and footer */
-#datasets_content {
-  padding: 1em;
-
-}  
-
-#footer {
-  color: black;
-  font-size: 87%;
-  background-color: white;
-  width: 774px;
-  height: 120px;
-  margin: 0 auto 1em auto;
-  border: none;
-  clear: both;
-}
-#footer_comment {
-  padding-top: 10px;
-  float: right;
-  width: 600px;
-}
-
-
-.code {
-font-family:monospace;
-font-size:127%;
-}
-span.code {
-background:#EEEEEE none repeat scroll 0% 0%;
-font-weight:bold;
-}
-#flash, .notice {
-font-size:120%;
-font-weight:bolder;
-margin:0pt auto 0.5em;
-width:680px;
-}
-#flash div, .notice {
-padding:20px 15px 20px 65px;
-}
-#flash .ok {
-background:#d8ecd8 url(../images/ok.png) no-repeat scroll 10px center;
-}
-#flash .warning {
-background:#fff483 url(../images/warning.png) no-repeat scroll 10px center;
-}
-#flash .error {
-background:#f9c5c1 url(../images/error.png) no-repeat scroll 10px center;
-}
-#flash .alert,
-#flash .info {
-background:#EEEEFF url(../images/info.png) no-repeat scroll 10px center;
-}
-.notice {
-background:#EEEEFF url(../images/info.png) no-repeat scroll 10px center;
-}
-.fielderror {
-color:red;
-font-weight:bold;
-}
-div.clearingdiv {
-clear:both;
-}
-
-/* MapFish toolbar */
-.float-left {
-  float: left;
-}
-.clear-left {
-  clear: left;
-}
-.zoomin {
-  background-image:url(../javascript/mfbase/mapfish/img/icon_zoomin.png) !important;
-  height:20px !important;
-  width:20px !important;
-}
-.zoomout {
-  background-image:url(../javascript/mfbase/mapfish/img/icon_zoomout.png) !important;
-  height:20px !important;
-  width:20px !important;
-}
-.zoomfull {
-  background-image:url(../javascript/mfbase/mapfish/img/icon_zoomfull.png) !important;
-  height:20px !important;
-  width:20px !important;
-}
-.pan {
-  background-image:url(../javascript/mfbase/mapfish/img/icon_pan.png) !important;
-  height:20px !important;
-  width:20px !important;
-}
-.drawpoint {
-  background-image:url(../javascript/mfbase/mapfish/img/draw_point_off.png) !important;
-  height:20px !important;
-  width:20px !important;
-}
-.drawline {
-  background-image:url(../javascript/mfbase/mapfish/img/draw_line_off.png) !important;
-  height:20px !important;
-  width:20px !important;
-}
-.drawpolygon {
-  background-image:url(../javascript/mfbase/mapfish/img/draw_polygon_off.png) !important;
-  height:20px !important;
-  width:20px !important;
-}
-.next {
-    background-image:url(../javascript/mfbase/mapfish/img/resultset_next.png) !important;
-    height:20px !important;
-    width:20px !important;
-}
-.back {
-    background-image:url(../javascript/mfbase/mapfish/img/resultset_previous.png) !important;
-    height:20px !important;
-    width:20px !important;
-}
-
-/* Mapper 
-
-#x-form-el-eastutm{
-  display: block;
-  float: right; 
-  padding-left: 0; 
-  width: 50px;
-}
-#x-form-el-westutm{
-  display: block;
-  float: right; 
-  padding-left: 0; 
-  width: 50px;
-}
-*/
-
-div.olControlMousePosition {
-  right: 3px;
-  font-family: Verdana;
-  font-size: 0.75em;
-}
-
-.x-combo-list-item {
-    font:normal 12px tahoma, arial, helvetica, sans-serif;
-    padding:2px;
-    border:1px solid #fff;
-    white-space: nowrap;
-    overflow:hidden;
-    text-overflow: ellipsis;
-    text-align: left;
-}
-
-.rgis-tab-download { 
-  background-image: url(../images/download.png) !important; 
-}
-.rgis-tab-map { 
-  background-image: url(../images/view.png) !important; 
-}
-.rgis-tab-services { 
-  background-image: url(../images/services.png) !important; 
-}
-.rgis-tab-print { 
-  background-image: url(../images/print.png) !important; 
-}
-.rgis-tab-metadata { 
-  background-image: url(../images/metadata.jpg)  !important; 
-}
-.rgis-tab-cart { 
-  background-image: url(../images/shopping_cart.gif)  !important; 
-}
-
-.spatialsearch-combo {
-    width: 280px;
-
+#main {
+    padding-top: 1em;
+    clear: left;
 }
