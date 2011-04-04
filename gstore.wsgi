@@ -4,6 +4,7 @@ sys.path.append('/var/gstore')
 
 from paste.deploy import loadapp
 
-#application = loadapp('config:/var/gstore/production.ini')
-application = loadapp('config:/var/gstore/development.ini')
+application = loadapp('config:/var/gstore/production.ini')
+#application = loadapp('config:/var/gstore/development.ini')
+
 

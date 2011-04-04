@@ -343,5 +343,6 @@ class DatasetsController(BaseController):
         c.Layers = layers
         c.Description = description
         c.AppId = app_id
+        c.MEDIA_URL = config.get('MEDIA_URL')
 
         return render('mapper.html')
