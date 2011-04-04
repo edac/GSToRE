@@ -29,7 +29,7 @@ Ext.onReady(function() {
 
 	rgis_base = new OpenLayers.Layer.WMS(
 		"GSTORE Base", 
-		"/apps/" + AppId + "/datasets/base/services/ogc/wms?",
+		"/apps/" + AppId + "/datasets/base/services/ogc/wms_tiles?",
 		{ 
 			layers: 'naturalearthsw,southwestutm,nmcounties', 
 		    //transparent: true,
