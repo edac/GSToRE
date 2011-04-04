@@ -48,7 +48,7 @@ Ext.onReady(function() {
     extentLayer.addMarker(new OpenLayers.Marker.Box(layerExtent, 'blue', 2));
     map.addLayer(extentLayer);
 
-    var base_wms_url = "/apps/" + AppId + "/datasets/" + Description.id + "/services/ogc/wms?";
+    var base_wms_url = "/apps/" + AppId + "/datasets/" + Description.id + "/services/ogc/wms_tiles?";
     var currentLayer = new OpenLayers.Layer.WMS( Description.title, base_wms_url, {
         layers: Description.layers,
         format: tile_format,
