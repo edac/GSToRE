@@ -75,6 +75,7 @@ class DatasetsController(BaseController):
         #self.protocol = RGISDatasetProtocol(meta.Session, DatasetFootprint, self.readonly)
         pass
 
+
     def index(self, app_id, format='html'):
         """GET /datasets: All items in the collection"""
         pass
@@ -154,6 +155,7 @@ class DatasetsController(BaseController):
             tf = open(filename, 'r')
             contents = tf.read()
             tf.close()
+            meta.Session.remove()
             return contents
 
         # url('dataset', id=ID)
@@ -189,13 +191,15 @@ class DatasetsController(BaseController):
                     content_type, content = myogc.wfs(params)
                     response.headers['Content-Type'] = content_type
                     myogc = None
-                    return content
 
                 elif service == 'wms_tiles':
+                    meta.Session.remove()
                     return tilecache(None, app_id, config, kargs, is_base = True)
 
                 else:
                     abort(404)
+                meta.Session.remove()
+                return content
 
             elif id.isdigit():
                 dataset = meta.Session.query(Dataset).\
@@ -231,7 +235,6 @@ class DatasetsController(BaseController):
                         content_type, content = myogc.wms(params)
                         response.headers['Content-Type'] = content_type
                         myogc = None
-                        return content
 
                     if service == 'wfs':
                         myogc = OGC(app_id, config, [ds])
@@ -239,7 +242,6 @@ class DatasetsController(BaseController):
                         content_type, content = myogc.wfs(params)
                         response.headers['Content-Type'] = content_type
                         myogc = None
-                        return content
 
                     if service == 'wcs':
                         myogc = OGC(app_id, config, [ds])
@@ -247,13 +249,17 @@ class DatasetsController(BaseController):
                         content_type, content = myogc.wcs(params)
                         response.headers['Content-Type'] = content_type
                         myogc = None
-                        return content
 
                     elif service == 'wms_tiles':
+                        meta.Session.remove()
                         return tilecache(ds, app_id, config, kargs, is_base = False)
 
                     else:
                         abort(404)
+
+                    meta.Session.remove() 
+                    return content
+
             else:
                 abort(404)
 
@@ -344,5 +350,7 @@ class DatasetsController(BaseController):
         c.Description = description
         c.AppId = app_id
         c.MEDIA_URL = config.get('MEDIA_URL')
+
+        meta.Session.remove()
 
         return render('mapper.html')

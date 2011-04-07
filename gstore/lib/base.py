@@ -12,6 +12,9 @@ from gstore import model
 
 class BaseController(WSGIController):
     streaming_mode = False
+    def __before__(self):
+        model.meta.Session.close()
+
     def __call__(self, environ, start_response):
         """Invoke the Controller"""
         # WSGIController.__call__ dispatches to the Controller method
