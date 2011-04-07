@@ -163,8 +163,9 @@ class Dataset(object):
     @staticmethod
     def get_formats(cls):
         formats = []
-        for fmt in  cls.formats.split(','):
-            formats.append(fmt)
+        if cls:
+            for fmt in  cls.formats.split(','):
+                formats.append(fmt)
 
         return formats
                             
