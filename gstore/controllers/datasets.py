@@ -213,7 +213,7 @@ class DatasetsController(BaseController):
                     if not os.path.isfile(ds.shapefile):
                         ds.write_vector_format('shp', FORMATS_PATH)
                 elif dataset.taxonomy == 'geoimage':
-                    ds = RasterDataset(dataset, config)
+                    ds = RasterDataset(dataset)
                 elif dataset.taxonomy == 'rtindex':
                     ds = RasterTileIndexDataset(dataset, config)
                 elif dataset.taxonomy == 'vtindex':
