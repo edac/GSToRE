@@ -96,7 +96,7 @@ Ext.onReady(function() {
             title: "Description and available tools",
             contentEl: "description",
             collapsible: true,
-            height: 120,
+            height: 130,
             split: true
         }]
     });

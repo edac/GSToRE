@@ -16,16 +16,16 @@ import zipfile, tempfile
 
 from geoutils import transform_bbox, bbox_to_polygon, reproject_geom
 
-__all__ = ['RasterDataset']
+__all__ = ['TileIndexDataset', 'VectorTileIndexDataset', 'RasterTileIndexDataset']
 
-SRID = int(config['SRID'])
 
 class TileIndexDataset(object):
-    def __init__(self, dataset):
+    def __init__(self, dataset, config):
         if dataset.taxonomy not in ['rtindex','vtindex']:
             raise Exception('Dataset is not tile index compatible')
         self.dataset = dataset
         self.bundle_id = dataset.bundle_id
+        self.SRID = int(config['SRID'])
         if self.bundle_id is None:
             raise Exception('Dataset has no bundle associated of Tile index type')
         
@@ -87,7 +87,7 @@ class TileIndexDataset(object):
 
             # Set the MBR (minimum bounding rectangle) geometry
             mbr = ogr.CreateGeometryFromWkb(row.geom.decode('hex'))
-            if self.dataset.orig_epsg != SRID:
+            if self.dataset.orig_epsg != self.SRID:
                 if reproject_geom(mbr, sr, orig_sr):
                     raise Exception('Can not reproject geometry from %s to WGS84' % self.dataset.orig_epsg)
         
@@ -153,21 +153,20 @@ class RasterTileIndexDataset(TileIndexDataset):
     """
     is_mappable = True
 
-    def __init__(self, dataset):
+    def __init__(self, dataset, config):
         """
         @param dataset: c(Dataset) instance.
         """  
         if dataset.taxonomy != 'rtindex':
             raise Exception('Dataset is not raster tile index compatible.')
 
-        super(RasterTileIndexDataset, self).__init__(dataset)
+        super(RasterTileIndexDataset, self).__init__(dataset, config)
 
     def get_index_from_bundle(self):
         return self._get_index_from_bundle('tif') 
          
     def get_srid(self):
-        srid = None
-        return srid
+        return self.SRID
     
     def set_srid(self, srid):
         pass

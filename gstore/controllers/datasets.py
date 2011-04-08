@@ -150,7 +150,7 @@ class DatasetsController(BaseController):
             basepath = os.path.join(basepath, format)
             filename = str(os.path.join(basepath, filename))
             if not os.path.isfile(filename):
-                vd = VectorDataset(dataset, meta.Session)
+                vd = VectorDataset(dataset, meta.Session, config)
                 vd.write_vector_format(format, FORMATS_PATH)
             tf = open(filename, 'r')
             contents = tf.read()
@@ -175,7 +175,6 @@ class DatasetsController(BaseController):
         # OGC Bunch
         kargs = self._get_method_args()
         params = request.params
-
 
         if service_type == 'ogc':
             if id == 'base':
@@ -206,59 +205,50 @@ class DatasetsController(BaseController):
                       options(FromCache('short_term', 'bydatasetid')).\
                       get(id)
 
+
                 if dataset is None:
                     abort(404)
+                elif dataset.taxonomy == 'vector':
+                    ds = VectorDataset(dataset, meta.Session, config)
+                    if not os.path.isfile(ds.shapefile):
+                        ds.write_vector_format('shp', FORMATS_PATH)
+                elif dataset.taxonomy == 'geoimage':
+                    ds = RasterDataset(dataset, config)
+                elif dataset.taxonomy == 'rtindex':
+                    ds = RasterTileIndexDataset(dataset, config)
+                elif dataset.taxonomy == 'vtindex':
+                    ds = VectorTileIndexDataset(dataset, config)
                 else:
-                    if dataset is None:
-                        abort(404)
-                    elif dataset.taxonomy == 'vector':
-                        ds = VectorDataset(dataset, meta.Session)
-                        if not os.path.isfile(ds.shapefile):
-                            ds.write_vector_format('shp', FORMATS_PATH)
-                    elif dataset.taxonomy == 'geoimage':
-                        ds = RasterDataset(dataset)
-                    elif dataset.taxonomy == 'rtindex':
-                        ds = RasterTileIndexDataset(dataset)
-                    elif dataset.taxonomy == 'vtindex':
-                        ds = VectorTileIndexDataset(dataset)
-                    else:
-                        ds = None
+                    ds = None
 
-                    if ds is None:
-                        abort(404)
-                    if not ds.is_mappable:
-                        abort(404)
+                if ds is None or not ds.is_mappable:
+                    abort(404)
+                elif service == 'wms':
+                    myogc = OGC(app_id, config, [ds])
+                    myogc.buildService()
+                    content_type, content = myogc.wms(params)
+                    response.headers['Content-Type'] = content_type
+                    myogc = None
+                elif service == 'wfs':
+                    myogc = OGC(app_id, config, [ds])
+                    myogc.buildService()
+                    content_type, content = myogc.wfs(params)
+                    response.headers['Content-Type'] = content_type
+                    myogc = None
+                elif service == 'wcs':
+                    myogc = OGC(app_id, config, [ds])
+                    myogc.buildService()
+                    content_type, content = myogc.wcs(params)
+                    response.headers['Content-Type'] = content_type
+                    myogc = None
+                elif service == 'wms_tiles':
+                    meta.Session.remove()
+                    return tilecache(ds, app_id, config, kargs, is_base = False)
+                else:
+                    abort(404)
 
-                    if service == 'wms':
-                        myogc = OGC(app_id, config, [ds])
-                        myogc.buildService()
-                        content_type, content = myogc.wms(params)
-                        response.headers['Content-Type'] = content_type
-                        myogc = None
-
-                    if service == 'wfs':
-                        myogc = OGC(app_id, config, [ds])
-                        myogc.buildService()
-                        content_type, content = myogc.wfs(params)
-                        response.headers['Content-Type'] = content_type
-                        myogc = None
-
-                    if service == 'wcs':
-                        myogc = OGC(app_id, config, [ds])
-                        myogc.buildService()
-                        content_type, content = myogc.wcs(params)
-                        response.headers['Content-Type'] = content_type
-                        myogc = None
-
-                    elif service == 'wms_tiles':
-                        meta.Session.remove()
-                        return tilecache(ds, app_id, config, kargs, is_base = False)
-
-                    else:
-                        abort(404)
-
-                    meta.Session.remove() 
-                    return content
+                meta.Session.remove() 
+                return content
 
             else:
                 abort(404)
@@ -274,16 +264,16 @@ class DatasetsController(BaseController):
         if dataset is None:
             abort(404)
         elif dataset.taxonomy == 'vector':
-            ds = VectorDataset(dataset, meta.Session)
+            ds = VectorDataset(dataset, meta.Session, config)
             taxonomy = 'Vector dataset'
         elif dataset.taxonomy == 'geoimage':
             ds = RasterDataset(dataset)
             taxonomy = 'Raster image'
         elif dataset.taxonomy == 'rtindex':
-            ds = RasterTileIndexDataset(dataset)
+            ds = RasterTileIndexDataset(dataset, config)
             taxonomy = 'Raster Virtual Mosaic'
         elif dataset.taxonomy == 'vtindex':
-            ds = VectorTileIndexDataset(dataset)
+            ds = VectorTileIndexDataset(dataset, config)
             taxonomy = 'Vector Virtual Mosaic'
         else:
             ds = None

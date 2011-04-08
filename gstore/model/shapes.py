@@ -24,7 +24,6 @@ import zipfile, tempfile
 from geoutils import *
 
 SRID = int(config.get('SRID', 4326))
-FORMATS_PATH = config.get('FORMATS_PATH', '/tmp')
 YIELD_PER_ROWS = int(config.get('YIELD_PER_ROWS', 100))
 
 __ALL__ = ['VectorDataset', 'ShapesAttribute', 'ShapesVector',
@@ -755,17 +754,18 @@ def PromoteVectorDatasetFromKml(sourcepath, dataset, session, load_data = True, 
 class VectorDataset(object):
     is_mappable = True
 
-    def __init__(self, dataset, session):
+    def __init__(self, dataset, session, config):
         if dataset.taxonomy != 'vector':
             raise Exception('Dataset not vector compatible')
         self.Session = session
+        self.config = config
         self.dataset = dataset
         self.projection = osr.SpatialReference()
         self.projection.SetWellKnownGeogCS('WGS84')
         self.geomtype = dataset.geomtype
  
         self.basename = str(dataset.basename)
-        self.shapefile = "%s/%s/shp/%s.shp" % (FORMATS_PATH, dataset.id, dataset.basename)
+        self.shapefile = "%s/%s/shp/%s.shp" % (config.get('FORMATS_PATH'), dataset.id, dataset.basename)
 
         if self.dataset.orig_epsg:
             self.orig_projection = osr.SpatialReference()
