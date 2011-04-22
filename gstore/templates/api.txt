@@ -1,3 +1,4 @@
+    
 Base URL: http://gstore.unm.edu
 
     In all requests an application must be specified:
@@ -185,4 +186,12 @@ External Mapping Services:
     Bing Maps (limited to 2Mb files only):
 
         GET http://www.bing.com/maps/?mapurl=http://gstore.unm.edu/apps/{app_id}/datasets/{dataset_id}.kml
+
  
+Please send your comments and report problems to:   
+    Renzo Sanchez-Silva 
+    renzo@edac.unm.edu
+    Analyst Programmer and Research Scientist
+    GSTORE Author and maintainer
+    University of New Mexico
+
