@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 __all__ = ['SearchController']
 
 SRID = int(config['SRID'])
-APPS = ['rgis', 'epscor']
+APPS = config.get('APPS').split(',')
 
 def convert_string_box_numeric(box):
     try: 

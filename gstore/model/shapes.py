@@ -470,7 +470,7 @@ def PromoteVectorDatasetFromShapefile(sourcepath, dataset, session, load_data = 
 
     L = datasource.GetLayer(0)
 
-    session.begin(subtransactions = True, nested = True)
+    #session.begin(subtransactions = True, nested = True)
 
     # The rule here is to set basename to lowercase
     if not kw.get('basename'):
@@ -674,6 +674,9 @@ def PromoteVectorDatasetFromKml(sourcepath, dataset, session, load_data = True, 
     if dataset.feature_count == 0:
         return (4, 'No features in shapefile')
 
+    if kw.has_key('inactive'):
+        dataset.inactive = kw.get('inactive')
+
     # Assemble the dataset.shapes.properties or, the same, dataset.attributes_ref.
     FD = FeatureDefinitions([])
     FD.reset_from(L.GetLayerDefn())
@@ -820,19 +823,30 @@ class VectorDataset(object):
                 - cached, for the shapefile transformed into geographic saved in the cache
                 - database, for iterating over the Shapes table keyed by self.dataset.id
         """
+
+        # Copied from gstore/model/hstore.py
+        def serialize_hstore(val):
+            """
+            Serialize a dictionary into an hstore literal. Keys and values must both be
+            strings.
+            """
+            def esc(s, position):
+                try:
+                    return s.encode('string_escape').replace('"', r'\"')
+                except AttributeError:
+                    raise ValueError("%r in %s position is not a string." %
+                            (s, position))
+            return ', '.join( '"%s"=>"%s"' % (esc(k, 'key'), esc(v, 'value'))
+                    for k, v in val.iteritems() )
+        # end copy
+    
         dest = open(destination_filename, 'w')
         dest.write('BEGIN;\n')
         dest.write('COPY shapes (gid, dataset_id, geom, values) FROM stdin; \n')
 
         if source == 'database':
             for shape in self.dataset.shapes.yield_per(YIELD_PER_ROWS):
-                values = []
-                for att in self.properties_ref:
-                    value = '"' + shape.values[att.name] + '"'
-                    if not value:
-                        value = 'NULL'
-                    values.append(value)
-                values = "{" + ",".join(values) + "}"
+                values = serialize_hstore(shape.values)
                 dest.write('\t'.join([ str(shape.gid), str(self.dataset.id), shape.geom, values]) + '\n') 
 
         elif source == 'cached':    
@@ -848,22 +862,22 @@ class VectorDataset(object):
             D = ogr.Open(temp_basepath) 
             L = D.GetLayerByIndex(0)
             S = L.GetSpatialRef()
-            dataset_fields = self.get_fields('sql')
 
             for i in range(0, L.GetFeatureCount()):
                 ftr = L.GetNextFeature()
                 geom = ftr.GetGeometryRef().Clone()
                 if self.dataset.orig_epsg != SRID:    
                     reproject_geom(geom, S, self.projection) 
-                values = []
+                values = {}
                 for att in self.properties_ref:
-                    value = '"' + ftr.GetFieldAsString(att.array_id - 1) + '"'
-                    value = decode_field(value, decoder).encode('utf8')
+                    value =  ftr.GetFieldAsString(att.array_id - 1).decode(encoding).encode('utf8')
                     if not value:
                         value = 'NULL'
-                    values.append(value)
-                values = "{" + ",".join(values) + "}"
-                dest.write('\t'.join([ str(ftr.GetFID()), str(self.dataset.id), geom.ExportToWkb().encode('hex'), values]) + '\n') 
+                        # actually skip this key=>value
+                        continue
+                    values[str(att.name)] = value
+
+                dest.write('\t'.join([ str(ftr.GetFID()), str(self.dataset.id), geom.ExportToWkb().encode('hex'), serialize_hstore(values)]) + '\n') 
             D.Destroy()
 
         dest.write('\.\n\nCOMMIT;')
@@ -1006,19 +1020,23 @@ class VectorDataset(object):
         y = 1
         for row in self.dataset.shapes.values(ShapesVector.values):   
             x = 0
-            for value in row.values:
-                att = self.properties_ref[x]  
-                if att.ogr_type ==  ogr.OFTReal:
-                    if value:
-                        value = Decimal(value.strip())
-                    else:
-                        value = None
-                elif att.ogr_type == ogr.OFTInteger:
-                    if value:
-                        value = int(float(value))
-                    else:
-                        value = None
-                
+            for key in row.values:
+                value = row.values.get(key)
+                att = self.properties_ref[x] 
+                try: 
+                    if att.ogr_type ==  ogr.OFTReal:
+                        if value:
+                            value = Decimal(value.strip())
+                        else:
+                            value = None
+                    elif att.ogr_type == ogr.OFTInteger:
+                        if value:
+                            value = int(float(value))
+                        else:
+                            value = None
+                except ValueError:
+                    pass
+ 
                 ws.write(y,x, value)
                 x += 1
             y += 1

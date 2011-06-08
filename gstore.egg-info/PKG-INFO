@@ -1,10 +1,10 @@
 Metadata-Version: 1.0
 Name: gstore
-Version: 0.1dev
-Summary: UNKNOWN
-Home-page: UNKNOWN
-Author: UNKNOWN
-Author-email: UNKNOWN
+Version: 0.1dev-r60
+Summary: Geographic Storage, Transformation and Retrieval Engine
+Home-page: http://gstore.unm.edu
+Author: Renzo Sanchez-Silva
+Author-email: renzo@edac.unm.edu
 License: UNKNOWN
 Description: UNKNOWN
 Platform: UNKNOWN

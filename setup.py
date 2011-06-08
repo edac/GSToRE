@@ -8,7 +8,7 @@ except ImportError:
 setup(
     name='gstore',
     version='0.1',
-    description='Geographic Storage and Retrieval Engine',
+    description='Geographic Storage, Transformation and Retrieval Engine',
     author='Renzo Sanchez-Silva',
     author_email='renzo@edac.unm.edu',
     url='http://gstore.unm.edu',
@@ -30,6 +30,11 @@ setup(
     entry_points="""
     [paste.app_factory]
     main = gstore.config.middleware:make_app
+
+    [paste.paster_command]
+    ingest-datasets = gstore.commands.ingest_datasets:IngestDatasets
+    promote-vector-datasets = gstore.commands.ingest_datasets:PromoteVectorDatasets
+    dump-vector-datasets = gstore.commands.ingest_datasets:DumpVectorDatasets    
 
     [paste.app_install]
     main = pylons.util:PylonsInstaller

@@ -9,6 +9,8 @@ from pylons.controllers.util import abort, redirect
 from gstore.lib.base import BaseController, render
 from lxml import etree
 
+from gstore.controllers.datasets import DatasetsController
+
 from gstore.model import meta, Dataset
 from gstore.model.caching_query import FromCache
 
@@ -58,7 +60,7 @@ class MetadataController(BaseController):
         #           method='delete')
         # url('metadata', id=ID)
 
-    def show(self, dataset_id, id, format='html'):
+    def show(self, dataset_id, app_id, format='html'):
         """GET /metadata/id: Show a specific item"""
 
         d = meta.Session.query(Dataset).options(FromCache('short_term', 'bydatasetid')).get(dataset_id)
@@ -86,6 +88,9 @@ class MetadataController(BaseController):
                     content = etree.tostring(content, encoding ='utf8')
                 except:
                     content = d.metadata_xml
+            elif format == 'rdf':
+                content_type = 'application/rdf+xml'
+                content = self.to_dublin_core(app_id, dataset_id)
             else:
                 content_type = 'text/xml'
                 content = d.metadata_xml
@@ -93,6 +98,68 @@ class MetadataController(BaseController):
             response.headers['Content-Type'] = '%s; charset=UTF-8' % content_type
             return content 
 
+    def to_dublin_core(self, app_id, dataset_id):
+        """
+        A cheap way to produce Dublin core metadata in RDF format directly from 
+        a GSTORE dataset.
+
+        References:
+        1. http://dublincore.org/documents/dc-rdf/ 
+        2. Template dc-template.xml taken from ESRI's Geoportal
+        3. http://dublincore.org/documents/2001/04/12/usageguide/generic.shtml
+        4. http://coris.noaa.gov/data/examples/MetadataCrosswalk.pdf
+        """
+        DC = DatasetsController()
+        (dataset, ds, layers, description) = DC.get_complete_description(app_id, dataset_id)
+        
+        dc_template = """<?xml version="1.0"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:ows="http://www.opengis.net/ows" xmlns:dct="http://purl.org/dc/terms/" xmlns:dcmiBox="http://dublincore.org/documents/2000/07/11/dcmi-box/">
+  <rdf:Description rdf:about="http://dublincore.org/">
+    %(dc_identifiers)s
+    %(dc_title)s 
+    <dc:description>GSTORE dataset</dc:description>
+    <dct:references></dct:references>
+    <dc:type>Dataset</dc:type>
+    <dc:creator/>
+    %(dc_date)s
+    <dc:language>eng</dc:language>
+    %(dc_subjects)s
+    %(dc_formats)s
+    <ows:WGS84BoundingBox>
+      <ows:LowerCorner>%(lower_corner)s</ows:LowerCorner>
+      <ows:UpperCorner>%(upper_corner)s</ows:UpperCorner>
+    </ows:WGS84BoundingBox>
+  </rdf:Description>
+</rdf:RDF>"""        
+        subjects = [ 
+            dataset.taxonomy,
+            dataset.theme,
+            dataset.subtheme,
+            dataset.groupname
+        ]
+        formats = Dataset.get_formats(dataset)
+        identifier = 'http://gstore.unm.edu/apps/%s/datasets/%s' % (app_id, dataset_id)
+    
+        dc_subjects = '\n'.join(['<dc:subject>%s</dc:subject>' % s for s in subjects])
+        dc_title = '<dc:title>%s</dc:title>' % dataset.description
+        dc_date = '<dc:date>%s</dc:date>' % dataset.dateadded.strftime('%Y-%m-%d %H:%M:%S')
+        dc_identifiers = '<dc:identifier>%s</dc:identifier>' % identifier
+        dc_formats = '\n'.join(['<dc:format>%s</dc:format>' % f for f in formats])
+        lower_corner = '%s %s' % ( dataset.box[0], dataset.box[1])
+        upper_corner = '%s %s' % ( dataset.box[2], dataset.box[3])
+
+        return dc_template % { 
+            'dc_identifiers': dc_identifiers,
+            'dc_title': dc_title,
+            'dc_date': dc_date,
+            'dc_subjects': dc_subjects,
+            'dc_formats': dc_formats,
+            'lower_corner': lower_corner,
+            'upper_corner': upper_corner
+        }
+
+         
+    
     def metadata_synch_webdav(self, transform_to_iso = False):
         token = request.params.get('secret_token',None)
         app_id = request.params.get('app_id', None)

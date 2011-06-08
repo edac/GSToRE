@@ -253,8 +253,7 @@ class DatasetsController(BaseController):
             else:
                 abort(404)
 
-    def mapper(self, app_id, id):
-
+    def get_complete_description(self, app_id, id):
         wms_req_params = 'VERSION=1.1.1&SERVICE=WMS&REQUEST=GetCapabilities'
         wfs_req_params = 'VERSION=1.0.0&SERVICE=WFS&REQUEST=GetCapabilities'
         dataset = meta.Session.query(Dataset).\
@@ -333,6 +332,11 @@ class DatasetsController(BaseController):
             'taxonomy': dataset.taxonomy,
             'taxonomy_desc': taxonomy
         }
+        return (dataset, ds, layers, description)
+        
+    def mapper(self, app_id, id):
+
+        (dataset, ds, layers, description) = self.get_complete_description(app_id, id)
 
         c.D = dataset
         c.DX = ds
