@@ -35,6 +35,7 @@ setup(
     ingest-datasets = gstore.commands.ingest_datasets:IngestDatasets
     promote-vector-datasets = gstore.commands.ingest_datasets:PromoteVectorDatasets
     dump-vector-datasets = gstore.commands.ingest_datasets:DumpVectorDatasets    
+    seed-vector-formats = gstore.commands.ingest_datasets:SeedVectorFormats
 
     [paste.app_install]
     main = pylons.util:PylonsInstaller

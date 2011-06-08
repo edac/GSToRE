@@ -1,4 +1,3 @@
-
 """
 http://docs.pylonsproject.org/projects/pylons_framework/dev/advanced_pylons/paster_commands.html
 Run it this way:
@@ -35,17 +34,21 @@ Where newdatasets.json is a file of the form:
 
 from paste.script.command import Command
 
-import json
+import simplejson as json
 from paste.deploy import appconfig
 from pylons import config
 from gstore.config.environment import load_environment
 from sqlalchemy.sql import func, and_
-
-conf = appconfig('config:/var/gstore/development.ini')
-load_environment(conf.global_conf, conf.local_conf)
+import os
 
 from gstore.model import *
 from gstore.model.geoutils import *
+
+config_location = os.path.join(os.path.dirname(__file__).replace('/gstore/commands',''), 'development.ini')
+conf = appconfig('config:' + config_location)
+load_environment(conf.global_conf, conf.local_conf)
+
+FORMATS_PATH = config.get('FORMATS_PATH', '/tmp')
 
 class PromoteVectorDatasets(Command):
     summary = "Command line tool for promoting datasets into vector datasets. JSON file should query unique datasets."
@@ -98,6 +101,41 @@ class DumpVectorDatasets(Command):
                 destination_filename = os.path.join(output_dir, '%s.sql' % dataset.id)
                 dat.shp2sql(destination_filename, source = 'source', dump = True, encoding = 'latin-1')
  
+class SeedVectorFormats(Command):
+    """
+    Sample usage:
+        Assuming do.json has contents: [{'subtheme': '2010 Census', 'theme': 'Census Data', 'groupname': '2010 Census Block Groups'}] 
+
+        paster --plugin=gstore seed-vector-formats /tmp/do.json 
+    """
+    summary = "Command line tool to generate all shp, gml, kmz, json, csv and xls file formats for vector datasets from JSON schema files"
+    usage = "inputfile (json)" 
+    group_name = "gstore"
+    parser = Command.standard_parser(verbose=False)
+    
+    def command(self):
+        ds = json.loads(open(self.args[0], 'r').read())
+        for d in ds:
+            query = meta.Session.query(Dataset)
+            if d.has_key('basename'):
+                query = query.filter(Dataset.basename == d['basename'])
+            if d.has_key('theme'):
+                query = query.filter(Dataset.theme == d['theme'])
+            if d.has_key('subtheme'):
+                query = query.filter(Dataset.subtheme == d['subtheme'])
+            if d.has_key('groupname'):
+                query = query.filter(Dataset.groupname == d['groupname'])
+            if d.has_key('description'):
+                query = query.filter(Dataset.description == d['description'])
+            
+            for dataset in query.yield_per(10):
+                if dataset.taxonomy != 'vector':
+                    print dataset
+                    continue
+                vecdat = VectorDataset(dataset, meta.Session, config)
+                for fmt in ['shp', 'gml', 'kml', 'csv', 'xls', 'json']:
+                    print FORMATS_PATH
+                    vecdat.write_vector_format(fmt, FORMATS_PATH)
     
 class IngestDatasets(Command):
     summary = "Command line tool for Dataset ingestion from JSON schema files"
