@@ -1034,7 +1034,7 @@ class VectorDataset(object):
                             value = int(float(value))
                         else:
                             value = None
-                except ValueError:
+                except:
                     pass
  
                 ws.write(y,x, value)
