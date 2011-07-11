@@ -103,6 +103,7 @@ Formats available for download:
 
             Other: zip or external url redirection.
 
+(EXPERIMENTAL)
 Features by dataset for vector based datasets:
 
     /apps/{app_id}/datasets/{dataset_id}/features.{format}
@@ -133,6 +134,7 @@ Features by dataset for vector based datasets:
             end_time: (float) Number of seconds before or after January 1, 1970 00:00:00 GMT. 
                        End of creation time range, see start_time above.
 
+(EXPERIMENTAL)
 * Features extracted from any dataset or list of datasets:       
  
     /apps/{app_id}/features.{format}
