@@ -281,7 +281,6 @@ class FeaturesBundleController(BaseController):
                     current_d_id = d_id
 
                     if not attributes.has_key(d_id):
-                        attributes[d_id] = {}
                         attributes[d_id] = [ 
                             (-2, ('gstore_time', 'string')), # KML does not support time SimpleField type
                             (-1, ('gstore_dataset_id', 'int')) 
@@ -293,7 +292,7 @@ class FeaturesBundleController(BaseController):
                     # For now CSV is the only format that requires preserving 
                     # ordering in attribute columns, the rest gets dump from htore dicts.
                     if format == 'csv' and i == 1:
-                        yield ','.join([attributes[d_id][1][0] for k in attributes[d_id]]) + '\n'
+                        yield ','.join([unicode(k[1][0]) for k in attributes[d_id]]) + '\n'
                     # If this is a single dataset we are querying and collection markup is not stripped
                     # inject Schema to the stream
                     if format == 'kml' and len(dataset_ids) == 1 and not strip_collection_markup and i == 1:
@@ -347,7 +346,7 @@ class FeaturesBundleController(BaseController):
                     elif format == 'gml': 
                         feat = ''.join((nl, geom))
                     elif format == 'csv':
-                        feat = write_csv_row([values[attributes[d_id][k]] for k in xrange(len(attributes[d_id]))])
+                        feat = write_csv_row([values[att[1][0]] for att in attributes[d_id] if att[1][0] in values.keys()])
                     else:
                         break
             
