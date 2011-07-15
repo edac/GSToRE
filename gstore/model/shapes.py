@@ -461,12 +461,16 @@ def ogrfeature_to_shapes(ogrfeature, decoder, properties, attach_properties = Tr
     return s
 
 
-def PromoteVectorDatasetFromShapefile(sourcepath, dataset, session, load_data = True, **kw):
+def PromoteVectorDatasetFromShapefile(sourcepath, dataset_id, session, load_data = True, **kw):
     # Open source as read only
     filename = str(sourcepath) # filename may be unicode string
     datasource = ogr.Open(filename)
     if not datasource:
         return (1, 'Not a valid OGR data source')
+
+    from gstore.model import Dataset
+        
+    dataset = session.query(Dataset).get(dataset_id)
 
     L = datasource.GetLayer(0)
 
@@ -606,12 +610,16 @@ def PromoteVectorDatasetFromShapefile(sourcepath, dataset, session, load_data = 
 
     return (0, '')
     
-def PromoteVectorDatasetFromKml(sourcepath, dataset, session, load_data = True, **kw):
+def PromoteVectorDatasetFromKml(sourcepath, dataset_id, session, load_data = True, **kw):
     # Open source as read only
     filename = str(sourcepath) # filename may be unicode string
     datasource = ogr.Open(filename)
     if not datasource:
         return (1, 'Not a valid OGR data source')
+
+    from gstore.model import Dataset
+        
+    dataset = session.query(Dataset).get(dataset_id)
 
     L = datasource.GetLayer(0)
 
@@ -758,8 +766,10 @@ class VectorDataset(object):
     is_mappable = True
 
     def __init__(self, dataset, session, config):
+        
         if dataset.taxonomy != 'vector':
             raise Exception('Dataset not vector compatible')
+            
         self.Session = session
         self.config = config
         self.dataset = dataset
