@@ -63,9 +63,8 @@ def wsgi_tilecache(model, app_id, config, kargs, is_base = False):
             d	
         )
     else:
-        dataset = model.dataset 
-        basename = dataset.basename
-        true_WMS = True_WMS  % dataset.id
+        basename = str(model.dataset.basename)
+        true_WMS = True_WMS  % model.dataset.id
         tileService = Service(
           Disk(disk_cache_base),
           {  
