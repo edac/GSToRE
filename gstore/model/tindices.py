@@ -89,7 +89,7 @@ class TileIndexDataset(object):
                     'format': 'ecw',
                     'app_id': self.dataset.apps_cache[0]
             })
-            feat.SetField('label', os.path.basename(row.location).split('.')[0])
+            feat.SetField('label', str(os.path.basename(row.location).split('.')[0]))
 
             # Set the MBR (minimum bounding rectangle) geometry
             mbr = ogr.CreateGeometryFromWkb(row.geom.decode('hex'))
