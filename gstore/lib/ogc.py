@@ -430,7 +430,7 @@ END
         (mapfilename, mapcontent) = self.getMapfile()
         wms_request = {}
 
-        params = [ 'REQUEST', 'SERVICE', 'LAYERS', 'CRS', 'SRS', 'BBOX', 'VERSION', 'FORMAT', 'WIDTH', 'HEIGHT', 'EXCEPTIONS', 'MAXEXTENT', 'TRANSPARENT', 'DISPLAYOUTSIDEMAXEXTENT', 'SINGLETILE', 'STYLES', 'EXCEPTIONS', 'QUERY_LAYERS', 'FEATURE_COUNT','INFO_FORMAT', 'FEATURE_COUNT', 'X', 'Y', 'SERVICENAME']
+        params = [ 'REQUEST', 'SERVICE', 'LAYERS', 'CRS', 'SRS', 'BBOX', 'VERSION', 'FORMAT', 'WIDTH', 'HEIGHT', 'EXCEPTIONS', 'MAXEXTENT', 'TRANSPARENT', 'DISPLAYOUTSIDEMAXEXTENT', 'SINGLETILE', 'STYLES', 'EXCEPTIONS', 'QUERY_LAYERS', 'FEATURE_COUNT','INFO_FORMAT', 'FEATURE_COUNT', 'X', 'Y', 'SERVICENAME', 'SLD']
         # Be ready for clients that switch from UPPER to lower keys in WMS requests
         for param in params:
             if req_params.has_key(param.lower()):
