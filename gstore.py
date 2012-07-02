@@ -1,1 +1,0 @@
-/var/gstore/gstore.wsgi
