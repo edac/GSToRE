@@ -304,7 +304,7 @@ class SearchController(BaseController):
                 cat = D.theme.distinct().label('text')    
         # Target columns
         if cat is None:
-            res = meta.Session.query(D)
+            res = meta.Session.query(D).filter(Dataset.inactive == False)
             C = [D.description, D.theme, D.subtheme, D.groupname, D.id, \
                     D.taxonomy, D.formats, D.box, D.dateadded, D.has_metadata]
  
@@ -323,7 +323,7 @@ class SearchController(BaseController):
 
         else:
             C = [cat]
-            res = meta.Session.query(cat).order_by('text ASC')
+            res = meta.Session.query(cat).filter(Dataset.inactive == False).order_by('text ASC')
 
         for f in filters:
             res = res.filter(f)

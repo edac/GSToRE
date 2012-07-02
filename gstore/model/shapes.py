@@ -1022,7 +1022,10 @@ class VectorDataset(object):
         y = 0
         x = 0 
         # Write header
-        for att in self.properties_ref:
+	###20120126 - modified to fix mismatch between field headers and data (field_attributes order/array_id != hstore values order) (soren)
+	attributes = self.properties_ref
+	for att in attributes:
+        #for att in self.properties_ref:
             if att.array_id != -1:
                 ws.write(0, x, att.name, style = style)
                 x += 1
@@ -1030,9 +1033,12 @@ class VectorDataset(object):
         y = 1
         for row in self.dataset.shapes.values(ShapesVector.values):   
             x = 0
-            for key in row.values:
-                value = row.values.get(key)
-                att = self.properties_ref[x] 
+	    ###20120126 - modified to fix mismatch between field headers and data (soren)
+	    #for key in row.values:
+                #value = row.values.get(key)
+                #att = self.properties_ref[x] 
+	    for att in attributes:
+		value = row.values.get(att.name)
                 try: 
                     if att.ogr_type ==  ogr.OFTReal:
                         if value:

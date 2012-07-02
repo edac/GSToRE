@@ -329,6 +329,7 @@ END
                         STYLE
                             COLORRANGE 0 0 0 255 255 255
                             DATARANGE -100 3000
+                            RANGEITEM "[pixel]"
                         END
                     END
                     """ 

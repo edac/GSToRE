@@ -125,7 +125,11 @@ class DatasetsController(BaseController):
             if format == 'zip' or dataset.taxonomy not in ['geoimage', 'vector']:
                 url = src.location
                 if urlparse.urlparse(url).scheme in ['file','']:
-                    response.headers['Content-Type'] = 'application/x-zip-compressed'
+                    #modified 20120307 (sscott) for delivering pdfs
+                    if format == 'zip':
+                        response.headers['Content-Type'] = 'application/x-zip-compressed'
+                    elif format == 'pdf':
+                        response.headers['Content-Type'] = 'application/pdf'
                     with open(str(url), 'r') as f:
                         shutil.copyfileobj(f, response) 
                     return 

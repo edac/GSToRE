@@ -1,0 +1,24 @@
+An error occurred: HTTP Error 500: Internal Server Error
+  File "/usr/local/lib/python2.6/dist-packages/TileCache/Service.py", line 303, in wsgiHandler
+    format, image = service.dispatchRequest( fields, path_info, req_method, host )
+  File "/usr/local/lib/python2.6/dist-packages/TileCache/Service.py", line 208, in dispatchRequest
+    return self.renderTile(tile, params.has_key('FORCE'))
+  File "/usr/local/lib/python2.6/dist-packages/TileCache/Service.py", line 138, in renderTile
+    data = layer.render(tile, force=force)
+  File "/usr/local/lib/python2.6/dist-packages/TileCache/Layer.py", line 444, in render
+    return self.renderTile(tile)
+  File "/usr/local/lib/python2.6/dist-packages/TileCache/Layers/WMS.py", line 29, in renderTile
+    tile.data, response = wms.fetch()
+  File "/usr/local/lib/python2.6/dist-packages/TileCache/Client.py", line 59, in fetch
+    response = self.client.open(urlrequest)
+  File "/usr/lib/python2.6/urllib2.py", line 399, in open
+    response = meth(req, response)
+  File "/usr/lib/python2.6/urllib2.py", line 512, in http_response
+    'http', request, response, code, msg, hdrs)
+  File "/usr/lib/python2.6/urllib2.py", line 437, in error
+    return self._call_chain(*args)
+  File "/usr/lib/python2.6/urllib2.py", line 369, in _call_chain
+    result = func(*args)
+  File "/usr/lib/python2.6/urllib2.py", line 520, in http_error_default
+    raise HTTPError(req.get_full_url(), code, msg, hdrs, fp)
+

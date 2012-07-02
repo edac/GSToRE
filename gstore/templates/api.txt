@@ -191,9 +191,5 @@ External Mapping Services:
 
  
 Please send your comments and report problems to:   
-    Renzo Sanchez-Silva 
-    renzo@edac.unm.edu
-    Analyst Programmer and Research Scientist
-    GSTORE Author and maintainer
-    University of New Mexico
+    devteam@edac.unm.edu
 
