@@ -1,43 +1,45 @@
-try:
-    from setuptools import setup, find_packages
-except ImportError:
-    from ez_setup import use_setuptools
-    use_setuptools()
-    from setuptools import setup, find_packages
+import os
 
-setup(
-    name='gstore',
-    version='0.1',
-    description='Geographic Storage, Transformation and Retrieval Engine',
-    author='Renzo Sanchez-Silva',
-    author_email='renzo@edac.unm.edu',
-    url='http://gstore.unm.edu',
-    install_requires=[
-        "Pylons>=1.0",
-        "SQLAlchemy>=0.5",
-    ],
-    setup_requires=["PasteScript>=1.6.3"],
-    packages=find_packages(exclude=['ez_setup']),
-    include_package_data=True,
-    test_suite='nose.collector',
-    package_data={'gstore': ['i18n/*/LC_MESSAGES/*.mo']},
-    #message_extractors={'gstore': [
-    #        ('**.py', 'python', None),
-    #        ('templates/**.mako', 'mako', {'input_encoding': 'utf-8'}),
-    #        ('public/**', 'ignore', None)]},
-    zip_safe=False,
-    paster_plugins=['PasteScript', 'Pylons'],
-    entry_points="""
-    [paste.app_factory]
-    main = gstore.config.middleware:make_app
+from setuptools import setup, find_packages
 
-    [paste.paster_command]
-    ingest-datasets = gstore.commands.ingest_datasets:IngestDatasets
-    promote-vector-datasets = gstore.commands.ingest_datasets:PromoteVectorDatasets
-    dump-vector-datasets = gstore.commands.ingest_datasets:DumpVectorDatasets    
-    seed-vector-formats = gstore.commands.ingest_datasets:SeedVectorFormats
+here = os.path.abspath(os.path.dirname(__file__))
+README = open(os.path.join(here, 'README.txt')).read()
+CHANGES = open(os.path.join(here, 'CHANGES.txt')).read()
 
-    [paste.app_install]
-    main = pylons.util:PylonsInstaller
-    """,
-)
+requires = [
+    'pyramid',
+    'SQLAlchemy',
+    'transaction',
+    'pyramid_tm',
+    'pyramid_debugtoolbar',
+    'zope.sqlalchemy',
+    'waitress',
+    ]
+
+setup(name='gstore_v3',
+      version='0.0',
+      description='gstore_v3',
+      long_description=README + '\n\n' +  CHANGES,
+      classifiers=[
+        "Programming Language :: Python",
+        "Framework :: Pylons",
+        "Topic :: Internet :: WWW/HTTP",
+        "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
+        ],
+      author='',
+      author_email='',
+      url='',
+      keywords='web wsgi bfg pylons pyramid',
+      packages=find_packages(),
+      include_package_data=True,
+      zip_safe=False,
+      test_suite='gstore_v3',
+      install_requires=requires,
+      entry_points="""\
+      [paste.app_factory]
+      main = gstore_v3:main
+      [console_scripts]
+      initialize_gstore_v3_db = gstore_v3.scripts.initializedb:main
+      """,
+      )
+

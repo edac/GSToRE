@@ -1,19 +1,14 @@
-This file is for you to describe the gstore application. Typically
-you would include information such as the information below:
+gstore_v3 README
+==================
 
-Installation and Setup
-======================
+Getting Started
+---------------
 
-Install ``gstore`` using easy_install::
+- cd <directory containing this file>
 
-    easy_install gstore
+- $venv/bin/python setup.py develop
 
-Make a config file as follows::
+- $venv/bin/populate_gstore_v3 development.ini
 
-    paster make-config gstore config.ini
+- $venv/bin/pserve development.ini
 
-Tweak the config file as appropriate and then setup the application::
-
-    paster setup-app config.ini
-
-Then you are ready to go.

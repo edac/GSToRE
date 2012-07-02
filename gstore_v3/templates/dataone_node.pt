@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<d1:node xmlns:d1="http://ns.dataone.org/service/types/v1" replicate="true" synchronize="true" type="mn" state="up">
+    <identifier>urn:node:DEMO2</identifier>
+    <name>${name}</name>
+    <description>${description}</description>
+    <baseURL>${baseUrl}</baseURL>
+    <services>
+        <service name="MNRead" version="v1" available="true"/>
+        <service name="MNCore" version="v1" available="true"/>
+    </services>
+    <synchronization>
+        <schedule hour="*" mday="*" min="0/3" mon="*" sec="10" wday="?" year="*"/>
+        <lastHarvested>2012-03-06T14:57:39.851+00:00</lastHarvested>
+        <lastCompleteHarvest>2012-03-06T14:57:39.851+00:00</lastCompleteHarvest>
+    </synchronization>
+    <ping success="true"/>
+    <subject>${subject}</subject>
+    <contactSubject>${contactsubject}</contactSubject>
+</d1:node>
