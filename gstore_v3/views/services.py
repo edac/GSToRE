@@ -284,7 +284,7 @@ def datasets(request):
     
     host = request.host_url
     g_app = request.script_name[1:]
-    base_url = '%s/%s/apps/%s/datasets/%s' % (host, g_app)
+    base_url = '%s/%s' % (host, g_app)
 
     #get dataset BBOX from decimal
     bbox = [float(b) for b in d.box]
