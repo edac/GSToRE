@@ -35,6 +35,7 @@ ecw test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ef4c8cdc-bec4-43aa-8f
 '''
 
 #TODO: REVISE FOR SLDs, RASTER BAND INFO, ETC
+#TODO: figure out ecw as DATA displaying as an empty tile
 
 #default syle objs
 def getStyle(geomtype):
@@ -120,17 +121,6 @@ def getLayer(d, src, dataloc, bbox):
         layer.metadata.set('wcs_rangeset_name', d.basename)
         layer.metadata.set('wcs_rangeset_label', d.description)
 
-        #check for any mapfile settings
-        #TODO: change this to look for any processing flags
-        #      then class flags (dem max/min, etc)
-        #      and deal with those differently
-        if src.map_settings:
-            if 'BANDS' in src.map_settings[0].settings:
-                layer.setProcessing('BANDS='+src.map_settings[0].settings['BANDS'])
-
-
-            
-
         '''
         for the dems:
         CLASS
@@ -142,19 +132,39 @@ def getLayer(d, src, dataloc, bbox):
         END
         '''
         
-        cls = mapscript.classObj()
-        #seriously, this must go
-        if d.basename[-5] == '__DEM':
-            s = mapscript.styleObj()
-            s.rangeitem = '[pixel]'
-            s.mincolor.setRGB(0,0,0)
-            s.maxcolor.setRGB(255, 255, 255)
-            s.minvalue = -100.0
-            s.maxvalue = 3000.0
-            cls.insertStyle(s)
-        cls.name = 'Everything'
-        layer.insertClass(cls)
-        
+#        cls = mapscript.classObj()
+#        #seriously, this must go
+#        if d.basename[-5] == '__DEM':
+#            s = mapscript.styleObj()
+#            s.rangeitem = '[pixel]'
+#            s.mincolor.setRGB(0,0,0)
+#            s.maxcolor.setRGB(255, 255, 255)
+#            s.minvalue = -100.0
+#            s.maxvalue = 3000.0
+#            cls.insertStyle(s)
+#        cls.name = 'Everything'
+#        layer.insertClass(cls)
+
+    #check for any mapfile settings
+    #TODO: change this to look for any processing flags
+    #      then class flags (dem max/min, etc)
+    #      and deal with those differently
+    if src.map_settings:
+        mapsettings = src.map_settings[0]
+        if 'BANDS' in mapsettings.settings:
+            layer.setProcessing('BANDS='+src.map_settings[0].settings['BANDS'])
+
+        if mapsettings.classes:
+            #do something with classes
+            for c in mapsettings.classes:
+                pass
+
+            pass
+            
+        if mapsettings.styles:
+            #do something different for the styles
+            pass
+       
     return layer
 
 '''
@@ -271,7 +281,10 @@ def datasets(request):
     #get some config stuff
     mappath = get_current_registry().settings['MAPS_PATH']
     tmppath = get_current_registry().settings['TEMP_PATH']
-    base_url = get_current_registry().settings['BASE_URL']
+    
+    host = request.host_url
+    g_app = request.script_name[1:]
+    base_url = '%s/%s/apps/%s/datasets/%s' % (host, g_app)
 
     #get dataset BBOX from decimal
     bbox = [float(b) for b in d.box]
