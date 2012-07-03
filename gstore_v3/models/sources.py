@@ -25,10 +25,6 @@ DO NOT CONFUSE THIS WITH THE ORIGINAL SOURCE TABLE
 this is not that at all
 '''
 
-
-#not sure if we still need this, but it doesn't seem to hurt anything
-#__all__ = ['sources', 'Source', 'source_files', 'SourceFile']
-
 '''
 the source collection models
 '''
@@ -45,6 +41,7 @@ class Source(Base):
         Column('active', Boolean),
         Column('file_filesize_mb', Numeric),
         Column('file_hash', String(150)),
+        Column('file_hash_type', String(20)),
         Column('file_mimetype', String(100)),
         Column('uuid', UUID, FetchedValue()),
         Column('dataset_id', Integer, ForeignKey('gstoredata.datasets.id')), #foreign key to datasets
@@ -93,12 +90,56 @@ class MapfileSetting(Base):
         schema='gstoredata'
     )
 
+    classes = relationship('MapfileClass')
+    styles = relationship('MapfileStyle')
+
     def __repr__(self):
         return '<MapfileSetting (%s, %s)>' % (self.id, self.source_id)
 
+class MapfileClass(Base):
+    __table__ = Table('mapfile_classes', Base.metadata,
+        Column('id', integer, primary_key=True),
+        Column('uuid', UUID, FetchedValue()),
+        HStoreColumn('settings', HSTORE()),
+        Column('name', String(50)),
+        schema='gstoredata'
+    )
+
+    def __repr__(self):
+        return '<MapfileClass (%s, %s)>' % (self.id, self.name)
+
+class MapfileStyle(Base):
+    __table__ = Table('mapfile_styles', Base.metadata,
+        Column('id', integer, primary_key=True),
+        Column('uuid', UUID, FetchedValue()),
+        HStoreColumn('settings', HSTORE()),
+        Column('name', String(25)),
+        schema='gstoredata'
+    )
+
+    def __repr__(self):
+        return '<MapfileStyle (%s, %s)>' % (self.id, self.name)
+
+#join tables
+
+#for the list of styles available for the map
+mapfile_settings_styles = Table('mapfile_settings_styles', Base.metadata,
+    Column('settings_id', Integer, ForeignKey('gstoredata.mapfile_settings.id')),
+    Column('style_id', Integer, ForeignKey('gstoredata.mapfile_styles.id')),
+    schema='gstoredata'
+)
+
+#for the classes for a map (where the default class style is one of the settings)
+mapfile_settings_classes = Table('mapfile_settings_classes', Base.metadata,
+    Column('class_id', Integer, ForeignKey('gstoredata.mapfile_classes.id')),
+    Column('settings_id', Integer, ForeignKey('gstoredata.mapfile_settings.id')),
+    schema='gstoredata'
+)
 
 
 
 
-    
+
+
+
 
