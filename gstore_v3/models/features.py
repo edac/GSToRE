@@ -26,7 +26,7 @@ class Feature(Base):
         Column('fid', Integer, primary_key=True), #this should really be the primary key
         Column('gid', Integer),
         Column('dataset_id', Integer, ForeignKey('gstoredata.datasets.id')),
-        Column('geom', String()),
+        Column('geom', String),
         Column('uuid', UUID, FetchedValue()),
         schema = 'gstoredata'
     )

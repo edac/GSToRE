@@ -39,7 +39,7 @@ def metadata(request):
 
     app = request.matchdict['app'] #doesn't actually mean anything right now
     dataset_id = request.matchdict['id']
-    standard = request.matchdict.get('standard', 'fgdc')
+    standard = request.matchdict.get('standard', 'fgdc') #for the v2 uri
     format = request.matchdict['ext']
 
     if standard not in ['fgdc']:
@@ -89,11 +89,12 @@ def metadata(request):
             #failover to the raw xml
             content_type='text/xml; charset=UTF-8'
             output = xml.encode('utf8')
-            return Response(str(e))
+            #return Response(str(e))
 
         return Response(output, content_type=content_type)
 
 #TODO: deal with this once we have linkable components in new schema
+#TODO: modify routes to have some {metadata object}/{uuid}.{ext} thing?
 @view_config(route_name='xlink_metadata')
 def xlink(request):
     return Response('metadata = %s' % (request.matchdict['id']))

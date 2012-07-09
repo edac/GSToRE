@@ -16,6 +16,8 @@ from ..models.datasets import (
     )
 
 from ..lib.database import *
+from ..lib.spatial import tilecache_service
+
 
 '''
 INSTALLING PIL for the virtualenv (http://justalittlebrain.wordpress.com/2011/08/21/installing-pil-in-virtualenv-in-ubuntu/)
@@ -281,23 +283,33 @@ def datasets(request):
     #get some config stuff
     mappath = get_current_registry().settings['MAPS_PATH']
     tmppath = get_current_registry().settings['TEMP_PATH']
+    srid = get_current_registry().settings['SRID']
     
     host = request.host_url
     g_app = request.script_name[1:]
     base_url = '%s/%s' % (host, g_app)
 
+    #maybe it's for the tile cache
+    if service == 'wms_tiles':
+        #baseurl, dataset, app, params, is_basemap = False
+        return tilecache_service(base_url, d, params, False)
+
     #get dataset BBOX from decimal
     bbox = [float(b) for b in d.box]
 
     #let's make sure the mapfile hasn't been cached already (dataset id.source id.map)
-    if os.path.isfile('%s/%s.%s.map' % (mappath, d.uuid, mapsrc)):
+    #TODO: deal with the vector data source with no sources record (formats cache)
+    if os.path.isfile('%s/%s.%s.map' % (mappath, d.uuid, mapsrc.uuid)):
         #just read the mapfile and carry on
-        m = mapscript.mapObj('%s/%s.%s.map' % (mappath, d.uuid, mapsrc))
+        m = mapscript.mapObj('%s/%s.%s.map' % (mappath, d.uuid, mapsrc.uuid))
     else: 
         #need to make a new mapfile
 
 
         #TODO: reproject bbox to source epsg
+        if srid != d.orig_epsg:
+            #reproject the bbox
+            pass
 
         #TODO: someday get the raster info to handle multiple bands, etc
 
@@ -461,25 +473,38 @@ def datasets(request):
 
 @view_config(route_name='services', match_param='type=tileindexes')
 def tileindexes(request):
+
+    #build the map file
+
 	return Response()
 
 
 #run the base layers for the mapper
 @view_config(route_name='base_services')
 def base_services(request):
-    #just point to the map file and do that
 
-    maps_path = get_current_registry().settings['MAPS_PATH']
-
-    #/clusterdata/gstore/maps/base/base.map
-    basemap = '%s/base/base.map' % maps_path
-    basemap = '/clusterdata/gstore/maps/base/base.map'
-
-    #open it and send it on to render the map
-    m = mapscript.mapObj(basemap)
+    service = request.matchdict['service']
 
     #get the query params because we like those
     params = request.params
+    
+    if service == 'wms_tiles':
+        host = request.host_url
+        g_app = request.script_name[1:]
+        base_url = '%s/%s' % (host, g_app)
+        #baseurl, dataset, app, params, is_basemap = False
+        return tilecache_service(base_url, None, params, True)
+
+    #just point to the map file and do that
+    maps_path = get_current_registry().settings['MAPS_PATH']
+
+    #TODO: change this so it isn't hardcoded in
+    #/clusterdata/gstore/maps/base/base.map
+    basemap = '%s/base/base.map' % maps_path
+    #basemap = '/clusterdata/gstore/maps/base/base.map'
+
+    #open it and send it on to render the map
+    m = mapscript.mapObj(basemap)
 
     #and get the type (if not there assume capabilities but really that should fail)
     ogc_req = params.get('REQUEST', 'GetCapabilities')

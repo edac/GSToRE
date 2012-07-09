@@ -1,6 +1,12 @@
 from osgeo import ogr, osr
 from datetime import datetime
 
+from TileCache.Service import Service, wsgiHandler
+from TileCache.Caches.Disk import Disk
+from TileCache.Layers import WMS as WMS
+
+from pyramid.threadlocal import get_current_registry
+
 '''
 the ogr field constants
 '''
@@ -112,9 +118,28 @@ def epsg_to_sr(epsg):
     sr.ImportFromEPSG(epsg)
     return sr
 
+#extent as string to float array
+#ASSUME: box = minx,miny,maxx,maxy
+def stringToBBox(box):
+    try:
+        if isinstance(box, basestring):
+            bbox = map(float, box.split(','))
+        else:
+            #try as a list of strings
+            bbox = map(float, box)
+    except:
+        bbox = []
+    return bbox
+
 #bbox to wkt
 def bbox_to_wkt(bbox):
     return """POLYGON((%(minx)s %(miny)s,%(minx)s %(maxy)s,%(maxx)s %(maxy)s,%(maxx)s %(miny)s,%(minx)s %(miny)s))""" % { 'minx': bbox[0], 'miny': bbox[1], 'maxx': bbox[2], 'maxy': bbox[3]}
+
+#geom to wkt
+def geom_to_wkt(geom, srid=''):
+    wkt = geom.ExportToWkt()
+    wkt = 'SRID=%s;%s' % (srid, wkt) if srid else wkt
+    return wkt
 
 '''
 0103000000010000000500000098CD95A187FB5AC0D7A37287D47B414098CD95A187FB5AC04499A34D494443407BE60D79A93F5AC04499A34D494443407BE60D79A93F5AC0D7A37287D47B414098CD95A187FB5AC0D7A37287D47B4140
@@ -203,4 +228,99 @@ def reproject_geom(geom, in_epsg, out_epsg):
 '''
 any other bbox stuff
 '''
+
+'''
+tilecache stuff
+
+maybe move to its own file?
+'''
+def tilecache_service(baseurl, dataset, app, params, is_basemap = False):
+    '''
+    TILE_EPSG = 26913
+    TILE_RESOLUTIONS = 2500,2000,1800,1600,1400,1200,1000,500,250,30,10,1,0.1524
+    TILE_SIZE = 256,256
+    TILE_EXTENT = -235635,3196994,1032202,4437481
+    '''
+    tilecache_path = get_current_registry().settings['TILECACHE_PATH']
+    tilecache_epsg = get_current_registry().settings['TILE_EPSG']
+    tilecache_resolutions = get_current_registry().settings['TILE_RESOLUTIONS']
+    tilecache_size = get_current_registry().settigns['TILE_SIZE']
+    tilecache_extent = get_current_registry().settings['TILE_EXTENT']
+
+    basic_wms = baseurl + '/apps/'+app+'/datasets/%s/services/ogc/wms'
+
+    format = kargs['format'] if 'format' in kargs else ''
+    format = kargs['FORMAT'] if 'FORMAT' in kargs else format
+
+    extension = 'png'
+    extension = 'jpeg' if 'jpeg' in format else extension
+    extension = 'gif' if 'gif' in format else extension    
+
+    if is_basemap:
+        #do one thing
+        basename = 'naturalearthsw,southwestutm,nmcounties,Highways'
+        basic_wms = basic_wms % ('base')
+
+        layers = ['naturalearthsw', 'southwestutm','nmcounties','Highways' ]
+        def make_wms_layer(layer):
+            return WMS.WMS(
+                layer,
+                basic_wms,
+                srs = 'EPSG:%s' % (epsg),
+                extension = extension,
+                resolutions = tile_resolutions,
+                bbox = tilecache_extent,
+                data_extent = tilecache_extent,
+                size = tile_size,
+                debug = False,
+                extent_type = 'loose'
+            )
+        baselayers = {}
+        for layer in layers:
+            baselayers[layer] = make_wms_layer(layer)
+        baselayers[','.join(layers)] = make_wms_layer(','.join(layers))
+
+        tile_service = Service(
+            Disk(tilecache_path),
+            baselayers
+        )
+    else:
+        #it's a dataset so do another thing
+        basic_wms = basic_wms % (str(dataset.uuid))
+        tile_service = Service(
+            Disk(tilecache_path),
+            {
+                basename: WMS.WMS(
+                    dataset.basename,
+                    basic_wms,
+                    srs = 'EPSG:%s' % (tilecache_epsg),
+                    extension = extension,
+                    bbox = tilecache_extent,
+                    data_extent = tilecache_extent,
+                    resolutions = tile_resolutions,
+                    size = tilecache_size,
+                    debug = False,
+                    extent_type = 'loose'
+                )
+            }
+        )
+
+    return wsgiHandler(kargs['environ'], kargs['start_response'], tile_service)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

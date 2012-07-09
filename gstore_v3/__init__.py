@@ -3,6 +3,7 @@ from sqlalchemy import engine_from_config
 
 from pyramid.response import Response
 from pyramid.view import notfound_view_config
+from pyramid.httpexceptions import HTTPNotFound, HTTPNotImplemented
 
 from .models import DBSession
 
@@ -14,15 +15,20 @@ bin/pshell gstore_v3/development.ini
 
 '''
 
-#custom notfound method
+#custom error methods
+#TODO: that should probably be changed to nicer things
+#@notfound_view_config(match_param='app=dataone')
+#def notimplemented_dataone(request):
+#    return HTTPNotImplemented()
+    
 @notfound_view_config(request_method='GET')
 def notfound_get(request):
-	return Response('Not found it', status='404 Not Found')
+	return HTTPNotFound('Invalid GET request.')
 
 #custom notfound method
 @notfound_view_config(request_method='POST')
 def notfound_post(request):
-	return Response('No posting', status='404 Not Found')
+	return HTTPNotFound('Invalid POST request.')
 
 '''
 custom predicates for some quick url validation before hitting the views
@@ -135,7 +141,9 @@ def main(global_config, **settings):
 
 #to the dataset
     #use the integer dataset_id or the uuid
-    config.add_route('dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{type}.{ext}', custom_predicates=(applist, typelist,))
+    config.add_route('html_dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.html', custom_predicates=(applist,))
+    config.add_route('dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}', custom_predicates=(applist, typelist,))
+    config.add_route('zip_dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}.zip', custom_predicates=(applist, typelist,))
     config.add_route('add_dataset', '/apps/{app}/datasets', custom_predicates=(applist,)) #POST
     config.add_route('update_dataset', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,)) #PUT
     config.add_route('dataset_services', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/services.{ext}', custom_predicates=(applist,))

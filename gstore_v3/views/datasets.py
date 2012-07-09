@@ -1,6 +1,6 @@
 from pyramid.view import view_config
 from pyramid.response import Response, FileResponse
-from pyramid.httpexceptions import HTTPNotFound, HTTPFound
+from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError
 
 from pyramid.threadlocal import get_current_registry
 
@@ -17,27 +17,36 @@ from ..models.datasets import (
 from ..lib.utils import *
 from ..lib.database import *
 
+
 '''
 datasets
 '''
 
-#TODO: figure out a route that doesn't conflict with the download route
 ##TODO: add the html renderer to this
-#@view_config(route_name='dataset', match_param='ext=html')
-#def show_html(request):
-#    dataset_id = request.matchdict['id']
+@view_config(route_name='html_dataset', renderer='dataset_card.mako')
+def show_html(request):
+    dataset_id = request.matchdict['id']
+    app = request.matchdict['app']
 
-#    if not isinstance(dataset_id, (int, long)): 
-#        #it's the uuid
-#        dfilter = 'uuid = %s' % (dataset_id)
-#    else:
-#        dfilter = 'id = %s' % (dataset_id)
+    d = get_dataset(dataset_id)
 
-#    #get the dataset by the filter
+    if not d:
+        return HTTPNotFound('No results')
 
-#    return Response('html ' + dfilter)
-#    
+    #http://129.24.63.66/gstore_v3/apps/rgis/datasets/8fc27d61-285d-45f6-8ef8-83785d62f529/soils83.html
 
+    #get the host url
+    host = request.host_url
+    g_app = request.script_name[1:]
+    base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
+    
+    rsp = d.get_full_service_dict(base_url)
+
+    return rsp
+    #return Response('html ' + str(d.uuid))
+    
+
+@view_config(route_name='zip_dataset')
 @view_config(route_name='dataset')
 def dataset(request):
     #use the original dataset_id structure 
@@ -46,6 +55,7 @@ def dataset(request):
     dataset_id = request.matchdict['id']
     format = request.matchdict['ext']
     datatype = request.matchdict['type'] #original vs. derived
+    basename = request.matchdict['basename']
 
     #go get the dataset
     d = get_dataset(dataset_id)
@@ -81,7 +91,8 @@ def dataset(request):
         src = src[0]
         loc = src.src_files[0].location
         return HTTPFound(location=loc)
-      
+
+    #TODO: refactor the heck out of this  
     if d.taxonomy in ['geoimage', 'file']:
         src = [s for s in d.sources if s.extension == format and s.set == datatype and s.active]
         if not src:
@@ -126,7 +137,7 @@ def dataset(request):
             if not tmppath:
                 return HTTPNotFound('where is the temp!')
             #get the name of the file from the url
-            zippath = os.path.join(tmppath, '%s.%s.%s.zip' % (dataset_id, datatype, format))
+            zippath = os.path.join(tmppath, '%s/%s.%s.%s.zip' % (dataset_id, d.basename, datatype, format))
             #make the zipfile
             files = [f.location for f in files]
             output = createZip(zippath, files)
@@ -135,13 +146,11 @@ def dataset(request):
             #it should already be a zip
             output = files[0].location
             outname = files[0].location
-        
-        #Response.content_disposition = 'attachment; filename=%s' % (outname)
-        #Response.content_type = mimetype
+
         fr = FileResponse(output, content_type=mimetype)
         fr.content_disposition = 'attachment; filename=%s' % (outname)
         return fr
-        #return FileResponse(output, content_type=mimetype)
+
     else:
         #TODO: deal with the vectors once mongo is running and there's data
         #TODO: what about formats not in sources (always derived)? bounce if uuid.original.gml?
@@ -149,9 +158,72 @@ def dataset(request):
         # get file
         # zip file (or if kml, kmz it)
         #deliver
-        return Response('Not doing vectors today. Come back later. kthxbye.')
+        
+        #check for the existing file in sources
+        src = [s for s in d.sources if s.extension == format and s.set == datatype and s.active]
+        if src:
+            src = src[0]
+            #zip or not
+            if src.is_external:
+                loc = src.src_files[0].location
+                #redirect and bail
+                return HTTPFound(location=loc)
 
+            #get the mimetype (not as unicode)
+            mimetype = str(src.file_mimetype)
 
+            #get the files
+            files = src.src_files
+            if not files:
+                return HTTPNotFound('why are there no files?')
+
+            #zip'em up unless it's already a zip
+            if format != 'zip':
+
+                #to test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ccfc9523-4b9e-4c58-8cf5-7d727fc8a807/{basename}.original.tif
+                tmppath = get_current_registry().settings['TEMP_PATH']
+                if not tmppath:
+                    return HTTPNotFound('where is the temp!')
+                #get the name of the file from the url
+                zippath = os.path.join(tmppath, '%s/%s.%s.%s.zip' % (dataset_id, d.basename, datatype, format))
+                #make the zipfile
+                files = [f.location for f in files]
+                output = createZip(zippath, files)
+                outname = zippath.split('/')[-1]
+            else:
+                #it should already be a zip
+                output = files[0].location
+                outname = files[0].location
+
+            fr = FileResponse(output, content_type=mimetype)
+            fr.content_disposition = 'attachment; filename=%s' % (outname)
+            return fr
+
+        #TODO: probably something about the KML -> KMZ situation
+        #check for the existing file in formats
+        fmtpath = get_current_registry().settings['FORMATS_PATH']
+        cachepath = os.path.join(fmtpath, str(d.uuid), format)
+        #don't forget the actual packed zip
+        cachefile = os.path.join(cachepath, str(d.basename) + '.' + format + '.zip')
+        if os.path.isfile(cachefile):
+            fr = FileResponse(cachefile, content_type=mimetype)
+            fr.content_disposition = 'attachment; filename=%s' % (str(d.basename) + '.' + format + '.zip')
+            return fr
+
+        #build the file
+        #at the cache path
+        if not os.path.isdir(cachepath):
+            #make a new one
+            os.path.mkdir(cachepath)
+        success = d.build_vector(format, cachepath)
+        if success[0] != 0:
+            return HTTPServerError('failed to build vector')
+
+        #return the file (already been zipped)
+        fr = FileResponse(cachefile, content_type=mimetype)
+        fr.content_disposition = 'attachment; filename=%s' % (str(d.basename) + '.' + format + '.zip')
+        return fr
+        
 
 @view_config(route_name='dataset_services', renderer='json')
 def services(request):
@@ -169,8 +241,9 @@ def services(request):
     if not d:
         return HTTPNotFound('No results')
 
-    if d.is_available == False:
-        return HTTPNotFound('Temporarily unavailable')
+#can still show the basic info
+#    if d.is_available == False:
+#        return HTTPNotFound('Temporarily unavailable')
 
     #ogc services as {host}/apps/{app}/datasets/{id}/services/{service_type}/{service}
     #downloads as {host}/apps/{app}/datasets/{id}.{set}.{ext}
@@ -193,66 +266,10 @@ def services(request):
     host = request.host_url
     g_app = request.script_name[1:]
 
-    base_url = '%s/%s/apps/%s/datasets/%s' % (host, g_app, app, d.uuid)
+    #base_url = '%s/%s/apps/%s/datasets/%s' % (host, g_app, app, d.uuid)
+    base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
 
-    #all the basic info
-    rsp = {'id': d.id, 'uuid': d.uuid, 'description': d.description, 
-                'spatial': {'bbox': [float(s) for s in d.box], 'epsg': 4326}, 
-                'categories': [{'theme': t.theme, 'subtheme': t.subtheme, 'groupname': t.groupname} for t in d.categories]}
-    
-    #base the services on the taxonomy
-    #TODO: change this once the excluded list is ready
-    #base the downloads on formats + the sources.set combination (if format in sources, otherwise for vector it's all derived except the zip)
-    svcs = []
-    dlds = []
-    fmts = d.formats_cache.split(',')
-    srcs = d.sources
-    srcs = [s for s in srcs if s.active]
-    
-    if d.taxonomy == 'geoimage':
-        svcs = ['wms', 'wcs']
-
-        #add the downloads by source
-        #TODO: maybe compare to the formats list?
-        dlds = [(s.set, s.extension) for s in srcs]
-#        for s in srcs:
-#            dlds.append((s.set, s.extension))
-    elif d.taxonomy == 'vector':
-        svcs = ['wms', 'wfs']
-
-        #get the formats
-        #check for a source
-        #if none, derived + fmt
-        #if one, set + fmt
-        for f in fmts:
-            sf = [s for s in srcs if s.extension == f]
-            st = sf[0].set if sf else 'derived'
-            dlds.append((st, f))
-    elif d.taxonomy == 'file':
-        #just the formats
-        for f in fmts:
-            sf = [s for s in srcs if s.extension == f]
-            if sf:
-                #if it's not in there, that's a whole other problem (i.e. why is it listed in the first place?)
-                dlds.append((sf[0], f))
-                
-    #update the response dict
-    rsp.update({'services': [{s: '%s/services/ogc/%s' % (base_url, s) for s in svcs}], 'downloads': [{s[1]: '%s.%s.%s' % (base_url, s[0], s[1]) for s in dlds}]})
-    
-    #then just add the metadata
-    if d.has_metadata_cache:
-        standards = ['fgdc']
-        exts = ['html', 'txt', 'xml']
-        '''
-        as {fgdc: {ext: url}}
-        '''
-        mt = [{s: {e: '%s/metadata/%s.%s' % (base_url, s, e) for e in exts} for s in standards}]
-      
-        rsp.update({'metadata': mt})
-
-    #TODO: add the html card view also maybe
-
-    #TODO: add related datasets
+    rsp = d.get_full_service_dict(base_url)
 
     return rsp
 

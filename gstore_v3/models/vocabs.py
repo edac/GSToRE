@@ -13,7 +13,7 @@ from sqlalchemy.orm import (
 from zope.sqlalchemy import ZopeTransactionExtension
 
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
-#from hstore import HStore, HStoreColumn
+from hstore import HStore, HStoreColumn
 
 '''
 models for all of the controlled vocabularies
@@ -47,8 +47,7 @@ class ParameterLUT(Base):
         Column('term', String(25)),
         Column('description', String(500)),
         Column('source', String),
-        #add the hstore
-        #HStoreColumn('properties', HStore()),
+        HStoreColumn('properties', HStore()),
         schema='gstoredata'
     )
     

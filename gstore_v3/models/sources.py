@@ -90,17 +90,17 @@ class MapfileSetting(Base):
         schema='gstoredata'
     )
 
-    classes = relationship('MapfileClass')
-    styles = relationship('MapfileStyle')
+    classes = relationship('MapfileClass', secondary='gstoredata.mapfile_settings_classes')
+    styles = relationship('MapfileStyle', secondary='gstoredata.mapfile_settings_styles')
 
     def __repr__(self):
         return '<MapfileSetting (%s, %s)>' % (self.id, self.source_id)
 
 class MapfileClass(Base):
     __table__ = Table('mapfile_classes', Base.metadata,
-        Column('id', integer, primary_key=True),
+        Column('id', Integer, primary_key=True),
         Column('uuid', UUID, FetchedValue()),
-        HStoreColumn('settings', HSTORE()),
+        HStoreColumn('settings', HStore()),
         Column('name', String(50)),
         schema='gstoredata'
     )
@@ -110,9 +110,9 @@ class MapfileClass(Base):
 
 class MapfileStyle(Base):
     __table__ = Table('mapfile_styles', Base.metadata,
-        Column('id', integer, primary_key=True),
+        Column('id', Integer, primary_key=True),
         Column('uuid', UUID, FetchedValue()),
-        HStoreColumn('settings', HSTORE()),
+        HStoreColumn('settings', HStore()),
         Column('name', String(25)),
         schema='gstoredata'
     )
