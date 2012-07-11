@@ -1,5 +1,5 @@
 from pyramid.view import view_config
-from pyramid.response import Response
+from pyramid.response import Response, FileResponse
 
 from pyramid.httpexceptions import HTTPNotFound, HTTPServerError
 from pyramid.threadlocal import get_current_registry
@@ -31,6 +31,12 @@ see http://mule1.dataone.org/ArchitectureDocs-current/apis/MN_APIs.html
 def datetime_to_dataone(dt):
     #TODO: deal with timezone-y issues
     fmt = '%Y-%m-%dT%H:%M:%S.0Z'
+    return dt.strftime(fmt)
+    
+def datetime_to_http(dt):
+    #TODO: utc to gmt
+    #Wed, 16 Dec 2009 13:58:34 GMT
+    fmt = '%a, %d %b %Y %H:%M:%S GMT'
     return dt.strftime(fmt)
 
 #TODO: modify the cache settings
@@ -198,16 +204,10 @@ def show(request):
 
     if not d:
         #emit that xml
-        request.response.content_type = 'text/xml; charset=UTF-8'
-        request.response.status = 404
-        return '<?xml version="1.0" encoding="UTF-8"?><error detailCode="1800" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: DOESNTEXIST</description></error>'
-
-    #temporary we're not serving vector stuff data check
-    if d.taxonomy not in ['file', 'geoimage']:
-        #emit that xml
-        request.response.content_type = 'text/xml; charset=UTF-8'
-        request.response.status = 404
-        return '<?xml version="1.0" encoding="UTF-8"?><error detailCode="1800" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: DOESNTEXIST</description></error>'
+#        request.response.content_type = 'text/xml; charset=UTF-8'
+#        request.response.status = 404
+        return Response('<?xml version="1.0" encoding="UTF-8"?><error detailCode="1800" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: DOESNTEXIST</description></error>',
+                        content_type='text/xml; charset=UTF-8', status='404')
 
     #get the file we want to serve as the dataset
     #for file + geomimage, should be set==original
@@ -215,22 +215,29 @@ def show(request):
     src = [s for s in d.sources if s.file_hash != None]
     if not src:
         #emit that xml
-        request.response.content_type = 'text/xml; charset=UTF-8'
-        request.response.status = 404
-        return '<?xml version="1.0" encoding="UTF-8"?><error detailCode="1800" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: DOESNTEXIST</description></error>'
+        return Response('<?xml version="1.0" encoding="UTF-8"?><error detailCode="1800" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: DOESNTEXIST</description></error>',
+                        content_type='text/xml; charset=UTF-8', status='404')
         #this just gets worse
 
     srcfiles = src[0].src_files
-    file_size = src[0].file_size_mb
+    file_size = src[0].file_filesize_mb
     file_hash = src[0].file_hash
 
     #TODO: add some header stuff and check that we need to add some header stuff
     #dump the file
-    return FileResponse(srcfiles[0], content_type='application/octet-stream')
+    #TODO: check the file name stuff
+    fname = pid + '.zip'
+    if src[0].extension in ['pdf']:
+        fname = fname.replace('.zip', src[0].extension)
+    fr = FileResponse(srcfiles[0].location, content_type='application/octet-stream')
+    fr.headers['Content-disposition'] = str('attachment; filename=%s' % (fname))
+    return fr
 
 @view_config(route_name='dataone_object', request_method='HEAD', match_param='app=dataone')
 def head(request):
     '''
+    d1.method = describe
+    
     HTTP/1.1 200 OK
     Last-Modified: Wed, 16 Dec 2009 13:58:34 GMT
     Content-Length: 10400
@@ -251,9 +258,54 @@ def head(request):
     '''
 
     pid = request.matchdict['pid']
-    return Response('dataone object header')
 
-@view_config(route_name='dataone_meta', match_param='app=dataone', renderer='templates/dataeone_metadata.pt')
+    d = get_dataset(pid)
+    
+    if not d:
+        lst = [('Content-Type', 'text/xml'), 
+               ('DataONE-Exception-Name', 'NotFound'), 
+               ('DataONE-Exception-DetailCode', '1380'), 
+               ('DataONE-Exception-Description', 'The specified object does not exist on this node.'),
+               ('DataONE-Exception-PID', str(pid))]
+        rsp = Response()
+        rsp.status = 404
+        rsp.headerlist = lst
+        return rsp
+
+    src = [s for s in d.sources if s.file_hash != None]
+    if not src:
+        lst = [('Content-Type', 'text/xml'), 
+               ('DataONE-Exception-Name', 'NotFound'), 
+               ('DataONE-Exception-DetailCode', '1380'), 
+               ('DataONE-Exception-Description', 'The specified object does not exist on this node.'),
+               ('DataONE-Exception-PID', pid)]
+        rsp = Response()
+        rsp.status = 404
+        rsp.headerlist = lst
+        return rsp
+
+    lastmodified = d.dateadded
+    file_mb = src[0].file_filesize_mb
+    file_hash = src[0].file_hash
+    file_hashtype = src[0].file_hash_type
+    mimetype = src[0].file_mimetype
+
+    #1 Megabyte (MB) = 1 048 576 Byte
+    file_b = file_mb * 1048576
+
+    #TODO: deal with all the strings (can't be unicode from postgres)
+    lst = [('Last-Modified','%s' % (str(datetime_to_http(lastmodified)))), ('Content-Type','application/octet-stream'), ('Content-Length','%s' % (int(file_b)))]
+    #TODO: change this
+    lst.append(('DataONE-ObjectFormat',str(mimetype)))
+    lst.append(('DataONE-Checksum', '%s,%s' % (str(file_hashtype), str(file_hash))))
+    #TODO: change this to something
+    lst.append(('DataONE-SerialType', '1234'))
+
+    rsp = Response()
+    rsp.headerlist = lst
+    return rsp
+
+@view_config(route_name='dataone_meta', match_param='app=dataone', renderer='../templates/dataone_metadata.pt')
 def metadata(request):
     '''
     <?xml version="1.0" encoding="UTF-8"?>
@@ -298,21 +350,35 @@ def metadata(request):
     pid = request.matchdict['pid']
     d = get_dataset(pid)
 
+    #TODO: create a dataone 404 error method for these
     if not pid:
         request.response.content_type = 'text/xml; charset=UTF-8'
         request.response.status = 404
-        return '<?xml version="1.0" encoding="UTF-8"?><error detailCode="1800" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: DOESNTEXIST</description></error>'
+        #TODO: hint url?
+        return '''<?xml version="1.0" encoding="UTF-8"?><error detailCode="4060" errorCode="404"><description>The specified object does not exist on this node.</description>
+                <traceInformation>
+                    <value key="identifier">%s</value>
+                    <value key="method">cn.getSystemMetadata</value>
+                    <value key="hint">Unknown</value>
+                </traceInformation>
+                </error>''' % (pid)
 
     src = [s for s in d.sources if s.file_hash != None]
     if not src:
         #emit that xml
         request.response.content_type = 'text/xml; charset=UTF-8'
         request.response.status = 404
-        return '<?xml version="1.0" encoding="UTF-8"?><error detailCode="1800" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: DOESNTEXIST</description></error>'
+        return '''<?xml version="1.0" encoding="UTF-8"?><error detailCode="4060" errorCode="404"><description>The specified object does not exist on this node.</description>
+                <traceInformation>
+                    <value key="identifier">%s</value>
+                    <value key="method">cn.getSystemMetadata</value>
+                    <value key="hint">Unknown</value>
+                </traceInformation>
+                </error>''' % (pid)
         #this just gets worse
 
     srcfiles = src[0].src_files
-    file_size = src[0].file_size_mb
+    file_size = src[0].file_filesize_mb
     file_hash = src[0].file_hash
     file_hash_type = src[0].file_hash_type
 
@@ -321,9 +387,11 @@ def metadata(request):
     base_url = '%s/%s/apps/dataone/' % (host, g_app)
 
     #TODO: fix all of this
-    rsp = {'pid': pid, 'dateadded': datetime_to_dataone(d.dateadded), 'obj_format': src[0].extension, 'file_size': file_size, 'uid': 'GSTORE', 'o': 'EDAC', 'dc': 'everything', 'org': 'EDAC', 'hash_type': file_hash_type,
+    rsp = {'pid': pid, 'dateadded': datetime_to_dataone(d.dateadded), 'obj_format': src[0].extension, 'file_size': file_size, 
+           'uid': 'GSTORE', 'o': 'EDAC', 'dc': 'everything', 'org': 'EDAC', 'hash_type': file_hash_type,
            'hash': file_hash, 'embargo': '', 'metadata_modified': datetime_to_dataone(datetime.now()), 'mn': host}
 
+    request.response.content_type = 'text/xml; charset=UTF-8'
     return rsp
 
 @view_config(route_name='dataone_checksum', match_param='app=dataone')
