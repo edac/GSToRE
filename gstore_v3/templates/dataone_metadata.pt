@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<d1:systemMetadata xmlns:d1="http://dataone.org/coordinating_node_sysmeta_0.1"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:schemaLocation="http://dataone.org/coordinating_node_sysmeta_0.1 https://repository.dataone.org/software/cicore/trunk/schemas/coordinating_node_sysmeta.xsd">
+    <identifier>${pid}</identifier>
+    <objectFormat>${obj_format}</objectFormat>
+    <size>${file_size}</size>
+    <submitter>uid=${uid},o=${o},dc=${dc},dc=${org}</submitter>
+    <rightsHolder>uid=${uid},o=${o},dc=${dc},dc=${org}</rightsHolder>
+    <describes>${pid}</describes>
+    <checksum algorithm="${hash_type}">${hash}</checksum>
+    <embargoExpires>${embargo}</embargoExpires>
+    <accessRule rule="allow" service="read" principal="Principal0"/>
+    <accessRule rule="allow" service="read" principal="Principal1"/>
+    <replicationPolicy replicationAllowed="true" numberReplicas="2">
+        <preferredMemberNode>MemberNode12</preferredMemberNode>
+        <preferredMemberNode>MemberNode13</preferredMemberNode>
+        <blockedMemberNode>MemberNode6</blockedMemberNode>
+        <blockedMemberNode>MemberNode7</blockedMemberNode>
+    </replicationPolicy>
+    <dateUploaded>${dateadded}</dateUploaded>
+    <dateSysMetadataModified>${metadata_modified}</dateSysMetadataModified>
+    <originMemberNode>${mn}/</originMemberNode>
+    <authoritativeMemberNode>${mn}/</authoritativeMemberNode>
+</d1:systemMetadata>
+
