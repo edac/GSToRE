@@ -120,7 +120,7 @@ def epsg_to_sr(epsg):
 
 #extent as string to float array
 #ASSUME: box = minx,miny,maxx,maxy
-def stringToBBox(box):
+def string_to_bbox(box):
     try:
         if isinstance(box, basestring):
             bbox = map(float, box.split(','))
