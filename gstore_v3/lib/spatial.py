@@ -5,6 +5,8 @@ from TileCache.Service import Service, wsgiHandler
 from TileCache.Caches.Disk import Disk
 from TileCache.Layers import WMS as WMS
 
+from pyramid.wsgi import wsgiapp
+
 from pyramid.threadlocal import get_current_registry
 
 '''
@@ -234,7 +236,7 @@ tilecache stuff
 
 maybe move to its own file?
 '''
-def tilecache_service(baseurl, dataset, app, params, is_basemap = False):
+def tilecache_service(baseurl, dataset, app, params, kargs, is_basemap = False):
     '''
     TILE_EPSG = 26913
     TILE_RESOLUTIONS = 2500,2000,1800,1600,1400,1200,1000,500,250,30,10,1,0.1524
@@ -244,13 +246,13 @@ def tilecache_service(baseurl, dataset, app, params, is_basemap = False):
     tilecache_path = get_current_registry().settings['TILECACHE_PATH']
     tilecache_epsg = get_current_registry().settings['TILE_EPSG']
     tilecache_resolutions = get_current_registry().settings['TILE_RESOLUTIONS']
-    tilecache_size = get_current_registry().settigns['TILE_SIZE']
+    tilecache_size = get_current_registry().settings['TILE_SIZE']
     tilecache_extent = get_current_registry().settings['TILE_EXTENT']
 
-    basic_wms = baseurl + '/apps/'+app+'/datasets/%s/services/ogc/wms'
+    #basic_wms = 
 
-    format = kargs['format'] if 'format' in kargs else ''
-    format = kargs['FORMAT'] if 'FORMAT' in kargs else format
+    format = params['format'] if 'format' in params else ''
+    format = params['FORMAT'] if 'FORMAT' in params else format
 
     extension = 'png'
     extension = 'jpeg' if 'jpeg' in format else extension
@@ -259,7 +261,7 @@ def tilecache_service(baseurl, dataset, app, params, is_basemap = False):
     if is_basemap:
         #do one thing
         basename = 'naturalearthsw,southwestutm,nmcounties,Highways'
-        basic_wms = basic_wms % ('base')
+        basic_wms = '%s/apps/%s/datasets/%s/services/ogc/wms' % (baseurl, app, 'base')
 
         layers = ['naturalearthsw', 'southwestutm','nmcounties','Highways' ]
         def make_wms_layer(layer):
@@ -268,7 +270,7 @@ def tilecache_service(baseurl, dataset, app, params, is_basemap = False):
                 basic_wms,
                 srs = 'EPSG:%s' % (epsg),
                 extension = extension,
-                resolutions = tile_resolutions,
+                resolutions = tilecache_resolutions,
                 bbox = tilecache_extent,
                 data_extent = tilecache_extent,
                 size = tile_size,
@@ -286,18 +288,18 @@ def tilecache_service(baseurl, dataset, app, params, is_basemap = False):
         )
     else:
         #it's a dataset so do another thing
-        basic_wms = basic_wms % (str(dataset.uuid))
+        basic_wms = '%s/apps/%s/datasets/%s/services/ogc/wms' % (baseurl, app, str(dataset.uuid))
         tile_service = Service(
             Disk(tilecache_path),
             {
-                basename: WMS.WMS(
+                dataset.basename: WMS.WMS(
                     dataset.basename,
                     basic_wms,
                     srs = 'EPSG:%s' % (tilecache_epsg),
                     extension = extension,
                     bbox = tilecache_extent,
                     data_extent = tilecache_extent,
-                    resolutions = tile_resolutions,
+                    resolutions = tilecache_resolutions,
                     size = tilecache_size,
                     debug = False,
                     extent_type = 'loose'
@@ -305,7 +307,8 @@ def tilecache_service(baseurl, dataset, app, params, is_basemap = False):
             }
         )
 
-    return wsgiHandler(kargs['environ'], kargs['start_response'], tile_service)
+    #return wsgiHandler(kargs['environ'], kargs['start_response'], tile_service)
+    return wsgiHandler(None, ('200', []), tile_service)
 
 
 

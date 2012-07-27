@@ -1,0 +1,139 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" xmlns:tal="http://xml.zope.org/namespaces/tal">
+<head>
+    <title>GStore V3 API</title>
+    <style>
+        dl {margin-bottom: 50px;}
+        dl dt {background: #5f9be3; color: #fff; float: left; font-weight:bold; margin-right: 10px; padding: 5px; width:100px;}
+        dl dd {margin: 2px 0; padding: 5px 0;}
+    </style>
+</head>
+<body>
+    <h1>GSTORE: Geographic Storage, Transformation and Retrieval Engine!</h1>
+    <p>Documentation for Version 3.</p>
+    <h2>Basic Usage</h2>
+    <p>Definition of terms, basic route structures</p>
+    <dl>
+        <dt>UUID</dt>
+        <dd>The dataset or object identifier, for example 7b5a3ba0-d806-11e1-9b23-0800200c9a66.</dd>
+        <dt>app</dt>
+        <dd>The GStore name of the application (rgis, epscor, etc). All API calls are limited to the APP data objects. The examples below refer to data objects in the RGIS application.</dd>
+    </dl>
+    <h2>Datasets</h2>
+    <p></p>
+    
+    <h3>Service Description</h3>
+
+    <h3>OGC Services</h3>
+    <dl>
+        <dt></dt>
+        <dd></dd>
+        <dt></dt>
+        <dd></dd> 
+    </dl>
+
+    <h4>Examples</h4>
+    <p>http://129.24.63.66/gstore_v3/apps/rgis/datasets/b8989369-3183-49af-a817-1c9b37116ebc/services/ogc/wms?REQUEST=GetCapabilities&SERVICE=WMS&VERSION=1.1.1</p>
+
+    <h2>Metadata</h2>
+    <p>Sticking with the regular fgdc services right now.</p>
+    <dl>
+        <dt></dt>
+        <dd></dd>
+        <dt></dt>
+        <dd></dd> 
+    </dl>    
+    
+    <h2>Search</h2>
+    <h3>Datasets</h3>
+    <dl>
+        <dt>version</dt>
+        <dd>(optional) 2 or 3. Defaults to version 2 output format if version not included. You are strongly encouraged to use version=3 for any new development.</dd>
+        <dt>limit</dt>
+        <dd>(optional) integer; number of objects to return. Defaults to 25.</dd>
+        <dt>offset</dt>
+        <dd>(optional) integer; start of result set based on number of records to return. Defaults to 0.</dd>
+        <dt>dir</dt>
+        <dd>(optional) ASC or DESC. Sort order of the result set.</dd>
+        <dt>sort</dt>
+        <dd>(optional) lastupdate or text; </dd>
+        <dt>start_time</dt>
+        <dd>(optional) Start date for date added comparison. Format yyyyMMdd. UTC.</dd>
+        <dt>end_time</dt>
+        <dd>(optional) End date for date added comparison. Format yyyyMMdd. UTC.</dd>
+        <dt>valid_start</dt>
+        <dd>(optional) Start date for valid date range comparison. Format yyyyMMdd. UTC.</dd>
+        <dt>valid_end</dt>
+        <dd>(optional) End date for valid date range comparison. Format yyyyMMdd. UTC.</dd>
+        <dt>box</dt>
+        <dd>(optional) Bounding box coordinates as a comma-delimited list (minx, minyy, maxx, maxy)</dd>
+        <dt>epsg</dt>
+        <dd>(optional) EPSG code for the specified box rectangle. Default is 4326.</dd>
+        <dt>theme</dt>
+        <dd>(optional) search term for the theme.</dd>
+        <dt>subtheme</dt>
+        <dd>(optional) search term for the subtheme</dd>
+        <dt>groupname</dt>
+        <dd>(optional) search term for the groupname</dd>
+        <dt>query</dt>
+        <dd>(optional) keyword search terms.</dd>
+        <dt>format</dt>
+        <dd>(optional) zip,shp,kml,csv,xls,json,rss,gml,tif,sid,ecw,dem,hdf,ascii,nc,grib,txt,html,pdf,doc,docx,xlsx,gz,png,gif,jpg. Not all formats are available for a given dataset. Availability is based on the dataset taxonomy.</dd>
+        <dt>service</dt>
+        <dd>(optional) wms, wcs, or wfs</dd>
+        <dt>taxonomy</dt>
+        <dd>(optional) file, vector, geoimage (raster) or service</dd>
+        <dt>geomtype</dt>
+        <dd>(optional) point, linestring, polygon, multipolygon, 3d linestring, 3d polygon</dd>
+    </dl>
+
+    <h4>Examples</h4>
+    <p>${base_url}/apps/rgis/search/datasets.json?version=3&start_time=20120201&dir=ASC</p>
+    <p>${base_url}/apps/rgis/search/datasets.json?version=3&box=-106.058,36.013,-105.200,36.996</p>
+
+    <h3>Features</h3>
+    <p>Still working on it.</p>
+    <dl>
+        <dt></dt>
+        <dd></dd>
+        <dt></dt>
+        <dd></dd> 
+    </dl>
+
+    <h3>Category Tree</h3>
+    <p></p>
+    <dl>
+        <dt>node</dt>
+        <dd>(optional) Theme, subtheme and groupname search terms. Separate each term by __|__. For example, to return the groupnames under the Contour section of Elevation, use Elevation__|__Contours.</dd>
+    </dl>  
+
+    <h4>Examples</h4>
+    <p>${base_url}/apps/rgis/search/categories.json</p>
+    <p>${base_url}/apps/rgis/search/categories.json?node=Boundaries__|__General</p>  
+
+    <h3>Geospatial Lookups</h3>
+    <p>Search for quad names or placenames</p>
+    <p>The search request returns bounding boxes and names for either nm_quads (quad names) or nm_gnis (placenames). Indicate which lookup to use as nm_quads.json or nm_gnis.json.</p>
+    
+    <h4>Query Parameters</h4>
+    <dl>
+        <dt>query</dt>
+        <dd>(optional) Keywords to include in the name search. Replace any spaces with +.</dd> 
+        <dt>version</dt>
+        <dd>(optional) 2 or 3. Defaults to version 2 output format if version not included. You are strongly encouraged to use version=3 for any new development.</dd>
+        <dt>limit</dt>
+        <dd>(optional) integer; number of objects to return. Defaults to 25.</dd>
+        <dt>offset</dt>
+        <dd>(optional) integer; start of result set based on number of records to return. Defaults to 0.</dd>
+        <dt>dir</dt>
+        <dd>(optional) ASC or DESC. Sort order of the result set.</dd>
+        <dt>epsg</dt>
+        <dd>(optional) EPSG code for the result set bounding boxes. </dd>
+    </dl>
+    <h4>Examples</h4>
+    <p>${base_url}/apps/rgis/search/nm_quads.json?query=albu</p>
+    
+    
+    
+    
+</body>

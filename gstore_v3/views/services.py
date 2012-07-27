@@ -119,7 +119,7 @@ def getLayer(d, src, dataloc, bbox):
         layer.metadata.set('static', 'no')
         layer.metadata.set('annotation_name', '%s: %s' % (d.basename, d.dateadded))
         layer.metadata.set('wcs_label', 'imagery_wcs_%s' % (d.basename))
-        layer.metadata.set('wcs_formats', 'GTiff,PNG,JPEG,GIF')
+        layer.metadata.set('wcs_formats', 'GTiff,PNG,JPEG,GIF,AAIGRID')
         layer.metadata.set('wcs_rangeset_name', d.basename)
         layer.metadata.set('wcs_rangeset_label', d.description)
 
@@ -234,6 +234,7 @@ def generateService(mapfile, params, request_type, mapname=''):
     else:
         return HTTPNotFound('Invalid OGC request')
     
+    #TODO: add the wcs/wfs methods (or at least the thing to make mapscript handle them)
 
     
 '''
@@ -289,10 +290,13 @@ def datasets(request):
     g_app = request.script_name[1:]
     base_url = '%s/%s' % (host, g_app)
 
+    #NOTE: skipping tilecache and just running with wms services here
     #maybe it's for the tile cache
     if service == 'wms_tiles':
         #baseurl, dataset, app, params, is_basemap = False
-        return tilecache_service(base_url, d, params, False)
+        #kargs = self._get_method_args()
+        #return tilecache_service(base_url, d, app, params, request, False)
+        service = 'wms'
 
     #get dataset BBOX from decimal
     bbox = [float(b) for b in d.box]
@@ -331,7 +335,9 @@ def datasets(request):
         m.setProjection('+init=epsg:4326')
 
         #add some metadata
-        m.web.metadata.set('wms_srs', 'EPSG:4326 EPSG:4269 EPSG:4267 EPSG:26913 EPSG:26912 EPSG:26914 EPSG:26713 EPSG:26712 EPSG:26714')
+        supported_srs = get_current_registry().settings['OGC_SRS'].replace(',', ' ')
+        m.web.metadata.set('wms_srs', supported_srs)
+        #m.web.metadata.set('wms_srs', 'EPSG:4326 EPSG:4269 EPSG:4267 EPSG:26913 EPSG:26912 EPSG:26914 EPSG:26713 EPSG:26712 EPSG:26714')
 
         #enable the ogc services
         m.web.metadata.set('ows_enable_request', "*")
@@ -408,6 +414,28 @@ def datasets(request):
         of.setMimetype('image/jpeg')
         of.imagemode = mapscript.MS_IMAGEMODE_RGB
         m.appendOutputFormat(of)
+        if service == 'wcs':
+            #add geotif and ascii grid
+            of = mapscript.outputFormatObj('GDAL/GTiff', 'GEOTIFF_16')
+            of.setExtension('tif')
+            of.setMimetype('image/tiff')
+            of.imagemode = mapscript.MS_IMAGEMODE_FLOAT32
+            m.appendOutputFormat(of)
+
+            of = mapscript.outputFormatObj('GDAL/AAIGRID', 'AAIGRID')
+            of.setExtension('grd')
+            of.setMimetype('image/x-aaigrid')
+            of.imagemode = mapscript.MS_IMAGEMODE_INT16
+            of.setOption('FILENAME','result.grd')
+            m.appendOutputFormat(of)
+        #elif service == 'wfs':
+            #add gml and ?
+            #TODO:look into this
+#            of = mapscript.outputFormatObj('OGR/GML', 'OGRGML')
+#            of.setOption('STORAGE', 'memory')
+#            of.setOption('FORM', 'multipart')
+#            m.appendOutputFormat(of)
+
     
         #add the legend
         lgd = mapscript.legendObj()
@@ -484,16 +512,19 @@ def tileindexes(request):
 def base_services(request):
 
     service = request.matchdict['service']
+    app = request.matchdict['app']
 
     #get the query params because we like those
     params = request.params
-    
+
+    #TODO: if the issue isn't with paste.request, maybe temporarily turn this off and just return from mapserver
     if service == 'wms_tiles':
         host = request.host_url
         g_app = request.script_name[1:]
         base_url = '%s/%s' % (host, g_app)
-        #baseurl, dataset, app, params, is_basemap = False
-        return tilecache_service(base_url, None, params, True)
+        #baseurl, dataset, app, params, config, is_basemap = False
+        kargs = request.environ
+        return tilecache_service(base_url, None, app, params, kargs, True)
 
     #just point to the map file and do that
     maps_path = get_current_registry().settings['MAPS_PATH']
@@ -513,6 +544,8 @@ def base_services(request):
 
     return generateService(m, params, ogc_req, None)
 
+
+#http://129.24.63.66/gstore_v3/apps/rgis/datasets/6965/services/ogc/wms_tiles?LAYERS=t13nr01e27_sw_image__6965&FORMAT=image%2Fpng&TRANSPARENT=true&MAXEXTENT=left-bottom%3D(333323.7916480107%2C3909958.3300974485)%20right-top%3D(334153.2481547035%2C3910799.439216765)&DISPLAYOUTSIDEMAXEXTENT=false&SINGLETILE=false&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&EXCEPTIONS=application%2Fvnd.ogc.se_inimage&SRS=EPSG%3A26913&BBOX=335245,3900994,337805,3903554&WIDTH=256&HEIGHT=256
 
 '''
 mapper

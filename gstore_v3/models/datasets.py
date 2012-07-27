@@ -204,7 +204,7 @@ class Dataset(Base):
         base_url += str(self.uuid)
     
         results = {'id': self.id, 'uuid': self.uuid, 'description': self.description, 
-                'spatial': {'bbox': stringToBBox(self.box), 'epsg': 4326},  'lastupdate': self.dateadded.strftime('%Y%m%d'), 'name': self.basename, 
+                'spatial': {'bbox': string_to_bbox(self.box), 'epsg': 4326},  'lastupdate': self.dateadded.strftime('%Y%m%d'), 'name': self.basename, 
                 'categories': [{'theme': t.theme, 'subtheme': t.subtheme, 'groupname': t.groupname} for t in self.categories]}
 
 
@@ -326,6 +326,7 @@ class Dataset(Base):
 
             if format not in ['csv']:
                 #add the geometry
+                #TODO: add EXISTS check and if not, go get the geom by FID from shapes!!!
                 wkb = v['geom']['g']
                 geom = wkb_to_geom(wkb, epsg)
                 feature.SetGeometry(geom)

@@ -13,17 +13,23 @@ from .models import DBSession
 from .models.datasets import *
 
 #TODO: set up a better default - like the api docs currently
-@view_config(route_name='home', renderer='templates/mytemplate.pt')
+@view_config(route_name='home', renderer='templates/home.pt')
 def my_view(request):
     try:
         #one = DBSession.query(MyModel).filter(MyModel.name=='one').first()
         #one = DBSession.query(MyModel).filter(MyModel.name=='one').first()
+        #get the host url
+        host = request.host_url
+        g_app = request.script_name[1:]
+
+        #base_url = '%s/%s/apps/%s/datasets/%s' % (host, g_app, app, d.uuid)
+        base_url = '%s/%s' % (host, g_app)
         
         one = DBSession.query(Dataset).filter(Dataset.id==143533).first()
         one = ''
     except DBAPIError as e:
         return Response(str(e), content_type='text/plain', status_int=500)
-    return {'one':one, 'project':'gstore_v3'}
+    return {'base_url':base_url}
 
 conn_err_msg = """\
 Pyramid is having a problem using your SQL database.  The problem

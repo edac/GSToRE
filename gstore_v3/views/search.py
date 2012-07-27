@@ -105,7 +105,7 @@ def search_categories(request):
     {"total": 0, "results": [{"text": "PLSS V1", "leaf": true, "id": "Cadastral__|__NSDI__|__PLSS V1", "cls": "folder"}]}
 
     groupname (node=Climate__|__General__|__United%States)
-    (what exactyl would be the point?)
+    (what exactly would be the point?)
     {"total": 0, "results": []}
     '''
 
@@ -116,12 +116,12 @@ def search_categories(request):
         
         if len(parts) == 1:
             #clicked on theme so get the distinct subthemes
-            cats = DBSession.query(Category).filter("'%s'=ANY(apps_cache)" % (app)).filter(Category.theme==parts[0]).distinct(Category.subtheme).order_by(Category.subtheme.asc()) 
+            cats = DBSession.query(Category).filter("'%s'=ANY(apps)" % (app)).filter(Category.theme==parts[0]).distinct(Category.subtheme).order_by(Category.subtheme.asc()) 
 
             resp = {"total": 0, "results": [{"text": c.subtheme, "leaf": False, "id": '%s__|__%s' % (c.theme, c.subtheme)} for c in cats]}
         elif len(parts) == 2:
             #clicked on the subtheme
-            cats = DBSession.query(Category).filter("'%s'=ANY(apps_cache)" % (app)).filter(Category.theme==parts[0]).filter(Category.subtheme==parts[1]).order_by(Category.groupname.asc()) 
+            cats = DBSession.query(Category).filter("'%s'=ANY(apps)" % (app)).filter(Category.theme==parts[0]).filter(Category.subtheme==parts[1]).order_by(Category.groupname.asc()) 
 
             resp = {"total": 0, "results": [{"text": c.groupname, "leaf": True, "id": '%s__|__%s__|__%s' % (c.theme, c.subtheme, c.groupname), "cls": "folder"} for c in cats]}
         else:
@@ -132,7 +132,7 @@ def search_categories(request):
             
     else:
         #just pull all of the categories for the app
-        cats = DBSession.query(Category).filter("'%s'=ANY(apps_cache)" % (app)).distinct(Category.theme).order_by(Category.theme.asc()).order_by(Category.subtheme.asc()).order_by(Category.groupname.asc()) 
+        cats = DBSession.query(Category).filter("'%s'=ANY(apps)" % (app)).distinct(Category.theme).order_by(Category.theme.asc()).order_by(Category.subtheme.asc()).order_by(Category.groupname.asc()) 
         resp = {"total": 0, "results": [{"text": c.theme, "leaf": False, "id": c.theme} for c in cats]}
 
     return resp
@@ -406,11 +406,14 @@ def search_datasets(request):
     return rsp
 
 
-#TODO: Why?
+#TODO: finish this
 #return fids for the features that match the params
 #this is NOT the streamer (see views.features)
 @view_config(route_name='search', match_param='resource=features')
 def search_features(request):
+    '''
+    return a listing of fids that match the filters (for potentially some interface later or as an option to the streamer)
+    '''
     #pagination
     limit = int(request.params.get('limit')) if 'limit' in request.params else 25
     offset = int(request.params.get('offset')) if 'offset' in request.params else 0
@@ -425,6 +428,8 @@ def search_features(request):
     if sort not in ['observed']:
         return HTTPNotFound('Bad sort parameter')
 
+    #geometry type so just points, polygons or lines or something
+    geomtype = request.params.get('geomtype', '')
 
     #sort direction
     sortdir = request.params.get('dir').upper() if 'dir' in request.params else 'DESC'
@@ -441,6 +446,21 @@ def search_features(request):
     theme = request.params.get('theme') if 'theme' in request.params else ''
     subtheme = request.params.get('subtheme') if 'subtheme' in request.params else ''
     groupname = request.params.get('groupname') if 'groupname' in request.params else ''
+
+    #parameter search
+    #TODO: add the other bits to this and implement it
+    param = request.params['param'] if 'param' in request.params else ''
+
+    
+
+    #so we'd want the intersect between the fids from the dataset queries and the fids from the mongo query
+    #where we only run the mongo query if there's a valid dates? request so that we don't return them 
+    #because they're in the dataset but outside the given date range
+    if start_valid or end_valid:
+        #load up the mongo request and intersect
+        #this seems like a super bad idea
+        #so let's go!
+        pass
 
     return Response('searching the features')
 
@@ -469,7 +489,8 @@ def search(request):
 
     #keyword
     keyword = request.params.get('query') if 'query' in request.params else ''
-
+    keyword = keyword.replace('+', ' ') if keyword else keyword
+    
     #get the epsg for the returned results
     epsg = request.params.get('epsg') if 'epsg' in request.params else ''
 
