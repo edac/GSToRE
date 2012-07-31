@@ -1,6 +1,24 @@
 import os, re, zipfile
+import hashlib
 
 from pyramid.threadlocal import get_current_registry
+
+
+'''
+image mimetypes (mostly for mapserver)
+'''
+_IMAGE_MIMETYPES = {
+        'PNG': 'image/png',
+        'JPEG': 'image/jepg',
+        'GIF': 'image/gif',
+        'TIFF': 'image/tiff'
+    }
+def get_image_mimetype(s):
+    #check the value and the key for fun
+    #m = [v for k, v in _IMAGE_MIMETYPES.iteritems() if v.lower() == s.lower() or k.upper() == s.upper()]
+    m = [(k, v) for k, v in _IMAGE_MIMETYPES.iteritems() if v.lower() == s.lower() or k.upper() == s.upper()]
+    m = m[0] if m else None
+    return m
 
 '''
 file utils
@@ -16,6 +34,25 @@ def createZip(fullname, files):
     #which is silly except as a success indicator
     #which is silly
     return fullname
+
+'''
+hashes
+(see dataone api)
+'''
+
+#return the hash as sha1 or md5 for a file (so zip it somewhere first if it's a bunch of things)
+def getHash(zipfile, algo):
+    #TODO: change this if dataone rolls out other hash types or we want something else
+    m = hashlib.md5() if algo.lower() == 'md5' else hashlib.sha1()
+    zf = open(zipfile, 'rb')
+    #turn this on if the files are too big for memory
+    while True:
+        data = zf.read(2**20)
+        if not data:
+            break
+        m.update(data)
+    zf.close()
+    return m.hexdigest()
 
 
 '''
@@ -58,3 +95,6 @@ def getServices():
     if not svcs:
         return []
     return svcs.split(',')
+
+
+    

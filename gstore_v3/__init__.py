@@ -15,12 +15,8 @@ bin/pshell gstore_v3/development.ini
 
 '''
 
-#custom error methods
-#TODO: that should probably be changed to nicer things
-#@notfound_view_config(match_param='app=dataone')
-#def notimplemented_dataone(request):
-#    return HTTPNotImplemented()
-    
+#TODO: set up some nice 404 pages
+#custom error methods   
 @notfound_view_config(request_method='GET')
 def notfound_get(request):
 	return HTTPNotFound('Invalid GET request.')
@@ -87,6 +83,9 @@ def main(global_config, **settings):
 
     #TEST ROUTE
     config.add_route('test', '/test/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}')
+    config.add_route('test_url', '/test/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}')
+    config.add_route('test_wcs', '/test/services/wcs')
+    config.add_route('test_fmt', '/test/services/{fmt}')
     
     #to the attributes
     config.add_route('attributes', '/apps/{app}/attributes/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))

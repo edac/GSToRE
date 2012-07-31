@@ -141,7 +141,8 @@ class HStore(satypes.MutableType, satypes.Concatenable, satypes.TypeEngine):
             return super(HStore, self)._adapt_expression(op, other_type)
 
     def copy_value(self, value):
-        return dict(value)
+        #added an existence check, otherwise it bails if there are no hstore pairs
+        return dict(value) if value else dict()
 
 
 class HStoreElement(saexp.ColumnElement):

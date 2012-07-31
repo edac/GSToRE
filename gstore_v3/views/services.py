@@ -1,7 +1,7 @@
 from pyramid.view import view_config
 from pyramid.response import Response
 
-from pyramid.httpexceptions import HTTPNotFound, HTTPFound
+from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPBadRequest
 from pyramid.threadlocal import get_current_registry
 
 import os 
@@ -14,9 +14,11 @@ from ..models import DBSession
 from ..models.datasets import (
     Dataset,
     )
+from ..models.sources import MapfileStyle
 
 from ..lib.database import *
-from ..lib.spatial import tilecache_service
+#from ..lib.spatial import tilecache_service
+from ..lib.utils import get_image_mimetype
 
 
 '''
@@ -86,7 +88,7 @@ def getLayer(d, src, dataloc, bbox):
     layer.metadata.set('ows_keywordlist', '') #TODO: something
     layer.metadata.set('legend_display', 'yes')
     layer.metadata.set('wms_encoding', 'UTF-8')
-    layer.metadata.set('wms_title', d.basename)
+    layer.metadata.set('ows_title', d.basename)
     
     if d.taxonomy == 'vector':
         style = getStyle(d.geomtype)
@@ -94,7 +96,7 @@ def getLayer(d, src, dataloc, bbox):
         layer.setProjection('init=epsg:4326')
         layer.opacity = 50
         layer.type = getType(d.geomtype)
-        layer.metadata.set('wms_srs', 'epsg:4326')
+        layer.metadata.set('ows_srs', 'epsg:4326')
         layer.metadata.set('base_layer', 'no')
         layer.metadata.set('wms_encoding', 'UTF-8')
         layer.metadata.set('wms_title', d.basename)
@@ -111,7 +113,7 @@ def getLayer(d, src, dataloc, bbox):
         layer.setProjection('init=epsg:%s' % (d.orig_epsg))
         layer.setProcessing('CLOSE_CONNECTION=DEFER')
         layer.type = mapscript.MS_LAYER_RASTER
-        layer.metadata.set('wms_srs', 'epsg:%s' % (d.orig_epsg))
+        layer.metadata.set('ows_srs', 'epsg:%s' % (d.orig_epsg))
         layer.metadata.set('queryable', 'no')
         layer.metadata.set('background', 'no')
         layer.metadata.set('time_sensitive', 'no')
@@ -159,12 +161,37 @@ def getLayer(d, src, dataloc, bbox):
         if mapsettings.classes:
             #do something with classes
             for c in mapsettings.classes:
-                pass
+                cls = mapscript.classObj()
+                cls.name = c.name
+                #check for a style ref
+                if 'STYLE' in c:
+                    style_name = c['STYLE']
+                    style = DBSession.query(MapfileStyle).filter(MapfileStyle.name==style_name.replace('"', '')).first()
+                    if not style:
+                        continue
+                    new_style = mapscript.styleObject()
+                    #ew this is ugly so, you know, fix it
+                    settings = style.settings
+                    if 'RANGEMIN' in settings and 'RANGEMAX' in settings:
+                        new_style.minvalue = float(settings['RANGEMIN'])
+                        new_style.maxvalue = float(settings['RANGEMAX'])
+                    if 'COLORMAX' in settings and 'COLORMIN' in settings:
+                        #needs to be split into three integers
+                        mincolor = [int(x) for x in settings['COLORMIN'].split(',')]
+                        new_style.mincolor.setRGB(mincolor[0], mincolor[1], mincolor[2])
+                        maxcolor = [int(x) for x in settings['COLORMAX'].split(',')]
+                        new_style.maxcolor.setRGB(maxcolor[0], maxcolor[1], maxcolor[2])
+                    if 'RANGEITEM' in settings:
+                        new_style.rangeitem = settings['RANGEITEM']
 
-            pass
+                    cls.insertStyle(new_style)     
+                    
+            layer.insertClass(cls)
+
             
         if mapsettings.styles:
-            #do something different for the styles
+            #add the styles as the available styles
+            
             pass
        
     return layer
@@ -172,69 +199,95 @@ def getLayer(d, src, dataloc, bbox):
 '''
 generic-ish mapserver response method
 '''
-def generateService(mapfile, params, request_type, mapname=''):
+def generateService(mapfile, params, mapname=''):
     #do all of the actual response here after the mapscript map 
     #has been read/built
+    #should work with png or image/png as format
 
     #create the request
+    request_type = params['REQUEST']
     req = mapscript.OWSRequest()
     #TODO: post the parameters that were given
-    req.setParameter('SERVICE', 'WMS')
-    req.setParameter('VERSION', '1.1.1') #check the version
-    req.setParameter('REQUEST', request_type)
+#    req.setParameter('SERVICE', params['SERVICE']) #WMS
+#    req.setParameter('VERSION', params['VERSION']) #1.1.1
+#    req.setParameter('REQUEST', request_type) #getcapabilities
 
-    #return Response(ogc_req)
+    '''
+    supported requests:
+
+    wms: getcapabilities (xml), getmap (image), getfeatureinfo (text or gml), describelayer (xml), getlegendgraphic (image), getstyles (xml)
+    wcs: getcapabilities (xml), describecoverage (xml), getcoverage (geotiff or ascii grid)
+    wfs: getcapabilities (xml), describefeature (xml), getfeature (gml or)
+
+    required params:
+    wms+getmap: srs, styles, layers
+    wms+getmap, wcs+getcoverage, : bbox, width, height, format **wcs can have bbox OR time
+    wcs+getcoverage: crs, coverage, resx, resy
+    wcs+describecoverage: coverage
+    wfs+getfeature: typenam
+
+
+    optional params:
+    wcs+getcoverage: response_crs
+    wfs+getfeature: maxfeatures
+    '''
+
+    '''
+http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a78001a/services/ogc/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=mod10a1_a2002210.fractional_snow_cover&FORMAT=PNG&SRS=EPSG:4326&BBOX=-107.93,34.96,-104.99,38.53&WIDTH=256&HEIGHT=256
+
+    '''
+
+    #set up the params
+    #TODO: possibly care about the params sent in and i don't know why we care about case
+    keys = params.keys()
+    for k in keys:
+        #if k.upper() not in ['SERVICE', 'VERSION', 'REQUEST']:
+        req.setParameter(k, params[k])
+
+    #TODO add the featureinfo, getcoverage, getfeature bits
 
     #now check the service type: capabilities, map, mapfile (for internal use)
-    if request_type.lower() == 'getcapabilities':
-        mapscript.msIO_installStdoutToBuffer()
-        mapfile.OWSDispatch(req)
-        content_type = mapscript.msIO_stripStdoutBufferContentType()
-        content = mapscript.msIO_getStdoutBufferBytes()
+    try:
+        if request_type.lower() in ['getcapabilities', 'describecoverage', 'describelayer', 'getstyles', 'describefeature']:
+            mapscript.msIO_installStdoutToBuffer()
+            mapfile.OWSDispatch(req)
+            content_type = mapscript.msIO_stripStdoutBufferContentType()
+            content = mapscript.msIO_getStdoutBufferBytes()
 
-        if 'xml' in content_type:
-            content_type = 'application/xml'
+            if 'xml' in content_type:
+                content_type = 'application/xml'
 
-        #TODO: double check all of this
+            #TODO: double check all of this
+            
+            return Response(content, content_type=content_type)
+
+        elif request_type.lower() in ['getmap', 'getlegendgraphic']:
+            #TODO: check this with the legend request
         
-        return Response(content, content_type=content_type)
-
-    elif request_type.lower() == 'getmap':
-        #TODO: set the parameters
-        #TODO: and check for defaults before getting here, tidy this up
-        req.setParameter('WIDTH', params.get('WIDTH', '256'))
-        req.setParameter('HEIGHT', params.get('HEIGHT', '256'))
-
-        #, ','.join([str(b) for b in dataset.box])
-        req.setParameter('BBOX', params.get('BBOX', []))
-        req.setParameter('STYLES', params.get('STYLES', ''))
-
-        #dataset.basename
-        layers = str(params['LAYERS']) if 'LAYERS' in params else ''
-        #req.setParameter('LAYERS', params.get('LAYERS', ''))
-        req.setParameter('LAYERS', layers)
-        req.setParameter('FORMAT', params.get('FORMAT', 'image/png'))
-        req.setParameter('SRS', params.get('SRS', 'EPSG:4326'))
-
-        mapfile.loadOWSParameters(req)
-        img = Image.open(StringIO(mapfile.draw().getBytes()))
-        buffer = StringIO()
-        #TODO: change png to the specified output type
-        img.save(buffer, 'PNG')
-        buffer.seek(0)
-        #TODO: change content-type based on specified output type
-        return Response(buffer.read(), content_type='image/png')
-    elif request_type.lower() == 'getmapfile':
-        #that's ours, we just want to save the mapfile to disk
-        #and use the dataset id-source id.map for the filename to make sure it's unique
-        #and make sure there isn't one first (chuck it if there is)
-        mapfile.save(mapname)
-        #TODO: make this some meaningful response (even though it isn't for public consumption)
-        return Response('map generated')
-    else:
-        return HTTPNotFound('Invalid OGC request')
-    
-    #TODO: add the wcs/wfs methods (or at least the thing to make mapscript handle them)
+            mapfile.loadOWSParameters(req)
+            img = Image.open(StringIO(mapfile.draw().getBytes()))
+            buffer = StringIO()
+            
+            image_type = get_image_mimetype(params['FORMAT'])
+            if not image_type:
+                image_type = ('PNG', 'image/png')
+            img.save(buffer, image_type[0])
+            
+            buffer.seek(0)
+            content_type = image_type[1]
+            return Response(buffer.read(), content_type=content_type)
+        elif request_type.lower() == 'getmapfile':
+            #that's ours, we just want to save the mapfile to disk
+            #and use the dataset id-source id.map for the filename to make sure it's unique
+            #and make sure there isn't one first (chuck it if there is)
+            mapfile.save(mapname)
+            #TODO: make this some meaningful response (even though it isn't for public consumption)
+            return Response('map generated')
+        else:
+            return HTTPNotFound('Invalid OGC request')
+    except:
+        #let's try this for what's probably a bad set of params by service+request type
+        return HTTPBadRequest()
 
     
 '''
@@ -336,14 +389,15 @@ def datasets(request):
 
         #add some metadata
         supported_srs = get_current_registry().settings['OGC_SRS'].replace(',', ' ')
-        m.web.metadata.set('wms_srs', supported_srs)
+        #TODO: check the list against the epsg for the dataset
+        m.web.metadata.set('ows_srs', supported_srs)
         #m.web.metadata.set('wms_srs', 'EPSG:4326 EPSG:4269 EPSG:4267 EPSG:26913 EPSG:26912 EPSG:26914 EPSG:26713 EPSG:26712 EPSG:26714')
 
         #enable the ogc services
         m.web.metadata.set('ows_enable_request', "*")
 
         #TODO: again, pick a decent name here
-        m.web.metadata.set('wms_name', 'imagery_wms_%s' % (d.basename))
+        m.web.metadata.set('ows_name', 'imagery_wms_%s' % (d.basename))
         m.web.metadata.set('WMS_ONLINERESOURCE', '%s/apps/%s/datasets/%s/services/ogc/wms' % (base_url, app, d.uuid))
         m.web.metadata.set('WMS_ABSTRACT', 'WMS Service for %s dataset %s' % (app, d.description))
 
@@ -496,7 +550,7 @@ def datasets(request):
     #to check the bands:
     #http://129.24.63.66/gstore_v3/apps/rgis/datasets/539117d6-bcce-4f16-b237-23591b353da1/services/ogc/wms?REQUEST=GetMap&SERVICE=WMS&VERSION=1.1.1&LAYERS=m_3110406_ne_13_1_20110512&BBOX=-104.316358581,31.9342908128,-104.246085056,32.0032463898
     
-    return generateService(m, params, ogc_req, mapname)
+    return generateService(m, params, mapname)
 
 
 @view_config(route_name='services', match_param='type=tileindexes')
