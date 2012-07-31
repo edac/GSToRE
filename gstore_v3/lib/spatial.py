@@ -89,17 +89,17 @@ def ogr_to_postgis(ogrgeom):
 def convert_by_ogrtype(value, ogr_type, datefmt=''):
     if not value:
         #do nothing
-        return value
+        return ''
     if ogr_type == ogr.OFTInteger:
         try :
             return int(value)
         except:
-            return value
+            return value.encode('utf-8')
     if ogr_type == ogr.OFTReal:
         try:
             return float(value)
         except:
-            return value
+            return value.encode('utf-8')
     if ogr_type == ogr.OFTDateTime:
         #no expected format, no datetime
         if not datefmt:
@@ -108,8 +108,8 @@ def convert_by_ogrtype(value, ogr_type, datefmt=''):
             #try to parse
             return datetime.strptime(value, datefmt)
         except:
-            return value
-    return value
+            return value.encode('utf-8')
+    return value.encode('utf-8')
 
 '''
 transformations & reprojections
@@ -236,6 +236,7 @@ tilecache stuff
 
 maybe move to its own file?
 '''
+#TODO: resolve import error (paste.request) and test again
 def tilecache_service(baseurl, dataset, app, params, kargs, is_basemap = False):
     '''
     TILE_EPSG = 26913
@@ -307,6 +308,7 @@ def tilecache_service(baseurl, dataset, app, params, kargs, is_basemap = False):
             }
         )
 
+    #TODO: resolve the environ and start_response objects
     #return wsgiHandler(kargs['environ'], kargs['start_response'], tile_service)
     return wsgiHandler(None, ('200', []), tile_service)
 

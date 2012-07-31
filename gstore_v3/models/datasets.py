@@ -23,7 +23,7 @@ from ..lib.utils import getFormats, getServices, createZip
 from ..lib.spatial import *
 from ..lib.mongo import gMongo
 
-import os, tempfile
+import os, tempfile, shutil
 
 
 #__all__ = ['Dataset', 'categories_datasets', 'Category']
@@ -188,8 +188,12 @@ class Dataset(Base):
                 return None, fmtfile
 
             #nope, go build the vector
-            success = self.build_vector('shp', fmtpath)
-            if success[0] != 0: 
+            if not os.path.isdir(os.path.join(fmtpath, str(self.uuid), 'shp')):
+                #make the directory
+                os.mkdir(os.path.join(fmtpath, str(self.uuid)))
+                os.mkdir(os.path.join(fmtpath, str(self.uuid), 'shp'))
+            success, message = self.build_vector('shp', os.path.join(fmtpath, str(self.uuid), 'shp'))
+            if success != 0: 
                 return None, None
                 
             return None, fmtfile
@@ -275,7 +279,7 @@ class Dataset(Base):
 
         #check the base location
         if os.path.abspath(basepath) != basepath or not os.path.isdir(basepath):
-            return 1 #do something for a reasonable error
+            return (1, 'invalid base path') #do something for a reasonable error
 
         if format == 'xls':
             #do something else
@@ -340,8 +344,8 @@ class Dataset(Base):
             for fld in flds:
                 att = [a for a in atts if a['name'] == fld.name]
                 if att:
-                    value = str(att[0]['val'])
-                    #convert it to the right type based on the field with string as default
+                    value = att[0]['val']  
+                    #convert it to the right type based on the field with string (and encoded to utf-8) as default
                     value = convert_by_ogrtype(value, fld.ogr_type)
                     feature.SetField(str(fld.name), value)
 
@@ -381,7 +385,8 @@ class Dataset(Base):
         #NO - move this to the view so that we can build vector formats wherever we want
 
         filename = os.path.join(basepath, '%s.%s.zip' % (self.uuid, format))
-        #get the files
+        #get the files for the zip
+        #and move them to the formats cache
         files = []
         if format=='shp':
             exts = ['shp', 'shx', 'dbf', 'prj', 'shp.xml', 'sbn', 'sbx']
@@ -391,6 +396,12 @@ class Dataset(Base):
         else:
             files.append(os.path.join(tmp_path, '%s.%s' % (self.basename, format)))
         output = createZip(filename, files)
+
+        #and copy everything in files to the formats cache
+        for f in files:
+            outfile = f.replace(tmp_path, basepath)
+            shutil.copyfile(f, outfile)
+            
 
         #TODO: tidy up tmp (or figure out where it is and cron job?)
         

@@ -45,24 +45,24 @@ ecw test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ef4c8cdc-bec4-43aa-8f
 def getStyle(geomtype):
     s = mapscript.styleObj()
     s.symbol = 0
-    if geomtype == 'MULTIPOLYGON':
+    if geomtype in ['POLYGON', 'MULTIPOLYGON']:
         s.size = 1
         s.color.setRGB(180, 223, 238)
-    elif geomtype == 'POLYGON':
-        s.size = 1
-        s.color.setRGB(180, 223, 238)
-    elif geomtype == 'LINESTRING':
-        s.size = 2
+        s.width = 1
+        s.outlinecolor.setRGB(0,0,0)
+    elif geomtype in ['LINESTRING', 'LINE', '3D LINESTRING']:
+        s.width = 2
         s.color.setRGB(0, 0, 0)
     elif geomtype == 'POINT':
-        s.size = 3
+        s.size = 10
         s.color.setRGB(0, 0, 0)
     else:
         s.size = 3
-        s.color.setRGB(0, 0, 0)
+        s.color.setRGB(100, 100, 100)
 
     return s
 
+#TODO: check on this for the 3D features
 def getType(geomtype):
     if geomtype in ['MULTIPOLYGON', 'POLYGON']:
         return mapscript.MS_LAYER_POLYGON
@@ -150,49 +150,51 @@ def getLayer(d, src, dataloc, bbox):
 #        layer.insertClass(cls)
 
     #check for any mapfile settings
-    #TODO: change this to look for any processing flags
-    #      then class flags (dem max/min, etc)
-    #      and deal with those differently
-    if src.map_settings:
-        mapsettings = src.map_settings[0]
-        if 'BANDS' in mapsettings.settings:
-            layer.setProcessing('BANDS='+src.map_settings[0].settings['BANDS'])
+    #TODO: refactor this to make it nicer (woof)
+    if src:
+        mapsettings = src.map_settings[0] if src.map_settings else None
+        if mapsettings:
+            #check for the bands to use and their order
+            if mapsettings.settings and 'BANDS' in mapsettings.settings:
+                layer.setProcessing('BANDS='+mapsettings.settings['BANDS'])
 
-        if mapsettings.classes:
-            #do something with classes
-            for c in mapsettings.classes:
-                cls = mapscript.classObj()
-                cls.name = c.name
-                #check for a style ref
-                if 'STYLE' in c:
-                    style_name = c['STYLE']
-                    style = DBSession.query(MapfileStyle).filter(MapfileStyle.name==style_name.replace('"', '')).first()
-                    if not style:
-                        continue
-                    new_style = mapscript.styleObject()
-                    #ew this is ugly so, you know, fix it
-                    settings = style.settings
-                    if 'RANGEMIN' in settings and 'RANGEMAX' in settings:
-                        new_style.minvalue = float(settings['RANGEMIN'])
-                        new_style.maxvalue = float(settings['RANGEMAX'])
-                    if 'COLORMAX' in settings and 'COLORMIN' in settings:
-                        #needs to be split into three integers
-                        mincolor = [int(x) for x in settings['COLORMIN'].split(',')]
-                        new_style.mincolor.setRGB(mincolor[0], mincolor[1], mincolor[2])
-                        maxcolor = [int(x) for x in settings['COLORMAX'].split(',')]
-                        new_style.maxcolor.setRGB(maxcolor[0], maxcolor[1], maxcolor[2])
-                    if 'RANGEITEM' in settings:
-                        new_style.rangeitem = settings['RANGEITEM']
+            if mapsettings.classes:
+                #do something with classes
+                for c in mapsettings.classes:
+                    cls = mapscript.classObj()
+                    cls.name = c.name
+                    #check for a style ref
+                    if 'STYLE' in c.settings:
+                        style_name = c.settings['STYLE']
+                        style = DBSession.query(MapfileStyle).filter(MapfileStyle.name==style_name.replace('"', '')).first()
+                        if not style:
+                            continue
+                        new_style = mapscript.styleObj()
+                        #ew this is ugly so, you know, fix it
+                        settings = style.settings
+                        if 'RANGEMIN' in settings and 'RANGEMAX' in settings:
+                            new_style.minvalue = float(settings['RANGEMIN'])
+                            new_style.maxvalue = float(settings['RANGEMAX'])
+                        if 'COLORMAX' in settings and 'COLORMIN' in settings:
+                            #needs to be split into three integers
+                            mincolor = [int(x) for x in settings['COLORMIN'].split(',')]
+                            new_style.mincolor.setRGB(mincolor[0], mincolor[1], mincolor[2])
+                            maxcolor = [int(x) for x in settings['COLORMAX'].split(',')]
+                            new_style.maxcolor.setRGB(maxcolor[0], maxcolor[1], maxcolor[2])
+                        if 'RANGEITEM' in settings:
+                            new_style.rangeitem = settings['RANGEITEM']
 
-                    cls.insertStyle(new_style)     
-                    
-            layer.insertClass(cls)
+                        cls.insertStyle(new_style)     
+                        
+                    layer.insertClass(cls)
 
-            
-        if mapsettings.styles:
-            #add the styles as the available styles
-            
-            pass
+            #TODO: add styles and make sure that they're available through the getstyles or whatever
+            #       probably add styles first and then the class points to it instead of baking the style into the class
+            #       like above
+            if mapsettings.styles:
+                #add the styles as the available styles
+                
+                pass
        
     return layer
 
@@ -205,7 +207,12 @@ def generateService(mapfile, params, mapname=''):
     #should work with png or image/png as format
 
     #create the request
-    request_type = params['REQUEST']
+    request_type = params['REQUEST'] if 'REQUEST' in params else ''
+    request_type = params['request'] if 'request' in params else request_type
+
+    if not request_type:    
+        return HTTPNotFound()
+    
     req = mapscript.OWSRequest()
     #TODO: post the parameters that were given
 #    req.setParameter('SERVICE', params['SERVICE']) #WMS
@@ -246,6 +253,9 @@ http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a7
 
     #TODO add the featureinfo, getcoverage, getfeature bits
 
+    fmt = params['FORMAT'] if 'FORMAT' in params else 'PNG'
+    fmt = params['format'] if 'format' in params else fmt
+
     #now check the service type: capabilities, map, mapfile (for internal use)
     try:
         if request_type.lower() in ['getcapabilities', 'describecoverage', 'describelayer', 'getstyles', 'describefeature']:
@@ -261,14 +271,24 @@ http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a7
             
             return Response(content, content_type=content_type)
 
-        elif request_type.lower() in ['getmap', 'getlegendgraphic']:
-            #TODO: check this with the legend request
-        
+        elif request_type.lower() in ['getmap']:        
             mapfile.loadOWSParameters(req)
             img = Image.open(StringIO(mapfile.draw().getBytes()))
             buffer = StringIO()
             
-            image_type = get_image_mimetype(params['FORMAT'])
+            image_type = get_image_mimetype(fmt)
+            if not image_type:
+                image_type = ('PNG', 'image/png')
+            img.save(buffer, image_type[0])
+            
+            buffer.seek(0)
+            content_type = image_type[1]
+            return Response(buffer.read(), content_type=content_type)
+        elif request_type.lower() == 'getlegendgraphic':
+            img = Image.open(StringIO(mapfile.drawLegend().getBytes()))
+            buffer = StringIO()
+            
+            image_type = get_image_mimetype(fmt)
             if not image_type:
                 image_type = ('PNG', 'image/png')
             img.save(buffer, image_type[0])
@@ -285,9 +305,10 @@ http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a7
             return Response('map generated')
         else:
             return HTTPNotFound('Invalid OGC request')
-    except:
+    except Exception as err:
+        #TODO: REMOVE THE EXCEPTION!
         #let's try this for what's probably a bad set of params by service+request type
-        return HTTPBadRequest()
+        return HTTPBadRequest(err)
 
     
 '''
@@ -331,7 +352,8 @@ def datasets(request):
     #or a shapefile for vector (or build if not there)
     mapsrc, srcloc = d.get_mapsource() # the source obj, the file path
 
-    if not mapsrc or not srcloc:
+    #need both for a raster, but just the file path for the vector (we made it!)
+    if ((not mapsrc or not srcloc) and d.taxonomy == 'geoimage') or (d.taxonomy == 'vector' and not srcloc):
         return HTTPNotFound('Invalid map source')
 
     #get some config stuff
@@ -355,13 +377,20 @@ def datasets(request):
     bbox = [float(b) for b in d.box]
 
     #let's make sure the mapfile hasn't been cached already (dataset id.source id.map)
-    #TODO: deal with the vector data source with no sources record (formats cache)
-    if os.path.isfile('%s/%s.%s.map' % (mappath, d.uuid, mapsrc.uuid)):
+
+    #fake the mapsrc info for the dynamic vector data files
+    if mapsrc:
+        mapsrc_uuid = mapsrc.uuid
+    else:
+        #it's dynamic so it has none of this info so fake it
+        mapsrc_uuid = '0'
+
+    #get the mapfile 
+    if os.path.isfile('%s/%s.%s.map' % (mappath, d.uuid, mapsrc_uuid)):
         #just read the mapfile and carry on
-        m = mapscript.mapObj('%s/%s.%s.map' % (mappath, d.uuid, mapsrc.uuid))
+        m = mapscript.mapObj('%s/%s.%s.map' % (mappath, d.uuid, mapsrc_uuid))
     else: 
         #need to make a new mapfile
-
 
         #TODO: reproject bbox to source epsg
         if srid != d.orig_epsg:
@@ -537,7 +566,7 @@ def datasets(request):
         m.insertLayer(layer)
 
     #post the results
-    mapname = '%s/%s.%s.map' % (mappath, d.uuid, mapsrc.uuid)
+    mapname = '%s/%s.%s.map' % (mappath, d.uuid, mapsrc_uuid)
 
     #TODO: check this some more
     #but make sure the required params have something 

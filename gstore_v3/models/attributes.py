@@ -50,8 +50,11 @@ class Attribute(Base):
     def att_to_fielddefn(self, format='shp'):
         fld = ogr.FieldDefn(str(self.name), self.ogr_type)
         #TODO: add the other flags
-        if format not in ['csv', 'km;', 'gml']:
-            pass
+        if format not in ['csv', 'kml', 'gml']:
+            if self.ogr_width:
+                fld.SetWidth(self.ogr_width)
+            if self.ogr_precision:
+                fld.SetPrecision(self.ogr_precision)     
         
         return fld
     
