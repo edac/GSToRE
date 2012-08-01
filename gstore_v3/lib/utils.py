@@ -9,7 +9,7 @@ image mimetypes (mostly for mapserver)
 '''
 _IMAGE_MIMETYPES = {
         'PNG': 'image/png',
-        'JPEG': 'image/jepg',
+        'JPEG': 'image/jpeg',
         'GIF': 'image/gif',
         'TIFF': 'image/tiff'
     }
