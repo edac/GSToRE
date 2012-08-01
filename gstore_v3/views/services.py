@@ -19,6 +19,7 @@ from ..models.sources import MapfileStyle
 from ..lib.database import *
 #from ..lib.spatial import tilecache_service
 from ..lib.utils import get_image_mimetype
+from ..lib.spatial import *
 
 
 '''
@@ -80,8 +81,8 @@ def getLayer(d, src, dataloc, bbox):
     layer.data = dataloc
     layer.dump = mapscript.MS_TRUE
 
-    layer.extent = bbox
-    layer.units = mapscript.MS_DD
+    layer.setExtent(bbox[0], bbox[1], bbox[2], bbox[3])
+    
 
     layer.metadata.set('layer_title', d.basename)
     layer.metadata.set('ows_abstract', d.description)
@@ -93,7 +94,10 @@ def getLayer(d, src, dataloc, bbox):
     if d.taxonomy == 'vector':
         style = getStyle(d.geomtype)
 
-        layer.setProjection('init=epsg:4326')
+        #units always 4326 decimal degrees - data not reprojected
+        layer.units = mapscript.MS_DD
+
+        layer.setProjection('+init=epsg:4326')
         layer.opacity = 50
         layer.type = getType(d.geomtype)
         layer.metadata.set('ows_srs', 'epsg:4326')
@@ -110,7 +114,8 @@ def getLayer(d, src, dataloc, bbox):
 
         layer.insertClass(cls)
     elif d.taxonomy == 'geoimage':
-        layer.setProjection('init=epsg:%s' % (d.orig_epsg))
+        #TODO: possibly add accurate units based on the epsg code
+        layer.setProjection('+init=epsg:%s' % (d.orig_epsg))
         layer.setProcessing('CLOSE_CONNECTION=DEFER')
         layer.type = mapscript.MS_LAYER_RASTER
         layer.metadata.set('ows_srs', 'epsg:%s' % (d.orig_epsg))
@@ -242,6 +247,8 @@ def generateService(mapfile, params, mapname=''):
     '''
 http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a78001a/services/ogc/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=mod10a1_a2002210.fractional_snow_cover&FORMAT=PNG&SRS=EPSG:4326&BBOX=-107.93,34.96,-104.99,38.53&WIDTH=256&HEIGHT=256
 
+
+
     '''
 
     #set up the params
@@ -303,6 +310,20 @@ http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a7
             mapfile.save(mapname)
             #TODO: make this some meaningful response (even though it isn't for public consumption)
             return Response('map generated')
+        elif request_type.lower() == 'getcoverage':
+            #need to return the binary (geotiff or ascii results)
+            mapscript.msIO_installStdoutToBuffer()
+            mapfile.OWSDispatch(req)
+            content_type = mapscript.msIO_stripStdoutBufferContentType()
+            content = mapscript.msIO_getStdoutBufferBytes()
+
+#let's see what happens without this for the tiff
+#            if 'xml' in content_type:
+#                content_type = 'application/xml'
+
+            #TODO: double check all of this
+            #, content_type=content_type
+            return Response(content)
         else:
             return HTTPNotFound('Invalid OGC request')
     except Exception as err:
@@ -392,34 +413,45 @@ def datasets(request):
     else: 
         #need to make a new mapfile
 
-        #TODO: reproject bbox to source epsg
-        if srid != d.orig_epsg:
-            #reproject the bbox
-            pass
-
         #TODO: someday get the raster info to handle multiple bands, etc
 
         #running with mapscript
         #defaults from the original string template
         m = mapscript.mapObj()
         
-        #set up the map
+        #set up the map WITH THE SRID BBOX (4326)
+        init_proj = 'init=epsg:4326'
+        
+        #unless it's a grid
+        if srid != d.orig_epsg and d.taxonomy == 'geoimage':
+            #reproject the bbox
+            bbox_geom = bbox_to_geom(bbox, int(srid))
+            reproject_geom(bbox_geom, int(srid), d.orig_epsg)
+            bbox = geom_to_bbox(bbox_geom)
+
+            init_proj = 'init=epsg:%s' % (d.orig_epsg)
+   
         m.setExtent(bbox[0], bbox[1], bbox[2], bbox[3])
         m.imagecolor.setRGB(255, 255, 255)
         m.setImageType('png24')
         #TODO: set from the default tile size unless there's a parameter, then use that
         m.setSize(600, 600)
-        
-        m.units = mapscript.MS_DD
+
+        if 'epsg:4326' in init_proj:
+            m.units = mapscript.MS_DD
+            
         #TODO: set a good name for the data (remember how it appears in arc/qgis) and also, not all rgis
         m.name = '%s_Dataset' % (app.upper())
 
-        m.setProjection('+init=epsg:4326')
+        #m.setProjection('+init=epsg:4326')
+        m.setProjection(init_proj)
 
         #add some metadata
-        supported_srs = get_current_registry().settings['OGC_SRS'].replace(',', ' ')
-        #TODO: check the list against the epsg for the dataset
-        m.web.metadata.set('ows_srs', supported_srs)
+        supported_srs = get_current_registry().settings['OGC_SRS'].split(',')
+        #layer srs must go first! for a correct wcs.describecoverage response
+        ows_srs = [s for s in supported_srs if s != 'EPSG:%s' % (d.orig_epsg)]
+        ows_srs.insert(0, 'EPSG:%s ' % (d.orig_epsg))
+        m.web.metadata.set('ows_srs', ' '.join(ows_srs))
         #m.web.metadata.set('wms_srs', 'EPSG:4326 EPSG:4269 EPSG:4267 EPSG:26913 EPSG:26912 EPSG:26914 EPSG:26713 EPSG:26712 EPSG:26714')
 
         #enable the ogc services

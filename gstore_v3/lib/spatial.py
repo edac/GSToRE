@@ -185,6 +185,13 @@ def bbox_to_geom(bbox, epsg):
     #create geometry
     return ogr.CreateGeometryFromWkt(wkt, sr)
 
+#geom to bbox
+def geom_to_bbox(geom):
+    #should already be in the desired projection
+    env = geom.GetEnvelope()
+    #reorder the pieces to match our bbox and return
+    return [env[0], env[2], env[1], env[3]]
+
 #wkb to box with epsg of the input geom
 def wkb_to_bbox(wkb, epsg):
     #convert back to minx, miny, maxx, maxy

@@ -486,35 +486,37 @@ def search_features(request):
     for d in ds:
         dataset_ids.append(d.id)
 
-    fids = dataset_ids
-
     shp_fids = []
     shape_clauses = []
     if dataset_ids:
-        shape_clauses.append(Feature.dataset_id.in_(dataset_ids))
-  
-#    if box:
-#        #or go hit up shapes, bad idea, very bad idea
-#        srid = int(get_current_registry().settings['SRID'])
-#        #make sure we have a valid epsg
-#        epsg = int(epsg) if epsg else srid
-#        
-#        #convert the box to a bbox
-#        bbox = string_to_bbox(box)
+        #TODO: move the limit part this is for testing
+        shape_clauses.append(Feature.dataset_id.in_(dataset_ids[0:limit]))
 
-#        #and to a geom
-#        bbox_geom = bbox_to_geom(bbox, epsg)
 
-#        #and reproject to the srid if the epsg doesn't match the srid
-#        if epsg != srid:
-#            reproject_geom(bbox_geom, epsg, srid)
+    if box:
+        #or go hit up shapes, bad idea, very bad idea
+        srid = int(get_current_registry().settings['SRID'])
+        #make sure we have a valid epsg
+        epsg = int(epsg) if epsg else srid
+        
+        #convert the box to a bbox
+        bbox = string_to_bbox(box)
 
-#        #now intersect on shapes and with dataset_id in dataset_ids
-#        shape_clauses.append(func.st_intersects(func.st_setsrid(Feature.geom, srid), func.st_geometryfromtext(geom_to_wkt(bbox_geom, srid)))
+        #and to a geom
+        bbox_geom = bbox_to_geom(bbox, epsg)
 
-#    shps = DBSession.query(Feature).filter(and_(*shape_clauses))
-#    shp_fids = [s.fid for s in shps]
+        #and reproject to the srid if the epsg doesn't match the srid
+        if epsg != srid:
+            reproject_geom(bbox_geom, epsg, srid)
 
+        #now intersect on shapes and with dataset_id in dataset_ids
+        shape_clauses.append(func.st_intersects(func.st_setsrid(Feature.geom, srid), func.st_geometryfromtext(geom_to_wkt(bbox_geom, srid))))
+    
+    shps = DBSession.query(Feature).filter(and_(*shape_clauses))
+    shp_fids = [s.fid for s in shps]
+
+
+    #db.vectors.find({'d.id': {$in: [52208, 52209, 56282, 56350]}}, {'f.id': 1})
     mongo_fids = []
     if start_valid or end_valid:
         #go hit up mongo, high style    
@@ -533,7 +535,7 @@ def search_features(request):
         pass
 
     #TODO: intersect the two lists
-    #fids = shp_fids
+    fids = shp_fids
     
 
     return {'total': len(fids), 'features': fids}

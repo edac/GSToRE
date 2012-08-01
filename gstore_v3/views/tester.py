@@ -97,7 +97,8 @@ def test_ogc(request):
     #bbox = [float(b) for b in d.box]
 
     #f = '/clusterdata/gstore/maps/a427563f-3c7e-44a2-8b35-68ce2a78001a.76744073-525b-4cd0-a786-e5f6c22f821b.map'
-    f = '/clusterdata/gstore/maps/35107b42.map'
+    #f = '/clusterdata/gstore/maps/35107b42.map'
+    f = '/clusterdata/gstore/maps/8f11ec21-dfe1-437d-a7be-a85bbb9e4283.e45fcdeb-a487-4daa-aeba-a25e28377fa2.map'
     m = mapscript.mapObj(f)
 
     #let's play with the wcs response
@@ -137,7 +138,8 @@ def format_tester(request):
     #       /clusterdata/gstore/maps/c2e948ee-2ea9-4dc4-935b-b5e56ff8071c.bc0b2893-d5eb-4a75-83ad-74abc9749263.map
     #YAY THE SID WORKS
     #test uuid for ecw - 0f081ca5-a7bf-45e8-8f96-dd7fba5df4d4
-    #
+    #       /clusterdata/gstore/maps/0f081ca5-a7bf-45e8-8f96-dd7fba5df4d4.7c015173-50bd-4c47-b3e0-3bd399162387.map
+    #YAY THE ECW WORKS
 
     #for the sid, note that i changed the filepath for this manually
     #f = '/clusterdata/gstore/maps/c2e948ee-2ea9-4dc4-935b-b5e56ff8071c.bc0b2893-d5eb-4a75-83ad-74abc9749263.map'
@@ -155,6 +157,7 @@ def format_tester(request):
     #for the sid
     #eq.setParameter('BBOX', '-103.068,36.9349,-102.995,37.0026')
 
+    #for the ecw
     req.setParameter('BBOX', '-108.038,35.4006,-107.899,35.5369')
     req.setParameter('STYLES', '')
 
