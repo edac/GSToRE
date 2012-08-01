@@ -17,6 +17,7 @@ from ..models.datasets import (
     Dataset,
     Category
     )
+from ..models.features import Feature
 
 from ..models.vocabs import geolookups
 from ..lib.spatial import *
@@ -409,11 +410,13 @@ def search_datasets(request):
 #TODO: finish this
 #return fids for the features that match the params
 #this is NOT the streamer (see views.features)
-@view_config(route_name='search', match_param='resource=features')
+@view_config(route_name='search', match_param='resource=features', renderer='json')
 def search_features(request):
     '''
     return a listing of fids that match the filters (for potentially some interface later or as an option to the streamer)
     '''
+    app = request.matchdict['app']
+    
     #pagination
     limit = int(request.params.get('limit')) if 'limit' in request.params else 25
     offset = int(request.params.get('offset')) if 'offset' in request.params else 0
@@ -432,24 +435,91 @@ def search_features(request):
     geomtype = request.params.get('geomtype', '')
 
     #sort direction
-    sortdir = request.params.get('dir').upper() if 'dir' in request.params else 'DESC'
+    sortdir = request.params.get('dir', 'desc').upper()
     direction = 0 if sortdir == 'DESC' else 1
     
     #sort geometry
-    box = request.params.get('box') if 'box' in request.params else ''
-    epsg = request.params.get('epsg') if 'epsg' in request.params else ''
-    if box and epsg:
-        #do stuff
-        k = 0   
+    box = request.params.get('box', '')
+    epsg = request.params.get('epsg', '') 
+
+    #TODO: let's add a search by dataset uuid?
+#    dataset_uuids = request.params.get('datasets', '')
+#    dataset_uuids = dataset_uuids.split(',') if dataset_uuids else ''
+    
 
     #category search
-    theme = request.params.get('theme') if 'theme' in request.params else ''
-    subtheme = request.params.get('subtheme') if 'subtheme' in request.params else ''
-    groupname = request.params.get('groupname') if 'groupname' in request.params else ''
+    theme = request.params.get('theme', '')
+    subtheme = request.params.get('subtheme', '')
+    groupname = request.params.get('groupname', '')
 
     #parameter search
     #TODO: add the other bits to this and implement it
     param = request.params['param'] if 'param' in request.params else ''
+    frequency = request.params.get('freq', '')
+    units = request.params.get('units', '')
+
+    #need to have all three right now?
+    if param and not frequency and not units:
+        return HTTPNotFound('Bad parameter request')
+    
+    #go for the dataset query first UNLESS there's a list of datasets
+    #then ignore geomtype, theme/subtheme/groupname
+    dataset_clauses = [Dataset.inactive==False, "'%s'=ANY(apps_cache)" % (app)]
+    if geomtype and geomtype.upper() in ['POLYGON', 'POINT', 'LINESTRING', 'MULTIPOLYGON', '3D POLYGON', '3D LINESTRING']:
+        dataset_clauses.append(Dataset.geomtype==geomtype.upper())
+
+    #and the valid data range to limit the datasets
+    if start_valid or end_valid:
+        c = getOverlapDateClause(Dataset.begin_datetime, Dataset.end_datetime, start_valid, end_valid)
+        if c is not None:
+            dataset_clauses.append(c)
+
+    dataset_ids = []
+
+    #shps = DBSession.query(features.Feature).filter(features.Feature.dataset_id.in_(lst))
+    #shps = DBSession.query(Feature).filter(Feature.dataset_id.in_(dataset_ids))
+
+
+    #need to go get the datasets
+    
+    ds = DBSession.query(Dataset).filter(and_(*dataset_clauses))
+    for d in ds:
+        dataset_ids.append(d.id)
+
+    fids = dataset_ids
+
+    shp_fids = []
+    shape_clauses = []
+    if dataset_ids:
+        shape_clauses.append(Feature.dataset_id.in_(dataset_ids))
+  
+#    if box:
+#        #or go hit up shapes, bad idea, very bad idea
+#        srid = int(get_current_registry().settings['SRID'])
+#        #make sure we have a valid epsg
+#        epsg = int(epsg) if epsg else srid
+#        
+#        #convert the box to a bbox
+#        bbox = string_to_bbox(box)
+
+#        #and to a geom
+#        bbox_geom = bbox_to_geom(bbox, epsg)
+
+#        #and reproject to the srid if the epsg doesn't match the srid
+#        if epsg != srid:
+#            reproject_geom(bbox_geom, epsg, srid)
+
+#        #now intersect on shapes and with dataset_id in dataset_ids
+#        shape_clauses.append(func.st_intersects(func.st_setsrid(Feature.geom, srid), func.st_geometryfromtext(geom_to_wkt(bbox_geom, srid)))
+
+#    shps = DBSession.query(Feature).filter(and_(*shape_clauses))
+#    shp_fids = [s.fid for s in shps]
+
+    mongo_fids = []
+    if start_valid or end_valid:
+        #go hit up mongo, high style    
+           
+        pass
 
     
 
@@ -462,9 +532,14 @@ def search_features(request):
         #so let's go!
         pass
 
-    return Response('searching the features')
+    #TODO: intersect the two lists
+    #fids = shp_fids
+    
+
+    return {'total': len(fids), 'features': fids}
 
 
+#NOTE: we chucked the geolookups structure completely to just keep a cleaner url moving forward.
 whats = ["nm_counties", "nm_gnis", "nm_quads"]
 #return geolookup data
 @view_config(route_name='search', renderer='json')
