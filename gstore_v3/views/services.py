@@ -40,13 +40,12 @@ ecw test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ef4c8cdc-bec4-43aa-8f
 '''
 
 #TODO: REVISE FOR SLDs, RASTER BAND INFO, ETC
-#TODO: figure out ecw as DATA displaying as an empty tile
 
 #default syle objs
 def getStyle(geomtype):
     s = mapscript.styleObj()
     s.symbol = 0
-    if geomtype in ['POLYGON', 'MULTIPOLYGON']:
+    if geomtype in ['POLYGON', 'MULTIPOLYGON', '3D POLYGON']:
         s.size = 1
         s.color.setRGB(180, 223, 238)
         s.width = 1
@@ -63,16 +62,17 @@ def getStyle(geomtype):
 
     return s
 
-#TODO: check on this for the 3D features
+#convert geomtype to layer type
 def getType(geomtype):
-    if geomtype in ['MULTIPOLYGON', 'POLYGON']:
+    if geomtype in ['MULTIPOLYGON', 'POLYGON', '3D POLYGON']:
         return mapscript.MS_LAYER_POLYGON
-    elif geomtype in ['LINESTRING', 'LINE']:
+    elif geomtype in ['LINESTRING', 'LINE', '3D LINESTRING']:
         return mapscript.MS_LAYER_LINE
     else:
         return mapscript.MS_LAYER_POINT
 
 #get the layer obj by taxonomy (for now)
+#the bbox should be reprojected to the originnal epsg before this
 def getLayer(d, src, dataloc, bbox):
     layer = mapscript.layerObj()
     layer.name = d.basename
@@ -115,6 +115,7 @@ def getLayer(d, src, dataloc, bbox):
         layer.insertClass(cls)
     elif d.taxonomy == 'geoimage':
         #TODO: possibly add accurate units based on the epsg code
+        #TODO: check on the wcs_formats list & compare to outputformats - ARE THE NAMES CORRECT?
         layer.setProjection('+init=epsg:%s' % (d.orig_epsg))
         layer.setProcessing('CLOSE_CONNECTION=DEFER')
         layer.type = mapscript.MS_LAYER_RASTER
@@ -531,7 +532,8 @@ def datasets(request):
         m.appendOutputFormat(of)
         if service == 'wcs':
             #add geotif and ascii grid
-            of = mapscript.outputFormatObj('GDAL/GTiff', 'GEOTIFF_16')
+            #TODO: check on this - name + name in wcs_formats list need to match?
+            of = mapscript.outputFormatObj('GDAL/GTiff', 'GEOTIFF') #from _16
             of.setExtension('tif')
             of.setMimetype('image/tiff')
             of.imagemode = mapscript.MS_IMAGEMODE_FLOAT32
