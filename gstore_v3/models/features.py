@@ -1,7 +1,7 @@
 from gstore_v3.models import Base, DBSession
 from sqlalchemy import MetaData, Table, ForeignKey
 from sqlalchemy import Column, String, Integer, Boolean, Numeric, FetchedValue
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship, backref, deferred
 
 from sqlalchemy.ext.declarative import declarative_base
 

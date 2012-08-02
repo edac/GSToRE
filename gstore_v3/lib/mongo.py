@@ -3,7 +3,7 @@ from urlparse import urlparse
 
 
 '''
-mongodb object
+mongodb object for the vector data
 
 pretty basic - connect, query, and insert
 
@@ -25,13 +25,41 @@ class gMongo:
         if collection:
             self.collection = self.db[collection]
 
+    def set_collection(self, coll):
+        self.collection = self.db[coll]
+
     def close(self):
         self.conn.close()
 
-    def query(self, querydict):
+    #TODO: something about the possibly unknown collection info
+    def query(self, querydict, fielddict={}, limit=None, offset=None):
         #what to do if there's no defined collection?
-        q = self.collection.find(querydict)
+        '''
+        generally for gstore we want all of the query results without paging
+        but for the dataone logging, we need to run limit/offset for the api
+
+        use the fielddict to just return some elements (i.e. fids for the feature search that isn't the streamer)
+        '''
+
+        if limit:
+            offset = offset if offset else 0
+            q = self.collection.find(querydict, fielddict).limit(limit).skip(offset)
+        else:
+            q = self.collection.find(querydict, fielddict)
         return q
 
-    def insert(self, data):
-        pass
+    #TODO: this.
+    def insert(self, docs):
+        '''
+        docs can be one json doc {'thing': 'data'} or a list of docs [{'thing': 'data'}, {'thing2': 'data'}]
+        '''
+        try:
+            self.collection.insert(docs)
+        except:
+            return 1
+        return 0
+        
+
+    #TODO: add some insert doc validation?
+    #      but now we have mutliple mongo deals running so maybe not here
+

@@ -8,12 +8,20 @@ import json
 import pymongo
 #from urlparse import urlparse
 
+from sqlalchemy import desc, asc, func
+from sqlalchemy.sql.expression import and_, or_
+from sqlalchemy.orm import defer
+
+
+from ..lib.mongo import gMongo
+
 #from the models init script
 from ..models import DBSession
 #from the generic model loader (like meta from gstore v2)
 from ..models.datasets import (
     Dataset,
     )
+from ..models.features import Feature
 
 
 from ..lib.utils import *
@@ -84,6 +92,34 @@ def to_csv(doc):
 
     return fields, output
 
+
+@view_config(route_name='test_fidsearch', renderer='json')
+def fid_search(request):
+    #query postgres for something
+    ds = DBSession.query(Dataset).filter(Dataset.geomtype=='POINT')
+    ids = [s.id for s in ds]
+
+    #get the fids (and just the fids to help speed things up)
+    shp_fids = DBSession.query(Feature.fid).filter(Feature.dataset_id.in_(ids))    
+    shp_fids = [f.fid for f in shp_fids]
+
+    #query mongo for something else
+    connstr = get_current_registry().settings['mongo_uri']
+    collection = get_current_registry().settings['mongo_collection']
+    gm = gMongo(connstr, collection)
+    mongo_clauses = {'d.id': {'$in': ids}, 'atts.name': 'EASTING'}
+    #db.vectors.find({'d.id': {$in: [52208, 52209, 56282, 56350]}}, {'f.id': 1})
+    #run the query and just return the fids (we aren't interested in anything else here)
+    mongo_fids = gm.query(mongo_clauses, {'f.id': 1})
+    mongo_fids = [f['f']['id'] for f in mongo_fids]
+    #return {'total': mongo_fids.count()}
+
+    #intersect!
+    s = set(shp_fids)
+    fids = s.intersection(mongo_fids)
+    
+    return {'fids': list(fids)}
+
 @view_config(route_name='test_wcs')
 def test_ogc(request):
     uuid = 'a427563f-3c7e-44a2-8b35-68ce2a78001a'
@@ -99,32 +135,33 @@ def test_ogc(request):
     #f = '/clusterdata/gstore/maps/a427563f-3c7e-44a2-8b35-68ce2a78001a.76744073-525b-4cd0-a786-e5f6c22f821b.map'
     #f = '/clusterdata/gstore/maps/35107b42.map'
     f = '/clusterdata/gstore/maps/8f11ec21-dfe1-437d-a7be-a85bbb9e4283.e45fcdeb-a487-4daa-aeba-a25e28377fa2.map'
-    m = mapscript.mapObj(f)
+    #uncomment to test IF THE MAPFILE EXISTS
+#    m = mapscript.mapObj(f)
 
-    #let's play with the wcs response
-    req = mapscript.OWSRequest()
-    req.setParameter('SERVICE', params.get('SERVICE', 'WMS'))
-    req.setParameter('VERSION', params.get('VERSION', '1.1.1'))
-    req.setParameter('REQUEST', ogc_req)
+#    #let's play with the wcs response
+#    req = mapscript.OWSRequest()
+#    req.setParameter('SERVICE', params.get('SERVICE', 'WMS'))
+#    req.setParameter('VERSION', params.get('VERSION', '1.1.1'))
+#    req.setParameter('REQUEST', ogc_req)
 
-    if ogc_req.lower() == 'describecoverage':
-        mapscript.msIO_installStdoutToBuffer()
-        m.OWSDispatch(req)
-        content_type = mapscript.msIO_stripStdoutBufferContentType()
-        content = mapscript.msIO_getStdoutBufferBytes()
-        return Response(content)
-    if ogc_req.lower() == 'getcapabilities':
-        mapscript.msIO_installStdoutToBuffer()
-        m.OWSDispatch(req)
-        content_type = mapscript.msIO_stripStdoutBufferContentType()
-        content = mapscript.msIO_getStdoutBufferBytes()
+#    if ogc_req.lower() == 'describecoverage':
+#        mapscript.msIO_installStdoutToBuffer()
+#        m.OWSDispatch(req)
+#        content_type = mapscript.msIO_stripStdoutBufferContentType()
+#        content = mapscript.msIO_getStdoutBufferBytes()
+#        return Response(content)
+#    if ogc_req.lower() == 'getcapabilities':
+#        mapscript.msIO_installStdoutToBuffer()
+#        m.OWSDispatch(req)
+#        content_type = mapscript.msIO_stripStdoutBufferContentType()
+#        content = mapscript.msIO_getStdoutBufferBytes()
 
-        if 'xml' in content_type:
-            content_type = 'application/xml'
+#        if 'xml' in content_type:
+#            content_type = 'application/xml'
 
-        #TODO: double check all of this
-        
-        return Response(content, content_type=content_type)
+#        #TODO: double check all of this
+#        
+#        return Response(content, content_type=content_type)
     
     return Response('hi')
 

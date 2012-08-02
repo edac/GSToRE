@@ -5,6 +5,10 @@ from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPBadRequest
 from pyramid.threadlocal import get_current_registry
 
 import os 
+from email.parser import Parser 
+from email.message import Message
+
+#make we sure we have pil
 import Image
 import mapscript
 from cStringIO import StringIO
@@ -18,7 +22,7 @@ from ..models.sources import MapfileStyle
 
 from ..lib.database import *
 #from ..lib.spatial import tilecache_service
-from ..lib.utils import get_image_mimetype
+from ..lib.utils import get_image_mimetype, normalize_params
 from ..lib.spatial import *
 
 
@@ -39,21 +43,38 @@ ecw test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ef4c8cdc-bec4-43aa-8f
 
 '''
 
-#TODO: REVISE FOR SLDs, RASTER BAND INFO, ETC
+#TODO: fix this to handle any of the grid formats and the actual multiple pieces
+#TODO: add the license chunk for this
+#based on eoxserver mapserver.py code
+def parse_tiff_response(content, content_type):
+    parser = Parser()
+    parts = parser.parsestr("Content-type:%s\n\n%s" % (content_type, content.rstrip("--wcs--\n\n"))).get_payload()
+    for p in parts:
+        if isGeotiff(p.get_content_type()):
+            #get the payload (the binary), the headers specific to the binary
+            return p.get_payload(), p.items()
+    return None, None
+#to check the multipart chunk mimetypes
+def isGeotiff(content_type):
+    return content_type.split(";")[0].lower() in 'image/tiff'
+def isAsciigrid(content_type):
+    return content_type.split(";")[0].lower() in 'image/x-aaigrid'
+       
 
+#TODO: REVISE FOR SLDs, RASTER BAND INFO, ETC
 #default syle objs
 def getStyle(geomtype):
     s = mapscript.styleObj()
     s.symbol = 0
-    if geomtype in ['POLYGON', 'MULTIPOLYGON', '3D POLYGON']:
+    if geomtype.upper() in ['POLYGON', 'MULTIPOLYGON', '3D POLYGON']:
         s.size = 1
         s.color.setRGB(180, 223, 238)
         s.width = 1
         s.outlinecolor.setRGB(0,0,0)
-    elif geomtype in ['LINESTRING', 'LINE', '3D LINESTRING']:
+    elif geomtype.upper() in ['LINESTRING', 'LINE', '3D LINESTRING']:
         s.width = 2
         s.color.setRGB(0, 0, 0)
-    elif geomtype == 'POINT':
+    elif geomtype.upper() == 'POINT':
         s.size = 10
         s.color.setRGB(0, 0, 0)
     else:
@@ -64,9 +85,9 @@ def getStyle(geomtype):
 
 #convert geomtype to layer type
 def getType(geomtype):
-    if geomtype in ['MULTIPOLYGON', 'POLYGON', '3D POLYGON']:
+    if geomtype.upper() in ['MULTIPOLYGON', 'POLYGON', '3D POLYGON']:
         return mapscript.MS_LAYER_POLYGON
-    elif geomtype in ['LINESTRING', 'LINE', '3D LINESTRING']:
+    elif geomtype.upper() in ['LINESTRING', 'LINE', '3D LINESTRING']:
         return mapscript.MS_LAYER_LINE
     else:
         return mapscript.MS_LAYER_POINT
@@ -76,7 +97,7 @@ def getType(geomtype):
 def getLayer(d, src, dataloc, bbox):
     layer = mapscript.layerObj()
     layer.name = d.basename
-    layer.status = mapscript.MS_DEFAULT
+    layer.status = mapscript.MS_ON
 
     layer.data = dataloc
     layer.dump = mapscript.MS_TRUE
@@ -213,17 +234,13 @@ def generateService(mapfile, params, mapname=''):
     #should work with png or image/png as format
 
     #create the request
-    request_type = params['REQUEST'] if 'REQUEST' in params else ''
-    request_type = params['request'] if 'request' in params else request_type
+    request_type = params['request'] if 'request' in params else ''
 
     if not request_type:    
         return HTTPNotFound()
-    
+
+    request_type = request_type.lower()  
     req = mapscript.OWSRequest()
-    #TODO: post the parameters that were given
-#    req.setParameter('SERVICE', params['SERVICE']) #WMS
-#    req.setParameter('VERSION', params['VERSION']) #1.1.1
-#    req.setParameter('REQUEST', request_type) #getcapabilities
 
     '''
     supported requests:
@@ -257,16 +274,15 @@ http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a7
     keys = params.keys()
     for k in keys:
         #if k.upper() not in ['SERVICE', 'VERSION', 'REQUEST']:
-        req.setParameter(k, params[k])
+        req.setParameter(k.upper(), params[k])
 
     #TODO add the featureinfo, getcoverage, getfeature bits
 
-    fmt = params['FORMAT'] if 'FORMAT' in params else 'PNG'
-    fmt = params['format'] if 'format' in params else fmt
+    fmt = params['format'] if 'format' in params else 'PNG'
 
     #now check the service type: capabilities, map, mapfile (for internal use)
     try:
-        if request_type.lower() in ['getcapabilities', 'describecoverage', 'describelayer', 'getstyles', 'describefeature']:
+        if request_type in ['getcapabilities', 'describecoverage', 'describelayer', 'getstyles', 'describefeature']:
             mapscript.msIO_installStdoutToBuffer()
             mapfile.OWSDispatch(req)
             content_type = mapscript.msIO_stripStdoutBufferContentType()
@@ -279,7 +295,7 @@ http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a7
             
             return Response(content, content_type=content_type)
 
-        elif request_type.lower() in ['getmap']:        
+        elif request_type in ['getmap']:        
             mapfile.loadOWSParameters(req)
             img = Image.open(StringIO(mapfile.draw().getBytes()))
             buffer = StringIO()
@@ -292,7 +308,7 @@ http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a7
             buffer.seek(0)
             content_type = image_type[1]
             return Response(buffer.read(), content_type=content_type)
-        elif request_type.lower() == 'getlegendgraphic':
+        elif request_type == 'getlegendgraphic':
             img = Image.open(StringIO(mapfile.drawLegend().getBytes()))
             buffer = StringIO()
             
@@ -304,27 +320,37 @@ http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a7
             buffer.seek(0)
             content_type = image_type[1]
             return Response(buffer.read(), content_type=content_type)
-        elif request_type.lower() == 'getmapfile':
+        elif request_type == 'getmapfile':
             #that's ours, we just want to save the mapfile to disk
             #and use the dataset id-source id.map for the filename to make sure it's unique
             #and make sure there isn't one first (chuck it if there is)
             mapfile.save(mapname)
             #TODO: make this some meaningful response (even though it isn't for public consumption)
             return Response('map generated')
-        elif request_type.lower() == 'getcoverage':
+        elif request_type == 'getcoverage':
             #need to return the binary (geotiff or ascii results)
+            #THIS IS A MULTIPART RESPONSE
+
+            #THAT I AM BLATANTLY STEALING FROM EOXSERVER (sorry).
             mapscript.msIO_installStdoutToBuffer()
             mapfile.OWSDispatch(req)
             content_type = mapscript.msIO_stripStdoutBufferContentType()
             content = mapscript.msIO_getStdoutBufferBytes()
 
-#let's see what happens without this for the tiff
-#            if 'xml' in content_type:
-#                content_type = 'application/xml'
+            #so rip apart the response
+            #repack with the right boundaries
+            if fmt.lower() in ['geotiff', 'gtiff', 'tiff', 'tif', 'image/tiff']:
+                coverage = str(params['coverage']) if 'coverage' in params else 'output'
+                tiff, headers = parse_tiff_response(content, content_type)
+                output_headers = {}
+                for h in headers:
+                    if h[0].lower() not in []:
+                        output_headers[h[0]] = str(h[1])
+                output_headers['Content-disposition'] = 'attachment; filename=%s.tif' % (coverage)
+                return Response(tiff, headers=output_headers)
 
-            #TODO: double check all of this
-            #, content_type=content_type
-            return Response(content)
+            #just send everything we've got
+            return Response(content, content_type='multipart/mixed; boundary=wcs')
         else:
             return HTTPNotFound('Invalid OGC request')
     except Exception as err:
@@ -351,10 +377,10 @@ def datasets(request):
     service = request.matchdict['service']
 
     #get the query params because we like those
-    params = request.params
+    params = normalize_params(request.params)
 
     #and get the type (if not there assume capabilities but really that should fail)
-    ogc_req = params.get('REQUEST', 'GetCapabilities')
+    ogc_req = params.get('request', 'GetCapabilities')
 
     #go get the dataset
     d = get_dataset(dataset_id)   
@@ -543,7 +569,7 @@ def datasets(request):
             of.setExtension('grd')
             of.setMimetype('image/x-aaigrid')
             of.imagemode = mapscript.MS_IMAGEMODE_INT16
-            of.setOption('FILENAME','result.grd')
+            #of.setOption('FILENAME','result.grd')
             m.appendOutputFormat(of)
         #elif service == 'wfs':
             #add gml and ?
@@ -632,16 +658,17 @@ def base_services(request):
     app = request.matchdict['app']
 
     #get the query params because we like those
-    params = request.params
+    params = normalize_params(request.params)
 
     #TODO: if the issue isn't with paste.request, maybe temporarily turn this off and just return from mapserver
     if service == 'wms_tiles':
-        host = request.host_url
-        g_app = request.script_name[1:]
-        base_url = '%s/%s' % (host, g_app)
-        #baseurl, dataset, app, params, config, is_basemap = False
-        kargs = request.environ
-        return tilecache_service(base_url, None, app, params, kargs, True)
+#        host = request.host_url
+#        g_app = request.script_name[1:]
+#        base_url = '%s/%s' % (host, g_app)
+#        #baseurl, dataset, app, params, config, is_basemap = False
+#        kargs = request.environ
+#        return tilecache_service(base_url, None, app, params, kargs, True)
+        service = 'wms'
 
     #just point to the map file and do that
     maps_path = get_current_registry().settings['MAPS_PATH']
@@ -655,7 +682,7 @@ def base_services(request):
     m = mapscript.mapObj(basemap)
 
     #and get the type (if not there assume capabilities but really that should fail)
-    ogc_req = params.get('REQUEST', 'GetCapabilities')
+    ogc_req = params.get('request', 'GetCapabilities')
 
     #return str(params['LAYERS'])
 

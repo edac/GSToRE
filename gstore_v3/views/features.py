@@ -11,6 +11,7 @@ from ..models.features import (
     )
 
 from ..lib.mongo import gMongo
+from ..lib.utils import normalize_params
 
 
 '''
@@ -26,7 +27,7 @@ def feature(request):
     /apps/rgis/features/e74a1e0d-3e75-44dd-bb4c-3328a2425856.json
 
 
-    now what did we forget? that uuids ar enot good indexes in mongo (too big)
+    now what did we forget? that uuids are not good indexes in mongo (too big)
     so ping shapes for the fid before pinging mongo (and then we already have our geom just in case)
     '''
     feature_id = request.matchdict['id']
@@ -53,6 +54,7 @@ def feature(request):
 
     #'observed': vector['obs'],
 
+    #TODO: deal with observed values
     #rebuild some json from the other json (i like it)
     results = {'dataset': {'id': vector['d']['id'], 'uuid': vector['d']['u']}, 'feature': {'id': vector['f']['id'], 'uuid': vector['f']['u']}, 
                 'attributes': vector['atts'], 'geometry': geom}
@@ -92,37 +94,39 @@ def features(request):
     #id the datasets that match the filters
     app = request.matchdict['app']
 
+    params = normalize_params(request.params)
+
     #pagination
-    limit = int(request.params.get('limit')) if 'limit' in request.params else 25
-    offset = int(request.params.get('offset')) if 'offset' in request.params else 0
+    limit = int(params.get('limit')) if 'limit' in params else 25
+    offset = int(params.get('offset')) if 'offset' in params else 0
 
     #check for valid utc datetime
-    start_added = request.params.get('start_time') if 'start_time' in request.params else ''
-    end_added = request.params.get('end_time') if 'end_time' in request.params else ''
+    start_added = params.get('start_time') if 'start_time' in params else ''
+    end_added = params.get('end_time') if 'end_time' in params else ''
 
     #check for valid utc datetime
-    start_valid = request.params.get('valid_start') if 'valid_start' in request.params else ''
-    end_valid = request.params.get('valid_end') if 'valid_end' in request.params else ''
+    start_valid = params.get('valid_start') if 'valid_start' in params else ''
+    end_valid = params.get('valid_end') if 'valid_end' in params else ''
 
     #check for OUTPUT format
-    format = request.params.get('format', '')
+    format = params.get('format', '')
     
     #check for geomtype
-    geomtype = request.params.get('geomtype', '')
+    geomtype = params.get('geomtype', '')
 
     #keyword search
-    keyword = request.params.get('query') if 'query' in request.params else ''
+    keyword = params.get('query') if 'query' in params else ''
     keyword = keyword.replace(' ', '%').replace('+', '%')
 
     #TODO: set up for the georelevance sorting
     #sort geometry
-    box = request.params.get('box') if 'box' in request.params else ''
-    epsg = request.params.get('epsg') if 'epsg' in request.params else ''
+    box = params.get('box') if 'box' in params else ''
+    epsg = params.get('epsg') if 'epsg' in params else ''
 
     #category params
-    theme = request.params.get('theme') if 'theme' in request.params else ''
-    subtheme = request.params.get('subtheme') if 'subtheme' in request.params else ''
-    groupname = request.params.get('groupname') if 'groupname' in request.params else ''
+    theme = params.get('theme') if 'theme' in params else ''
+    subtheme = params.get('subtheme') if 'subtheme' in params else ''
+    groupname = params.get('groupname') if 'groupname' in params else ''
 
     #set up the postgres checks
     dataset_clauses = [Dataset.inactive==False, "'%s'=ANY(apps_cache)" % (app)]

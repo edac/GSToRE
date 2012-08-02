@@ -97,4 +97,13 @@ def getServices():
     return svcs.split(',')
 
 
+'''
+convert the multidict request parameters to lowercase keys
+'''
+#convert all of the request parameter keys to lower case just to not have to deal with camelcase, uppercase, lowercase, all the cases!
+def normalize_params(params):
+    new_params = {}
+    for k in params.keys():
+        new_params[k.lower()] = params[k]
+    return new_params 
     

@@ -21,6 +21,8 @@ from ..models.features import Feature
 
 from ..models.vocabs import geolookups
 from ..lib.spatial import *
+from ..lib.mongo import gMongo
+from ..lib.utils import normalize_params
 
 '''
 search
@@ -81,7 +83,9 @@ def search_categories(request):
     #root OR Census Data OR Census Data__|__2008 TIGER
     #root OR theme OR theme__|__subtheme
     app = request.matchdict['app']
-    node = request.params.get('node') if 'node' in request.params else None
+
+    params = normalize_params(request.params)
+    node = params.get('node', '')
 
     '''
     return distinct themes if no node or if 
@@ -168,36 +172,38 @@ def search_datasets(request):
 
     app = request.matchdict['app']
 
+    params = normalize_params(request.params)
+
     #pagination
-    limit = int(request.params.get('limit')) if 'limit' in request.params else 25
-    offset = int(request.params.get('offset')) if 'offset' in request.params else 0
+    limit = int(params.get('limit')) if 'limit' in params else 25
+    offset = int(params.get('offset')) if 'offset' in params else 0
 
     #get version 
-    version = int(request.params.get('version')) if 'version' in request.params else 2
+    version = int(params.get('version')) if 'version' in params else 2
 
     #check for valid utc datetime
-    start_added = request.params.get('start_time') if 'start_time' in request.params else ''
-    end_added = request.params.get('end_time') if 'end_time' in request.params else ''
+    start_added = params.get('start_time') if 'start_time' in params else ''
+    end_added = params.get('end_time') if 'end_time' in params else ''
 
     #check for valid utc datetime
-    start_valid = request.params.get('valid_start') if 'valid_start' in request.params else ''
-    end_valid = request.params.get('valid_end') if 'valid_end' in request.params else ''
+    start_valid = params.get('valid_start') if 'valid_start' in params else ''
+    end_valid = params.get('valid_end') if 'valid_end' in params else ''
 
     #check for format
-    format = request.params.get('format', '')
+    format = params.get('format', '')
 
     #check for taxonomy
-    taxonomy = request.params.get('taxonomy', '')
+    taxonomy = params.get('taxonomy', '')
     
     #check for geomtype
-    geomtype = request.params.get('geomtype', '')
+    geomtype = params.get('geomtype', '')
 
     #TODO: add some explicit service field for this
     #check for avail services
-    service = request.params.get('service', '')
+    service = params.get('service', '')
 
     #sort parameter
-    sort = request.params.get('sort') if 'sort' in request.params else 'lastupdate'
+    sort = params.get('sort') if 'sort' in params else 'lastupdate'
     #if sort not in ['lastupdate', 'text', 'theme', 'subtheme', 'groupname']:
     if sort not in ['lastupdate', 'text']:
         return HTTPNotFound('Bad sort parameter')
@@ -205,23 +211,23 @@ def search_datasets(request):
     sort = 'description' if sort == 'text' else sort
 
     #sort direction
-    sortdir = request.params.get('dir').upper() if 'dir' in request.params else 'DESC'
+    sortdir = params.get('dir').upper() if 'dir' in params else 'DESC'
     #TODO: check on the sort direction (maybe backwards?)
     direction = 0 if sortdir == 'DESC' else 1
 
     #keyword search
-    keyword = request.params.get('query') if 'query' in request.params else ''
+    keyword = params.get('query') if 'query' in params else ''
     keyword = keyword.replace(' ', '%').replace('+', '%')
 
     #TODO: set up for the georelevance sorting
     #sort geometry
-    box = request.params.get('box') if 'box' in request.params else ''
-    epsg = request.params.get('epsg') if 'epsg' in request.params else ''
+    box = params.get('box') if 'box' in params else ''
+    epsg = params.get('epsg') if 'epsg' in params else ''
 
     #category params
-    theme = request.params.get('theme') if 'theme' in request.params else ''
-    subtheme = request.params.get('subtheme') if 'subtheme' in request.params else ''
-    groupname = request.params.get('groupname') if 'groupname' in request.params else ''
+    theme = params.get('theme') if 'theme' in params else ''
+    subtheme = params.get('subtheme') if 'subtheme' in params else ''
+    groupname = params.get('groupname') if 'groupname' in params else ''
 
     '''
     #from pshell
@@ -416,31 +422,33 @@ def search_features(request):
     return a listing of fids that match the filters (for potentially some interface later or as an option to the streamer)
     '''
     app = request.matchdict['app']
+
+    params = normalize_params(request.params)
     
     #pagination
-    limit = int(request.params.get('limit')) if 'limit' in request.params else 25
-    offset = int(request.params.get('offset')) if 'offset' in request.params else 0
+    limit = int(params.get('limit')) if 'limit' in params else 25
+    offset = int(params.get('offset')) if 'offset' in params else 0
 
     #check for valid utc datetime
-    start_valid = request.params.get('valid_start') if 'valid_start' in request.params else ''
-    end_valid = request.params.get('valid_end') if 'valid_end' in request.params else ''
+    start_valid = params.get('valid_start') if 'valid_start' in params else ''
+    end_valid = params.get('valid_end') if 'valid_end' in params else ''
 
     #sort parameter
     #TODO: sort params for features - by param or dataset or what?
-    sort = request.params.get('sort') if 'sort' in request.params else 'observed'
+    sort = params.get('sort') if 'sort' in params else 'observed'
     if sort not in ['observed']:
         return HTTPNotFound('Bad sort parameter')
 
     #geometry type so just points, polygons or lines or something
-    geomtype = request.params.get('geomtype', '')
+    geomtype = params.get('geomtype', '')
 
     #sort direction
-    sortdir = request.params.get('dir', 'desc').upper()
+    sortdir = params.get('dir', 'desc').upper()
     direction = 0 if sortdir == 'DESC' else 1
     
     #sort geometry
-    box = request.params.get('box', '')
-    epsg = request.params.get('epsg', '') 
+    box = params.get('box', '')
+    epsg = params.get('epsg', '') 
 
     #TODO: let's add a search by dataset uuid?
 #    dataset_uuids = request.params.get('datasets', '')
@@ -448,15 +456,15 @@ def search_features(request):
     
 
     #category search
-    theme = request.params.get('theme', '')
-    subtheme = request.params.get('subtheme', '')
-    groupname = request.params.get('groupname', '')
+    theme = params.get('theme', '')
+    subtheme = params.get('subtheme', '')
+    groupname = params.get('groupname', '')
 
     #parameter search
     #TODO: add the other bits to this and implement it
-    param = request.params['param'] if 'param' in request.params else ''
-    frequency = request.params.get('freq', '')
-    units = request.params.get('units', '')
+    param = params.get('param', '')
+    frequency = params.get('freq', '')
+    units = params.get('units', '')
 
     #need to have all three right now?
     if param and not frequency and not units:
@@ -474,23 +482,32 @@ def search_features(request):
         if c is not None:
             dataset_clauses.append(c)
 
+    query = DBSession.query(Dataset.id).filter(and_(*dataset_clauses))
+
+    category_clauses = []
+    if theme:
+        category_clauses.append(Category.theme.ilike(theme))
+    if subtheme:
+        category_clauses.append(Category.subtheme.ilike(subtheme))
+    if groupname:
+        category_clauses.append(Category.groupname.ilike(groupname))
+
+    #join to categories if we need to
+    if category_clauses:
+        query = query.join(Dataset.categories).filter(and_(*category_clauses))
+
     dataset_ids = []
 
-    #shps = DBSession.query(features.Feature).filter(features.Feature.dataset_id.in_(lst))
-    #shps = DBSession.query(Feature).filter(Feature.dataset_id.in_(dataset_ids))
-
-
     #need to go get the datasets
-    
-    ds = DBSession.query(Dataset).filter(and_(*dataset_clauses))
-    for d in ds:
-        dataset_ids.append(d.id)
+    dataset_ids = [d.id for d in query]
 
     shp_fids = []
     shape_clauses = []
     if dataset_ids:
         #TODO: move the limit part this is for testing
-        shape_clauses.append(Feature.dataset_id.in_(dataset_ids[0:limit]))
+        #TODO: actually , if it's not bbox related, just push to mongo (it seems quicker with the number of ids
+        #[0:limit]
+        shape_clauses.append(Feature.dataset_id.in_(dataset_ids))
 
 
     if box:
@@ -511,34 +528,41 @@ def search_features(request):
 
         #now intersect on shapes and with dataset_id in dataset_ids
         shape_clauses.append(func.st_intersects(func.st_setsrid(Feature.geom, srid), func.st_geometryfromtext(geom_to_wkt(bbox_geom, srid))))
-    
-    shps = DBSession.query(Feature).filter(and_(*shape_clauses))
-    shp_fids = [s.fid for s in shps]
 
+    #just return the fid field. makes it much faster (geoms are big) and defer is not fast, either.
+    shps = DBSession.query(Feature.fid).filter(and_(*shape_clauses))
+    shp_fids = [s.fid for s in shps]
 
     #db.vectors.find({'d.id': {$in: [52208, 52209, 56282, 56350]}}, {'f.id': 1})
     mongo_fids = []
+    #TODO: add the attribute part to this (if att.name == x and att.val != null or something)
     if start_valid or end_valid:
         #go hit up mongo, high style    
-           
-        pass
-
+        connstr = get_current_registry().settings['mongo_uri']
+        collection = get_current_registry().settings['mongo_collection']
+        gm = gMongo(connstr, collection)
+        mongo_clauses = {'d.id': {'$in': dataset_ids}}
+        #run the query and just return the fids (we aren't interested in anything else here)
+        vectors = gm.query(mongo_clauses, {'f.id': 1})
+        #and convert to a list without the objectids
+        mongo_fids = [v['f']['id'] for v in vectors]
     
+    #intersect the two lists IF there's something in both
+    if shp_fids and not mongo_fids:
+        fids = shp_fids
+    elif not shp_fids and mongo_fids:
+        fids = mongo_fids
+    else:
+        shp_set = set(shp_fids)
+        fids = shp_set.intersection(mongo_fids)
+        fids = list(fids)
 
-    #so we'd want the intersect between the fids from the dataset queries and the fids from the mongo query
-    #where we only run the mongo query if there's a valid dates? request so that we don't return them 
-    #because they're in the dataset but outside the given date range
-    if start_valid or end_valid:
-        #load up the mongo request and intersect
-        #this seems like a super bad idea
-        #so let's go!
-        pass
+    #return a honking big list
+    s = offset
+    e = limit + offset
 
-    #TODO: intersect the two lists
-    fids = shp_fids
-    
-
-    return {'total': len(fids), 'features': fids}
+    #and run the offset, limit against the list
+    return {'total': len(fids), 'features': fids[s:e]}
 
 
 #NOTE: we chucked the geolookups structure completely to just keep a cleaner url moving forward.
