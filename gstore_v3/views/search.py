@@ -283,6 +283,9 @@ def search_datasets(request):
     all the spatial query bits
     '''
     #TODO: move this somewhere more general for feature and feature streamer search
+    #can't check for existence of binary expression widget apparently so add a flag
+    georel_column = None
+    has_georel = False
     if box:
         srid = int(get_current_registry().settings['SRID'])
         #make sure we have a valid epsg
@@ -301,8 +304,12 @@ def search_datasets(request):
         if bbox_geom:
             #TODO: look into pulling some of geoalchemy over or something
             #setsrid may not matter? but probably should
-            dataset_clauses.append(func.st_intersects(func.st_setsrid(Dataset.geom, srid), func.st_geometryfromtext(geom_to_wkt(bbox_geom, srid))))
-        
+            bbox_wkt = geom_to_wkt(bbox_geom, srid)
+            dataset_clauses.append(func.st_intersects(func.st_setsrid(Dataset.geom, srid), func.st_geometryfromtext(bbox_wkt)))
+
+            georel_column = func.st_area(func.st_setsrid(Dataset.geom, srid)) / func.st_area(func.st_geometryfromtext(bbox_wkt))
+            has_georel = True
+
 
     #set up the dataset query
     query = DBSession.query(Dataset).filter(and_(*dataset_clauses))
@@ -327,8 +334,11 @@ def search_datasets(request):
     total = query.count()
     if total < 1:
         return {"total": 0, "results": []}
-#    rsp = {"total": datas.count()}
-#    results = []
+
+    #add the georelevance bit to the results
+    if has_georel:
+        #so add geom area / search area to create a dataset tuple of goodness
+        query = query.add_columns(georel_column)
 
     #set up the sorting
     #TODO: theme, subtheme, groupname sorting? (or was that just for the category tree?)
@@ -345,29 +355,40 @@ def search_datasets(request):
     else:
         #it's the descending dateadded
         sort_clause = Dataset.dateadded.desc()
+    sort_clauses = [sort_clause]
     
+    if has_georel:
+        #add the georelevance
+        sort_clauses.append(georel_column.desc())
 
     #and run the limit/offset/sort
-    datas = query.order_by(sort_clause).limit(limit).offset(offset)
+    datas = query.order_by(*sort_clauses).limit(limit).offset(offset)
 
     #get the host url
     host = request.host_url
     g_app = request.script_name[1:]
     base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
 
-    #TODO: deal with georelevance
     #TODO: sort out yield and streaming results (this threw an error - can't return generator as response)
     #def stream_results():
     #yield """{"total": %s, "results": [""" % total
 
     rsp = {"total": total}
     results = []
+    #note: georelevance is added not as an extra field but as the second element in a tuple. the first element is the dataset object. hence the wonkiness.
     if version == 2:
         '''
         {"box": [-109.114059, 31.309483, -102.98925, 37.044096000000003], "lastupdate": "02/29/12", "gr": 0.0, "text": "NM Property Tax Rates - September 2011", "config": {"what": "dataset", "taxonomy": "vector", "formats": ["zip", "shp", "gml", "kml", "json", "csv", "xls"], "services": ["wms", "wfs"], "tools": [1, 1, 1, 1, 0, 0], "id": 130043}, "id": 130043, "categories": "Boundaries__|__General__|__New Mexico"}
         ''' 
         
-        for d in datas:
+        for ds in datas:
+            if has_georel:
+                d = ds[0]
+                gr = ds[1]
+            else:
+                d = ds
+                gr = 0.0
+        
             #TODO: not this REVISE 
             tools = [0 for i in range(6)]
             if d.formats_cache:
@@ -392,7 +413,7 @@ def search_datasets(request):
             #let's build some json
             results.append({"text": d.description, "categories": '%s__|__%s__|__%s' % (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
                             "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
-                            "box": [float(b) for b in d.box], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id, "gr": 0.0})
+                            "box": [float(b) for b in d.box], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id, "gr": gr})
 
 #            yield json.dumps({"text": d.description, "categories": '%s__|__%s__|__%s' % (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
 #                            "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
@@ -401,8 +422,16 @@ def search_datasets(request):
         '''
         new format
         '''
-        for d in datas:
-            results.append(d.get_full_service_dict(base_url))
+        for ds in datas:
+            if has_georel:
+                d = ds[0]
+                gr = ds[1]
+            else:
+                d = ds
+                gr = 0.0
+            rst = d.get_full_service_dict(base_url)
+            rst.update({'gr': gr})
+            results.append(rst)
             #rsp = d.get_full_service_dict(base_url)
             #yield json.dumps(rsp)
             
@@ -504,9 +533,7 @@ def search_features(request):
     shp_fids = []
     shape_clauses = []
     if dataset_ids:
-        #TODO: move the limit part this is for testing
-        #TODO: actually , if it's not bbox related, just push to mongo (it seems quicker with the number of ids
-        #[0:limit]
+        #TODO: actually , if it's not bbox related, just push to mongo (it seems quicker with the number of ids)
         shape_clauses.append(Feature.dataset_id.in_(dataset_ids))
 
 
@@ -536,6 +563,7 @@ def search_features(request):
     #db.vectors.find({'d.id': {$in: [52208, 52209, 56282, 56350]}}, {'f.id': 1})
     mongo_fids = []
     #TODO: add the attribute part to this (if att.name == x and att.val != null or something)
+    #TODO: ADD DATETIME clause builder for before, after, between (or overlap)
     if start_valid or end_valid:
         #go hit up mongo, high style    
         connstr = get_current_registry().settings['mongo_uri']

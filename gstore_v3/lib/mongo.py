@@ -41,11 +41,15 @@ class gMongo:
         use the fielddict to just return some elements (i.e. fids for the feature search that isn't the streamer)
         '''
 
+        if fielddict:
+            q = self.collection.find(querydict, fielddict)
+        else:
+            q = self.collection.find(querydict)
+
         if limit:
             offset = offset if offset else 0
-            q = self.collection.find(querydict, fielddict).limit(limit).skip(offset)
-        else:
-            q = self.collection.find(querydict, fielddict)
+            q = q.limit(limit).skip(offset)
+
         return q
 
     #TODO: this.

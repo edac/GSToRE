@@ -54,6 +54,7 @@ def feature(request):
 
     #'observed': vector['obs'],
 
+
     #TODO: deal with observed values
     #rebuild some json from the other json (i like it)
     results = {'dataset': {'id': vector['d']['id'], 'uuid': vector['d']['u']}, 'feature': {'id': vector['f']['id'], 'uuid': vector['f']['u']}, 
