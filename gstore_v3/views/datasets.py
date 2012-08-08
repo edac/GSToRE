@@ -82,7 +82,7 @@ def dataset(request):
     if not sources && vector - check the cache
     if not sources && vector && no cache - generate cache file
     '''  
-    if taxonomy in ['services']:
+    if d.taxonomy in ['services']:
         src = [s for s in d.sources if s.extension == format and s.set == datatype and s.active]
         if not src:
             #not valid source information for the dataset
@@ -152,9 +152,6 @@ def dataset(request):
         return fr
 
     else:
-        #TODO: deal with the vectors once mongo is running and there's data
-        #TODO: what about formats not in sources (always derived)? bounce if uuid.original.gml?
-
         # get file
         # zip file (or if kml, kmz it)
         #deliver
@@ -193,18 +190,21 @@ def dataset(request):
             else:
                 #it should already be a zip
                 output = files[0].location
-                outname = files[0].location
+                outname = files[0].location.split('/')[-1]
 
             fr = FileResponse(output, content_type=mimetype)
             fr.content_disposition = 'attachment; filename=%s' % (outname)
             return fr
+
+        #at this point it's going to be an existing cached zip or a new zip
+        mimetype = 'application/x-zip-compressed'
 
         #TODO: probably something about the KML -> KMZ situation
         #check for the existing file in formats
         fmtpath = get_current_registry().settings['FORMATS_PATH']
         cachepath = os.path.join(fmtpath, str(d.uuid), format)
         #don't forget the actual packed zip
-        cachefile = os.path.join(cachepath, str(d.basename) + '.' + format + '.zip')
+        cachefile = os.path.join(cachepath, str(d.uuid) + '.' + format + '.zip')
         if os.path.isfile(cachefile):
             fr = FileResponse(cachefile, content_type=mimetype)
             fr.content_disposition = 'attachment; filename=%s' % (str(d.basename) + '.' + format + '.zip')
@@ -213,8 +213,10 @@ def dataset(request):
         #build the file
         #at the cache path
         if not os.path.isdir(cachepath):
-            #make a new one
-            os.path.mkdir(cachepath)
+            #make a new one and this is stupid
+            if not os.path.isdir(os.path.join(fmtpath, str(d.uuid))):
+                os.mkdir(os.path.join(fmtpath, str(d.uuid)))
+            os.mkdir(os.path.join(fmtpath, str(d.uuid), format))
         success = d.build_vector(format, cachepath)
         if success[0] != 0:
             return HTTPServerError('failed to build vector')

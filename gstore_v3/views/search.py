@@ -205,7 +205,8 @@ def search_datasets(request):
     #sort parameter
     sort = params.get('sort') if 'sort' in params else 'lastupdate'
     #if sort not in ['lastupdate', 'text', 'theme', 'subtheme', 'groupname']:
-    if sort not in ['lastupdate', 'text']:
+    #this includes geo-relevance even though it is not used (it is part of the request from rgis though)
+    if sort not in ['lastupdate', 'text', 'geo_relevance']:
         return HTTPNotFound('Bad sort parameter')
     sort = 'dateadded' if sort == 'lastupdate' else sort
     sort = 'description' if sort == 'text' else sort
@@ -335,7 +336,7 @@ def search_datasets(request):
     if total < 1:
         return {"total": 0, "results": []}
 
-    #add the georelevance bit to the results
+    #add the georelevance bit to the results so we don't calculate it for everything we don't need
     if has_georel:
         #so add geom area / search area to create a dataset tuple of goodness
         query = query.add_columns(georel_column)
@@ -359,7 +360,7 @@ def search_datasets(request):
     
     if has_georel:
         #add the georelevance
-        sort_clauses.append(georel_column.desc())
+        sort_clauses.insert(0, georel_column.asc())
 
     #and run the limit/offset/sort
     datas = query.order_by(*sort_clauses).limit(limit).offset(offset)
@@ -400,14 +401,7 @@ def search_datasets(request):
             if d.has_metadata_cache:
                 tools[2] = 1
 
-            #TODO: also not this
-            #services = ['wms', 'wfs'] if d.taxonomy == 'vector' else ['wms', 'wcs']
-            #services = [] if d.taxonomy in ['file', 'services'] else services
-            
             services = d.get_services()
-
-            #TODO: and maybe not even this
-            #fmts = d.formats_cache.split(',')
             fmts = d.get_formats()
                 
             #let's build some json
@@ -563,13 +557,33 @@ def search_features(request):
     #db.vectors.find({'d.id': {$in: [52208, 52209, 56282, 56350]}}, {'f.id': 1})
     mongo_fids = []
     #TODO: add the attribute part to this (if att.name == x and att.val != null or something)
-    #TODO: ADD DATETIME clause builder for before, after, between (or overlap)
+    #TODO: ADD DATETIME clause builder for before, after, between 
     if start_valid or end_valid:
         #go hit up mongo, high style    
         connstr = get_current_registry().settings['mongo_uri']
         collection = get_current_registry().settings['mongo_collection']
         gm = gMongo(connstr, collection)
+
+        
         mongo_clauses = {'d.id': {'$in': dataset_ids}}
+
+        #add the date clauses
+        #db.tests.find({$and: [{s: {$lte: end}}, {e: {$gte: start}}]})
+        #haha don't care. observed is a singleton
+        #d: {$gte: start, $lt: end}
+
+        #TODO: check date format
+        if start_valid and end_valid:
+            mongo_clauses.append({'obs': {'$gte': start_valid, '$lte': end_valid}})
+        elif start_valid and not end_valid:
+            mongo_clauses.append({'obs': {'$gte': start_valid}})
+        elif not start_valid and end_valid:
+            mongo_clauses.append({'obs': {'$lte': end_valid}})
+
+        #need to set up the AND
+        if len(mongo_clauses) > 1:
+            mongo_clauses = {'$and': mongo_clauses}
+
         #run the query and just return the fids (we aren't interested in anything else here)
         vectors = gm.query(mongo_clauses, {'f.id': 1})
         #and convert to a list without the objectids

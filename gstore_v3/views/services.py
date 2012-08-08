@@ -79,8 +79,8 @@ def getStyle(geomtype):
         s.width = 2
         s.color.setRGB(0, 0, 0)
     elif geomtype.upper() == 'POINT':
-        s.size = 10
-        s.color.setRGB(0, 0, 0)
+        s.size = 20
+        s.color.setRGB(100, 100, 100)
     else:
         s.size = 3
         s.color.setRGB(100, 100, 100)
@@ -123,7 +123,7 @@ def getLayer(d, src, dataloc, bbox):
         layer.units = mapscript.MS_DD
 
         layer.setProjection('+init=epsg:4326')
-        layer.opacity = 50
+        #layer.opacity = 50
         layer.type = getType(d.geomtype)
         layer.metadata.set('ows_srs', 'epsg:4326')
         layer.metadata.set('base_layer', 'no')

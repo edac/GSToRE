@@ -23,6 +23,8 @@ from ..lib.utils import getFormats, getServices, createZip
 from ..lib.spatial import *
 from ..lib.mongo import gMongo
 
+from ..models.features import Feature
+
 import os, tempfile, shutil
 
 
@@ -283,7 +285,7 @@ class Dataset(Base):
 
         if format == 'xls':
             #do something else
-            return build_excel(basepath)
+            return self.build_excel(basepath)
 
         #get the data
         connstr = get_current_registry().settings['mongo_uri']
@@ -330,8 +332,17 @@ class Dataset(Base):
 
             if format not in ['csv']:
                 #add the geometry
-                #TODO: add EXISTS check and if not, go get the geom by FID from shapes!!!
-                wkb = v['geom']['g']
+                #TODO: test this
+                if not 'geom' in v or ('geom' in v and not 'g' in v['geom']):
+                    #go get it
+                    fid = str(v['f']['id'])
+                    shape = DBSession.query(Feature).filter(Feature.fid==int(fid)).first()
+                    if not shape:
+                        #there's no geometry!
+                        continue
+                    wkb = shape.geom
+                else:    
+                    wkb = v['geom']['g']
                 geom = wkb_to_geom(wkb, epsg)
                 feature.SetGeometry(geom)
                 geom.Destroy()
@@ -444,9 +455,9 @@ class Dataset(Base):
                     value = str(va[0]['val'])
                  
                 #convert it to the right type based on the field with string as default
-                value = convert_by_ogrtype(value, fld.ogr_type)
+                value = convert_by_ogrtype(value, att.ogr_type)
 
-                ws.write(y, x, value)
+                worksheet.write(y, x, value)
                 x += 1
                 
             #TODO: add the observed timestamp data
@@ -457,8 +468,13 @@ class Dataset(Base):
                 break
 
         #write the file
-        filename = os.path.join(basepath, '%s.xls' % (self.uuid))
+        filename = os.path.join(basepath, '%s.xls' % (self.basename))
         workbook.save(filename)
+
+        #just to be consistent with all of the other types
+        #let's pack up a zip file
+        output = createZip(os.path.join(basepath, '%s.xls.zip' % (self.uuid)), [filename])
+        
         return (0, 'success')
     
 
