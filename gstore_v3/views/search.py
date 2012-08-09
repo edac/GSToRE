@@ -220,7 +220,6 @@ def search_datasets(request):
     keyword = params.get('query') if 'query' in params else ''
     keyword = keyword.replace(' ', '%').replace('+', '%')
 
-    #TODO: set up for the georelevance sorting
     #sort geometry
     box = params.get('box') if 'box' in params else ''
     epsg = params.get('epsg') if 'epsg' in params else ''
@@ -365,10 +364,13 @@ def search_datasets(request):
     #and run the limit/offset/sort
     datas = query.order_by(*sort_clauses).limit(limit).offset(offset)
 
-    #get the host url
-    host = request.host_url
-    g_app = request.script_name[1:]
-    base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
+#    #get the host url
+#    host = request.host_url
+#    g_app = request.script_name[1:]
+#    base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
+
+    load_balancer = get_current_registry().settings['BALANCER_URL']
+    base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
 
     #TODO: sort out yield and streaming results (this threw an error - can't return generator as response)
     #def stream_results():
@@ -401,8 +403,12 @@ def search_datasets(request):
             if d.has_metadata_cache:
                 tools[2] = 1
 
-            services = d.get_services()
-            fmts = d.get_formats()
+            if d.is_available:
+                services = d.get_services()
+                fmts = d.get_formats()
+            else:
+                services = []
+                fmts = []
                 
             #let's build some json
             results.append({"text": d.description, "categories": '%s__|__%s__|__%s' % (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),

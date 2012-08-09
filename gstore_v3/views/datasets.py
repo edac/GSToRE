@@ -34,11 +34,15 @@ def show_html(request):
         return HTTPNotFound('No results')
 
     #http://129.24.63.66/gstore_v3/apps/rgis/datasets/8fc27d61-285d-45f6-8ef8-83785d62f529/soils83.html
+    #http://{load_balancer}/apps/.....
 
-    #get the host url
-    host = request.host_url
-    g_app = request.script_name[1:]
-    base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
+#    #get the host url
+#    host = request.host_url
+#    g_app = request.script_name[1:]
+#    base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
+
+    load_balancer = get_current_registry().settings['BALANCER_URL']
+    base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
     
     rsp = d.get_full_service_dict(base_url)
 
@@ -199,7 +203,7 @@ def dataset(request):
         #at this point it's going to be an existing cached zip or a new zip
         mimetype = 'application/x-zip-compressed'
 
-        #TODO: probably something about the KML -> KMZ situation
+        #TODO: probably something about the KML -> KMZ situation (UNLESS we're packing some metadata in the zip)
         #check for the existing file in formats
         fmtpath = get_current_registry().settings['FORMATS_PATH']
         cachepath = os.path.join(fmtpath, str(d.uuid), format)
@@ -264,12 +268,13 @@ def services(request):
     }
     '''
 
-    #get the host url
-    host = request.host_url
-    g_app = request.script_name[1:]
+#    #get the host url
+#    host = request.host_url
+#    g_app = request.script_name[1:]
+#    base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
 
-    #base_url = '%s/%s/apps/%s/datasets/%s' % (host, g_app, app, d.uuid)
-    base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
+    load_balancer = get_current_registry().settings['BALANCER_URL']
+    base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
 
     rsp = d.get_full_service_dict(base_url)
 
@@ -285,6 +290,53 @@ def add_dataset(request):
 
     #generate uuid here, not through postgres - need to use 
     #outside uuids for data replication (nv/id data as local dataset with pointer to their files)
+
+
+    '''
+    we are skipping the file upload - no one wanted to do that (or no one wanted it to post to ibrix)
+    so maybe add it again later if it comes up, but we're starting with the basic json post functionality
+
+    description
+    taxonomy
+    geomtype
+    valid start
+    valid end
+    bbox
+    epsg
+
+    {uuid} (optional and add it later)
+
+    apps
+    formats
+    services
+    
+    record count
+    feature count
+
+    metadata (stays the same until we have the migration widget running)
+    sources
+    categories
+    
+    
+    '''
+
+    #get the data as json
+    post_data = request.json_body
+
+    #do stuff
+
+
+    #create the new dataset
+
+
+    #add the category set (if not in categories) and assign to dataset
+
+
+    #add the metadata
+    
+
+    #add the sources to the sources
+    
     
 
     return Response('hooray for post')

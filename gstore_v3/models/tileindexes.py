@@ -25,14 +25,42 @@ class TileIndex(Base):
         Column('name', String),
         Column('dateadded', TIMESTAMP, default='now()'),
         Column('bbox', ARRAY(Numeric)),
-        Column('epsg', Integer),
+        Column('epsgs', ARRAY(Integer)),
         Column('uuid', UUID, FetchedValue()),
+        Column('basename', String(25)),
+        Column('taxonomy', String(25)),
         schema='gstoredata'
     )
+    '''
+    bbox is the extent of the union of all extents in the tile index dataset collection
+    epsgs is a list of all epsgs in the tile index collection
+    '''
+
+    #relate to datasets
+    #although it's not necessary from the tileindex ogc service point of view
+    datasets = relationship('Dataset', secondary='gstoredata.tileindexes_datasets')
 
     def __repr__(self):
         return '<TileIndex (%s, %s)>' % (self.uuid, self.name)
 
+
+    #generate the extent from the union of all bboxes for the datasets in the collection
+    def get_index_extent(self):
+        '''
+        --you don't need the cte really, certainly not for sqla
+        with tile_geom as (
+	        select st_union(d.geom) as bbox
+	        from gstoredata.tileindexes t, gstoredata.tileindexes_datasets td, gstoredata.datasets d
+	        where t.id = td.tile_id and t.id = 3 and td.dataset_id = d.id
+        )
+        --to get the wkb geometry of the extent
+        --select encode(st_asbinary(st_extent(bbox)), 'hex') from tile_geom;
+        --or to get the wkt extent
+        select st_extent(bbox) from tile_geom;
+        '''
+        pass
+
+#dataset - tileindex join table
 tileindexes_datasets = Table('tileindexes_datasets', Base.metadata,
     Column('tile_id', Integer, ForeignKey('gstoredata.tileindexes.id')),
     Column('dataset_id', Integer, ForeignKey('gstoredata.datasets.id')),
@@ -58,4 +86,5 @@ class TileIndexView(Base):
 
     def __repr__(self):
         return '<TileIndexView (%s, %s)>' % (self.tile_uuid, self.dataset_uuid)
+
 

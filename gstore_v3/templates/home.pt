@@ -20,29 +20,49 @@
         <dd>The GStore name of the application (rgis, epscor, etc). All API calls are limited to the APP data objects. The examples below refer to data objects in the RGIS application.</dd>
     </dl>
     <h2>Datasets</h2>
-    <p></p>
+    <p>This includes dataset downloads, OGC services, the map preview service, and a dataset service description.</p>
+
+    <h3>Downloads</h3>
+    <p>To get a list of available download formats for a dataset, please use the Service Description request (see below).</p>
+    <p>URL structure: /apps/rgis/datasets/{uuid}/{basename}.{set}.{format}</p>
+    <p>where basename is the dataset file name, set is original or derived, and format is the desired format (so long as it is a supported format for the dataset).</p>
+    <p>There are no query parameters for this request.</p>
+    <h4>Examples</h4>
+    <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/coalminepermitbounds.derived.shp</p>
     
     <h3>Service Description</h3>
+    <p>The service description provides a listing of all available downloads, web services, metadata files, and other basic dataset information.</p>
+    <p>URL structure: /apps/rgis/datasets/{uuid}/services.json</p>
+    <p>There are no query parameters for this request.</p>
+    <h4>Examples</h4>
+    <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/services.json</p>
 
-    <h3>OGC Services</h3>
+    <h3>Web Services</h3>
+    <p>Available web services by dataset are currently limited to OGC services: WMS, WCS or WFS.</p>
     <dl>
-        <dt></dt>
-        <dd></dd>
-        <dt></dt>
-        <dd></dd> 
+        <dt>REQUEST</dt>
+        <dd>Method</dd>
+        <dt>SERVICE</dt>
+        <dd>WMS or WFS or WCS</dd> 
+        <dt>VERSION</dt>
+        <dd>which version of the service to use (see GetCapabilities for supported versions)</dd>
     </dl>
+    <p>This list does not include all of the parameters required or supported by the OGC services. Refer to the Mapserver OGC documentation for parameters by service and method.</p>
 
     <h4>Examples</h4>
-    <p>http://129.24.63.66/gstore_v3/apps/rgis/datasets/b8989369-3183-49af-a817-1c9b37116ebc/services/ogc/wms?REQUEST=GetCapabilities&SERVICE=WMS&VERSION=1.1.1</p>
+    <p>${base_url}/apps/rgis/datasets/b8989369-3183-49af-a817-1c9b37116ebc/services/ogc/wms?REQUEST=GetCapabilities&SERVICE=WMS&VERSION=1.1.1</p>
+
+    <h3>Map Preview</h3>
+    <p></p>
+    <h4>Examples</h4>
+    <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/mapper</p>
 
     <h2>Metadata</h2>
-    <p>Sticking with the regular fgdc services right now.</p>
-    <dl>
-        <dt></dt>
-        <dd></dd>
-        <dt></dt>
-        <dd></dd> 
-    </dl>    
+    <p>Currently GSToRE only supports FGDC.</p>
+    <p>URL Structure: /apps/rgis/datasets/{uuid}/metadata/{standard}.{format}</p>
+    <p>where standard is a supported metadata standard (FGDC or, later, ISO, DC, etc) and format is a supported format (html, txt, or xml).</p>
+    <h4>Examples</h4>
+    <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/metadata/fgdc.html</p>  
     
     <h2>Search</h2>
     <h3>Datasets</h3>

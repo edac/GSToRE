@@ -7,6 +7,7 @@ from pyramid.threadlocal import get_current_registry
 import os 
 from email.parser import Parser 
 from email.message import Message
+from urlparse import urlparse
 
 #make we sure we have pil
 import Image
@@ -64,6 +65,17 @@ def isGeotiff(content_type):
 def isAsciigrid(content_type):
     return content_type.split(";")[0].lower() in 'image/x-aaigrid'
 #end wcs response parts  
+
+#so, neat trick, the order of the srs matters for wcs.describecoverage
+#this rebuilds the list so that the check_srs (the dataset srs, for example) is listed once and is listed first
+def build_supported_srs(check_srs, supported_srs=[]):
+    if not supported_srs:
+        supported_srs = get_current_registry().settings['OGC_SRS'].split(',')
+    if check_srs:
+        supported_srs = [s for s in supported_srs if s != 'EPSG:%s' % (check_srs)]
+        supported_srs.insert(0, 'EPSG:%s' % (check_srs))
+    return ' '.join(supported_srs)
+
 
 #TODO: REVISE FOR SLDs, RASTER BAND INFO, ETC
 #default syle objs
@@ -123,18 +135,18 @@ def getLayer(d, src, dataloc, bbox):
         layer.units = mapscript.MS_DD
 
         layer.setProjection('+init=epsg:4326')
-        #layer.opacity = 50
+        layer.opacity = 50
         layer.type = getType(d.geomtype)
         layer.metadata.set('ows_srs', 'epsg:4326')
         layer.metadata.set('base_layer', 'no')
         layer.metadata.set('wms_encoding', 'UTF-8')
         layer.metadata.set('wms_title', d.basename)
         layer.metadata.set('gml_include_items', 'all')
-        layer.metadata.set('gml_featureid', 'gid') #mapserver likes this better than fid
+        layer.metadata.set('gml_featureid', 'FID') 
 
         #add the class (and the style)
         cls = mapscript.classObj()
-        cls.name = 'Everything'
+        #cls.name = 'Everything'
         cls.insertStyle(style)
 
         layer.insertClass(cls)
@@ -389,9 +401,12 @@ def datasets(request):
     tmppath = get_current_registry().settings['TEMP_PATH']
     srid = get_current_registry().settings['SRID']
     
-    host = request.host_url
-    g_app = request.script_name[1:]
-    base_url = '%s/%s' % (host, g_app)
+#    host = request.host_url
+#    g_app = request.script_name[1:]
+#    base_url = '%s/%s' % (host, g_app)
+
+    load_balancer = get_current_registry().settings['BALANCER_URL']
+    base_url = load_balancer
 
     #NOTE: skipping tilecache and just running with wms services here
     #maybe it's for the tile cache
@@ -454,11 +469,7 @@ def datasets(request):
         m.setProjection(init_proj)
 
         #add some metadata
-        supported_srs = get_current_registry().settings['OGC_SRS'].split(',')
-        #layer srs must go first! for a correct wcs.describecoverage response
-        ows_srs = [s for s in supported_srs if s != 'EPSG:%s' % (d.orig_epsg)]
-        ows_srs.insert(0, 'EPSG:%s ' % (d.orig_epsg))
-        m.web.metadata.set('ows_srs', ' '.join(ows_srs))
+        m.web.metadata.set('ows_srs', build_supported_srs(d.orig_epsg))
         #m.web.metadata.set('wms_srs', 'EPSG:4326 EPSG:4269 EPSG:4267 EPSG:26913 EPSG:26912 EPSG:26914 EPSG:26713 EPSG:26712 EPSG:26714')
 
         #enable the ogc services
@@ -522,8 +533,8 @@ def datasets(request):
         of = mapscript.outputFormatObj('AGG/PNG', 'png')
         of.setExtension('png')
         of.setMimetype('image/png')
-        of.imagemode = mapscript.MS_IMAGEMODE_RGB
-        of.transparent = mapscript.MS_ON
+        of.imagemode = mapscript.MS_IMAGEMODE_RGBA
+        of.transparent = mapscript.MS_TRUE
         of.setOption('GAMMA', '0.70')
         m.appendOutputFormat(of)
 
@@ -612,26 +623,197 @@ def datasets(request):
     #post the results
     mapname = '%s/%s.%s.map' % (mappath, d.uuid, mapsrc_uuid)
 
-    #TODO: check this some more
-    #but make sure the required params have something 
-#    if 'LAYERS' not in params:
-#        params['LAYERS'] = d.basename
-#    if 'BBOX' not in params:
-#        params['BBOX'] = ','.join([str(b) for b in bbox])
-
-
     #to check the bands:
     #http://129.24.63.66/gstore_v3/apps/rgis/datasets/539117d6-bcce-4f16-b237-23591b353da1/services/ogc/wms?REQUEST=GetMap&SERVICE=WMS&VERSION=1.1.1&LAYERS=m_3110406_ne_13_1_20110512&BBOX=-104.316358581,31.9342908128,-104.246085056,32.0032463898
     
     return generateService(m, params, mapname)
 
 
+#TODO: add apps to the tile indexes?
 @view_config(route_name='services', match_param='type=tileindexes')
 def tileindexes(request):
+    '''
+    build a tile index wms service based on the tile index view
 
+    if the tile index collection contains datasets with multiple spatial references, build a set of layers per spatial reference    
+
+    '''
+    tile_id = request.matchdict['id']
+    app = request.matchdict['app']
+    service_type = request.matchdict['service_type']
+    service = request.matchdict['service']
+
+    params = normalize_params(request.params)
+
+    #get the tile index by id/uuid
+    tile = get_tileindex(tile_id)
+
+    if not tile:
+        return HTTPNotFound()
+
+    if service_type.lower() != 'ogc':
+        return HTTPNotFound()
+        
+    mappath = get_current_registry().settings['MAPS_PATH']
+    tmppath = get_current_registry().settings['TEMP_PATH']
+    srid = get_current_registry().settings['SRID']
+
+    load_balancer = get_current_registry().settings['BALANCER_URL']
+    base_url = load_balancer
+    
+   
     #build the map file
+    mapname = '%s/%s.tile.map' % (mappath, tile.uuid)
 
-	return Response()
+    if os.path.isfile(mapname):
+        m = mapscript.mapObj(mapname)
+    else:
+        m = mapscript.mapObj()
+        
+        init_proj = 'init=epsg:%s' % (srid)
+        bbox = [float(b) for b in tile.bbox]
+
+        tile_epsgs = [int(e) for e in tile.epsgs]
+
+        m.setExtent(bbox[0], bbox[1], bbox[2], bbox[3])
+        m.imagecolor.setRGB(255,255,255)
+        m.setImageType('png24')
+        m.setSize(600, 600)
+
+        if 'epsg:4326' in init_proj:
+            m.units = mapscript.MS_DD
+
+        m.name = '%s_TileIndex' % (app.upper())
+        m.setProjection(init_proj)
+
+        #add a bunch of metadata
+
+        #we need to make sure that all of hte srs for the tile index are in the supported srs list (i guess)
+        check_list = []
+        for epsg in tile_epsgs:
+            supported_srs = build_supported_srs(epsg, check_list)
+            check_list = supported_srs.split(' ')
+        m.web.metadata.set('wms_srs', supported_srs)
+
+        #use "!*" for the wms_enable_request to hide the index layer from getcapabilities
+        m.web.metadata.set('wms_enable_request', '*')
+        #m.web.metadata.set('wms_enable_request', '!*')
+
+        m.web.metadata.set('wms_name', 'imagery_wms_%s' % (tile.id))
+        m.web.metadata.set('wms_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wms' % (base_url, app, tile.uuid))
+        m.web.metadata.set('wms_abstract', 'WMS Service for %s tile index %s' % (app, tile.name))
+
+        m.web.metadata.set('ows_contactperson', 'Clearinghouse manager')
+        m.web.metadata.set('ows_contactposition', 'manager')
+        m.web.metadata.set('ows_contactinstructions', 'phone or email')
+        m.web.metadata.set('ows_contactorganization', 'Earth Data Analysis Center')
+        m.web.metadata.set('ows_address', 'Earth Data Analysis Center, MSC01 1110, 1 University of New Mexico')
+        m.web.metadata.set('ows_contactvoicetelephone', '(505) 277-3622 ext. 230')
+        m.web.metadata.set('ows_contactfacsimiletelephone', '(505) 277-3614')
+        m.web.metadata.set('ows_contactelectronicmailaddress', 'ADDRESS@edac.unm.edu')
+        m.web.metadata.set('ows_addresstype', 'Mailing address')
+        m.web.metadata.set('ows_hoursofservice', '9-5 MST, M-F')
+        m.web.metadata.set('ows_role', 'data provider')
+
+
+        m.web.metadata.set('wms_formatlist', 'image/png,image/gif,image/jpeg')
+        m.web.metadata.set('wms_format', 'image/png')
+        m.web.metadata.set('ows_keywordlist', '%s, New Mexico' % (app))
+        m.web.metadata.set('ows_accessconstraints', 'none')
+        m.web.metadata.set('ows_fees', 'None')
+
+        #TODO: check on this
+        m.web.metadata.set('wms_server_version', '1.3.0')
+
+        m.web.metadata.set('ows_country', 'US')
+        m.web.metadata.set('ows_stateorprovince', 'NM')
+        m.web.metadata.set('ows_city', 'Albuquerque')  
+        m.web.metadata.set('ows_postcode', '87131')
+
+        m.web.metadata.set('ows_title', '%s Tile Index (%s)' % (app, tile.uuid))
+
+        #set the paths
+        m.mappath = mappath
+        m.web.imageurl = tmppath
+        m.web.imagepath = tmppath
+        #TODO: set up real templates (this doesn't even exist)
+        m.web.template = tmppath + '/client.html'
+
+        #add the output formats
+        of = mapscript.outputFormatObj('AGG/PNG', 'png')
+        of.setExtension('png')
+        of.setMimetype('image/png')
+        of.imagemode = mapscript.MS_IMAGEMODE_RGBA
+        of.transparent = mapscript.MS_TRUE
+        of.setOption('GAMMA', '0.70')
+        m.appendOutputFormat(of)
+
+        #and the gif
+        of = mapscript.outputFormatObj('GD/GIF', 'gif')
+        of.setExtension('gif')
+        of.setMimetype('image/gif')
+        of.imagemode = mapscript.MS_IMAGEMODE_PC256
+        m.appendOutputFormat(of)
+
+        #and the jpeg
+        of = mapscript.outputFormatObj('AGG/JPEG', 'jpg')
+        of.setExtension('jpg')
+        of.setMimetype('image/jpeg')
+        of.imagemode = mapscript.MS_IMAGEMODE_RGB
+        m.appendOutputFormat(of)
+
+        #now for the tile index layers (at least two)
+        for epsg in tile_epsgs:
+            #we need to add two layers per spatial reference
+            tilename = '%s_%s' % (tile.basename, epsg)
+            layer = mapscript.layerObj()
+            layer.name = tilename
+            layer.status = mapscript.MS_ON
+            layer.setProjection('init=epsg:%s' % (epsg))
+            layer.setProcessing('DITHER=YES')
+            layer.metadata.set('layer_title', tilename)
+            layer.metadata.set('base_layer', 'no')
+            layer.metadata.set('wms_encoding', 'UTF-8')
+            layer.metadata.set('wms_title', tilename)
+            layer.metadata.set('imageformat', 'image/png')
+
+            layer.tileindex = '%s_index' % (tilename)
+            layer.tileitem = 'location'
+
+            #TODO: modify if we ever use vector tile indexes
+            if tile.taxonomy == 'raster':   
+                layer.type = mapscript.MS_LAYER_RASTER
+            else:
+                pass
+
+            m.insertLayer(layer)
+
+            #and the index layer
+            layer = mapscript.layerObj()
+            layer.name = '%s_%s_index' % (tile.basename, epsg)
+            layer.setProjection('init=epsg:%s' % (epsg))
+            layer.metadata.set('layer_title', '%s_index' % tilename)
+            layer.metadata.set('base_layer', 'no')
+            layer.metadata.set('wms_encoding', 'UTF-8')
+            layer.metadata.set('wms_title', '%s_index' % tilename)
+            layer.metadata.set('imageformat', 'image/png')
+
+            layer.type = mapscript.MS_LAYER_TILEINDEX
+            layer.connectiontype = mapscript.MS_POSTGIS
+            layer.setProcessing('CLOSE_CONNECTION=DEFER')
+
+            #get the postgres connection
+            connstr = get_current_registry().settings['sqlalchemy.url']
+            psql = urlparse(connstr)
+            layer.connection = 'dbname=%s host=%s port=%s user=%s password=%s' % (psql.path[1:], psql.hostname, psql.port, psql.username, psql.password)
+            sql = 'geom from (select gid, geom, tile_id, description, location from gstoredata.get_tileindexes where tile_id = %s and orig_epsg = %s) as aview using unique gid using srid=4326' % (tile.id, epsg)
+            layer.data = sql
+            #layer.filteritem = 'tile_id = %s and orig_epsg = %s' 
+
+            m.insertLayer(layer)
+
+    
+    return generateService(m, params, mapname)
 
 
 #run the base layers for the mapper
@@ -679,7 +861,6 @@ def base_services(request):
 mapper
 '''
 #TODO: migrate to the interfaces only
-#TODO: Add html renderer for this
 @view_config(route_name='mapper', renderer='mapper.mako')
 def mapper(request):
     #build the dict
@@ -711,9 +892,12 @@ def mapper(request):
 
     media_url = get_current_registry().settings['MEDIA_URL']
     
-    host = request.host_url
-    g_app = request.script_name[1:]
-    base_url = '%s/%s/apps/%s/datasets/%s' % (host, g_app, app, d.uuid)
+#    host = request.host_url
+#    g_app = request.script_name[1:]
+#    base_url = '%s/%s/apps/%s/datasets/%s' % (host, g_app, app, d.uuid)
+
+    load_balancer = get_current_registry().settings['BALANCER_URL']
+    base_url = '%s/apps/%s/datasets/%s' % (load_balancer, app, d.uuid)
 
     c = {'MEDIA_URL': media_url, 'AppId': app}    
 
@@ -769,7 +953,6 @@ def mapper(request):
     metadatas.append({'title': 'XML', 'text': '%s/metadata/fgdc.xml' % (base_url)})
     c.update({'metadata': metadatas})
 
-    #TODO: fix all of this
     #add the layers
     lyrs = [{'layer': d.basename, 'id': d.id, 'title': d.description, 'features_attributes': [], 'maxExtent': [float(b) for b in d.box]}]
     c.update({'Layers': lyrs})

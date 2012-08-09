@@ -3,6 +3,8 @@ from pyramid.view import view_config
 
 from sqlalchemy.exc import DBAPIError
 
+from pyramid.threadlocal import get_current_registry
+
 #from the models init script
 from .models import DBSession
 #from the generic model loader (like meta from gstore v2)
@@ -23,7 +25,8 @@ def my_view(request):
         g_app = request.script_name[1:]
 
         #base_url = '%s/%s/apps/%s/datasets/%s' % (host, g_app, app, d.uuid)
-        base_url = '%s/%s' % (host, g_app)
+        #base_url = '%s/%s' % (host, g_app)
+        base_url = get_current_registry().settings['BALANCER_URL']
         
         one = DBSession.query(Dataset).filter(Dataset.id==143533).first()
         one = ''

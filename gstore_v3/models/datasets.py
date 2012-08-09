@@ -192,7 +192,8 @@ class Dataset(Base):
             #nope, go build the vector
             if not os.path.isdir(os.path.join(fmtpath, str(self.uuid), 'shp')):
                 #make the directory
-                os.mkdir(os.path.join(fmtpath, str(self.uuid)))
+                if not os.path.isdir(os.path.join(fmtpath, str(self.uuid))):
+                    os.mkdir(os.path.join(fmtpath, str(self.uuid)))
                 os.mkdir(os.path.join(fmtpath, str(self.uuid), 'shp'))
             success, message = self.build_vector('shp', os.path.join(fmtpath, str(self.uuid), 'shp'))
             if success != 0: 
@@ -210,14 +211,13 @@ class Dataset(Base):
         base_url += str(self.uuid)
     
         results = {'id': self.id, 'uuid': self.uuid, 'description': self.description, 
-                'spatial': {'bbox': string_to_bbox(self.box), 'epsg': 4326},  'lastupdate': self.dateadded.strftime('%Y%m%d'), 'name': self.basename, 
+                'spatial': {'bbox': string_to_bbox(self.box), 'epsg': 4326}, 'lastupdate': self.dateadded.strftime('%Y%m%d'), 'name': self.basename, 
                 'categories': [{'theme': t.theme, 'subtheme': t.subtheme, 'groupname': t.groupname} for t in self.categories]}
-
 
         if self.is_available:
             dlds = []
             fmts = self.get_formats()
-            svcs = self.get_services()
+            svcs = self.get_services()            
             #TODO: change the relate to only include active sources
             srcs = [s for s in self.sources if s.active]
 
@@ -247,8 +247,14 @@ class Dataset(Base):
 
             results.update({'services': [{s: '%s/services/ogc/%s' % (base_url, s) for s in svcs}], 'downloads': [{s[1]: '%s/%s.%s.%s' % (base_url, self.basename, s[0], s[1]) for s in dlds}]})
 
+            #add the link to the mapper 
+            #TODO: when the mapper moves, get rid of this
+            if self.taxonomy in ['geoimage', 'vector']:
+                mapper = '%s/mapper' % (base_url)
+                results.update({'preview': mapper})
+
         else:
-            results.update({'services': [], 'downloads': [], 'availability': False})
+            results.update({'services': [], 'downloads': [], 'preview': '', 'availability': False})
 
         #check on the metadata
         if self.has_metadata_cache:
@@ -276,6 +282,10 @@ class Dataset(Base):
         get the attribute data
         create an ogr dataset
         populate
+
+        note: we shouldn't care about whether the vector has one geometry for the recordset or multiple geometries
+              for the recordset. the wkb is in each mongo document or the fid so we have the info we need 
+              based on the mongo query resultset.
         '''
         
 
@@ -316,6 +326,8 @@ class Dataset(Base):
         lyrtype = postgis_to_ogr(self.geomtype)
         layer = datasource.CreateLayer(str(self.basename), sr, lyrtype)
 
+        layer.CreateField(ogr.FieldDefn('FID', ogr.OFTInteger))
+
         #deal with the fields
         #FID AND SHAPE are always set except for csv
         flds = self.attributes
@@ -330,12 +342,14 @@ class Dataset(Base):
         for v in vectors:
             feature = ogr.Feature(lyrdef)
 
+            fid = str(v['f']['id'])
+            feature.SetField('FID', int(fid))
+
             if format not in ['csv']:
                 #add the geometry
                 #TODO: test this
                 if not 'geom' in v or ('geom' in v and not 'g' in v['geom']):
                     #go get it
-                    fid = str(v['f']['id'])
                     shape = DBSession.query(Feature).filter(Feature.fid==int(fid)).first()
                     if not shape:
                         #there's no geometry!

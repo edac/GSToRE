@@ -17,6 +17,7 @@ from ..models.datasets import (
 
 from ..lib.utils import *
 from ..lib.database import *
+from ..lib.mongo import gMongo
 
 #log = logging.getLogger(__name__)
 
@@ -26,6 +27,19 @@ at the app level
 
 see http://mule1.dataone.org/ArchitectureDocs-current/apis/MN_APIs.html
 '''
+
+'''
+some presets
+'''
+#TODO: move to config?
+NODE = 'urn:node:GSTORE'
+SUBJECT = 'CN=GStore,DC=dataone,DC=org'
+RIGHTSHOLDER = 'CN=GStore,DC=dataone,DC=org'
+CONTACTSUBJECT = 'CN=GStore,DC=dataone,DC=org'
+IDENTIFIER = ''
+NAME = ''
+DESCRIPTION = ''
+
 
 #convert to the d1 format
 def datetime_to_dataone(dt):
@@ -38,6 +52,27 @@ def datetime_to_http(dt):
     #Wed, 16 Dec 2009 13:58:34 GMT
     fmt = '%a, %d %b %Y %H:%M:%S GMT'
     return dt.strftime(fmt)
+
+'''
+dataone logging in mongodb
+'''
+def log_entry(identifier, ip, event, useragent=None):
+    connstr = get_current_registry().settings['dataone_mongo_uri']
+    collection = get_current_registry().settings['dataone_mongo_collection']
+    gm = gMongo(connstr, collection)
+
+    #TODO: possible that identifier is just the pid?
+    gm.insert({"identifier": "" + identifier, "ip": ip, "useragent": useragent, "subject": SUBJECT, "date": datetime.utcnow(), "event": event, "node": NODE})
+
+def query_log(querydict, limit=0, offset=0):
+    connstr = get_current_registry().settings['dataone_mongo_uri']
+    collection = get_current_registry().settings['dataone_mongo_collection']
+    gm = gMongo(connstr, collection)
+    if limit:
+        logs = gm.query(querydict).limit(limit).skip(offset)
+    else:
+        logs = gm.query(querydict)
+    return logs
 
 #TODO: modify the cache settings
 @view_config(route_name='dataone_ping', match_param='app=dataone', http_cache=3600)
@@ -59,8 +94,8 @@ def ping(request):
     #TODO: add check for insufficient resources (except we don't seem to know that)
     #      (413)
 
-    #TODO: why isn't the logger writing to the stupid file?
-    logging.getLogger('dataone').debug('ping dataone')
+#    #TODO: why isn't the logger writing to the stupid file?
+#    logging.getLogger('dataone').debug('ping dataone')
 
     return Response()
 	
@@ -98,13 +133,13 @@ def dataone(request):
     rsp = {'name': 'GSTORE Node',
            'description': 'DATAONE member node for GSTORE',
            'baseUrl': '%s/%s/apps/dataone/' % (request.host_url, request.script_name[1:]),
-           'subject': 'CN=urn:node:DEMO2, DC=dataone, DC=org',
-           'contactsubject': 'CN=METACAT1, DC=dataone, DC=org'
+           'subject': SUBJECT,
+           'contactsubject': CONTACTSUBJECT
         }
     request.response.content_type='text/xml'
     return rsp
 
-@view_config(route_name='dataone_log', match_param='app=dataone')
+@view_config(route_name='dataone_log', match_param='app=dataone', renderer='dataone_logs.mako')
 def log(request):
     '''
     <?xml version="1.0" encoding="UTF-8"?>
@@ -144,7 +179,34 @@ def log(request):
 
     event = request.params.get('event') if 'event' in request.params else ''
 
-    return Response('dateone log')
+    querydict = {}
+    logs = query_logs(querydict, limit, offset)
+
+    results = logs.count()
+    #TODO: what is total? the number of all log entries? or what?
+    total = 0
+
+    '''
+    #2012-02-29T23:26:38.828+00:00
+    fmt = '%Y-%m-%dT%H:%M:%S+00:00'
+    post = {'total': 45, 'results': 3, 'offset': 0}
+    docs = [
+            {'id': 1, 'identifier': dataset_id, 'ip': '129.24.63.165', 'useragent': 'null', 'subject': 'CN=GStore,dc=informatics,dc=org', 'event':'read', 'dateLogged':datetime.utcnow().strftime(fmt), 'node': 'GSTORE'},
+            {'id': 2, 'identifier': dataset_id, 'ip': '129.24.63.55', 'useragent': 'null', 'subject': 'CN=GStore,dc=informatics,dc=org', 'event':'read', 'dateLogged':datetime.utcnow().strftime(fmt), 'node': 'GSTORE'},
+            {'id': 3, 'identifier': dataset_id, 'ip': '129.24.63.235', 'useragent': 'null', 'subject': 'CN=GStore,dc=informatics,dc=org', 'event':'read', 'dateLogged':datetime.utcnow().strftime(fmt), 'node': 'GSTORE'}
+        ]
+    post.update({'docs': docs})
+    '''
+
+    rsp = {'total': total, 'results': results, 'offset': offset}
+    docs = []
+    for g in logs:
+        logged = g['date']
+        
+        docs.append({'id': str(g['_id']), 'identifier': g['identifier'], 'ip': g['ip'], 'useragent': 'null', 'subject': g['subject'], 'event': g['event'], 'dateLogged': '', 'node': g['node']})
+
+    rsp.update({'docs': docs})
+    return rsp
 	
 @view_config(route_name='dataone_search', match_param='app=dataone')
 def search(request):
@@ -237,7 +299,8 @@ def show(request):
 def head(request):
     '''
     d1.method = describe
-    
+
+    curl -I http://129.24.63.66/gstore_v3/apps/dataone/object/b45bbf88-0b81-441c-bf9a-590c8ac5f0bf
     HTTP/1.1 200 OK
     Last-Modified: Wed, 16 Dec 2009 13:58:34 GMT
     Content-Length: 10400
@@ -246,6 +309,7 @@ def head(request):
     DataONE-Checksum: SHA-1,2e01e17467891f7c933dbaa00e1459d23db3fe4f
     DataONE-SerialVersion: 1234
 
+    curl -I http://129.24.63.66/gstore_v3/apps/dataone/object/b45bbf88-0b81-441c-bf9a-590c8ac5f09f
     error = 
     HTTP/1.1 404 Not Found
     Last-Modified: Wed, 16 Dec 2009 13:58:34 GMT
@@ -278,7 +342,7 @@ def head(request):
                ('DataONE-Exception-Name', 'NotFound'), 
                ('DataONE-Exception-DetailCode', '1380'), 
                ('DataONE-Exception-Description', 'The specified object does not exist on this node.'),
-               ('DataONE-Exception-PID', pid)]
+               ('DataONE-Exception-PID', str(pid))]
         rsp = Response()
         rsp.status = 404
         rsp.headerlist = lst
@@ -382,9 +446,12 @@ def metadata(request):
     file_hash = src[0].file_hash
     file_hash_type = src[0].file_hash_type
 
-    host = request.host_url
-    g_app = request.script_name[1:]
-    base_url = '%s/%s/apps/dataone/' % (host, g_app)
+#    host = request.host_url
+#    g_app = request.script_name[1:]
+#    base_url = '%s/%s/apps/dataone/' % (host, g_app)
+
+    load_balancer = get_current_registry().settings['BALANCER_URL']
+    base_url = '%s/apps/dataone/' % (load_balancer)
 
     #TODO: fix all of this
     rsp = {'pid': pid, 'dateadded': datetime_to_dataone(d.dateadded), 'obj_format': src[0].extension, 'file_size': file_size, 
@@ -394,6 +461,7 @@ def metadata(request):
     request.response.content_type = 'text/xml; charset=UTF-8'
     return rsp
 
+#TODO: change to dynamic hashing based on either SHA-1 or MD5
 @view_config(route_name='dataone_checksum', match_param='app=dataone')
 def checksum(request):
     '''
