@@ -403,12 +403,8 @@ def search_datasets(request):
             if d.has_metadata_cache:
                 tools[2] = 1
 
-            if d.is_available:
-                services = d.get_services()
-                fmts = d.get_formats()
-            else:
-                services = []
-                fmts = []
+            services = d.get_services()
+            fmts = d.get_formats()
                 
             #let's build some json
             results.append({"text": d.description, "categories": '%s__|__%s__|__%s' % (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
