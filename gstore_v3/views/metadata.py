@@ -36,6 +36,9 @@ note: is_available doesn't apply - metadata still accessible
 @view_config(route_name='metadata_v2')
 def metadata(request):
     #/apps/{app}/datasets/{id}/metadata/{standard}.{ext}
+    '''
+    note: for iso, return data with xlinks to lineage, entity info/attributes, contacts, possibly also spatial ref
+    '''
 
     app = request.matchdict['app'] #doesn't actually mean anything right now
     dataset_id = request.matchdict['id']
@@ -53,45 +56,27 @@ def metadata(request):
     if not d:
         return HTTPNotFound('No results')
 
-
     #TODO: replace this when the schema is complete & populated
     #and make sure there's metadata
     if d.has_metadata_cache == False:
         return HTTPNotFound('No metadata')
 
     #this should only be valid xml (<?xml or <metadata)
-    xml = d.dataset_metadata[0].original_xml
-
     #get the xml metadata
-    #TODO: update this for iso, fgdc, dc, etc
-    #TODO: xml-to-text transform iffy? or esri metadata in database so not valid fgdc
-    xslt_path = get_current_registry().settings['XSLT_PATH']
-    xslt = 'fgdc_classic_rgis.xsl' if format == 'html' else 'xml-to-text.xsl'
+    #TODO: the standard is a lie
+    output, content_type = d.dataset_metadata[0].transform(standard, format) 
 
-    if format == 'xml':
-        #dump the xml and encode so that everything matches
-        return Response(xml.encode('utf8'), content_type='text/xml; charset=UTF-8')
-    else:
-        #transform the xml
-        #TODO: update this for iso, fgdc, dc, etc
-        content_type = 'text/html; charset=UTF-8' if format == 'html' else 'text; charset=UTF-8'
+    return Response(output, content_type=content_type)
 
-        xslt_path = os.path.join(xslt_path, xslt)
-        xsltfile = open(xslt_path, 'r')
+@view_config(route_name='metadata_resolved')
+def metadata_resolver(request):
+    '''
+    this really only matters for ISO right now
+    but, if, iso, return full version of metadata, no xlinks
+    if not iso, return same as basic metadata view
+    '''
+    return Response()
 
-        try:
-            xslt = etree.parse(xsltfile)
-            transform = etree.XSLT(xslt)
-            xml_enc = etree.XML(xml.encode('utf8'))
-            output = transform(xml_enc)
-            output = etree.tostring(output, encoding='utf8')
-        except Exception as e:
-            #failover to the raw xml
-            content_type='text/xml; charset=UTF-8'
-            output = xml.encode('utf8')
-            #return Response(str(e))
-
-        return Response(output, content_type=content_type)
 
 #TODO: deal with this once we have linkable components in new schema
 #TODO: modify routes to have some {metadata object}/{uuid}.{ext} thing?
@@ -104,6 +89,16 @@ metadata maintenance
 '''
 @view_config(route_name='add_metadata', request_method='POST')
 def add_metadata(request):
+    '''
+    so could be one of several different imports:
+
+    1) POST edac xml file (need schema that can be validated by metadata crew) that can be parsed here into table structure
+
+    2) POST valid fgdc/iso(?) plus some extra JSON elements that is stored in original_metadata but that could be parsed later using the extra JSON bits
+
+    3) POST text that isn't anything and is stored in original_metadata.original_text that we do next to nothing to
+    '''
+
     return Response('metadata = %s' % (request.matchdict['id']))
 
 #i have no idea what would get updated though

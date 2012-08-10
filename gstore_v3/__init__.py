@@ -77,7 +77,7 @@ def main(global_config, **settings):
     config.scan('.models')
     engine = engine_from_config(settings, 'sqlalchemy.')
     models.initialize_sql(engine)
-    
+
     config.add_static_view('static', 'static', cache_max_age=3600)
     config.add_route('home', '/')    
 
@@ -101,7 +101,11 @@ def main(global_config, **settings):
     config.add_route('features', '/apps/{app}/features.{ext}', custom_predicates=(applist,))
 
 #to the metadata
+    #the unresolved (iso) metadata
     config.add_route('metadata', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata/{standard}.{ext}', custom_predicates=(applist,standardslist,))
+    #the resolved, no xlink version. maybe this only applies to the iso? or return transform of whatever but it will be the same as the file from above
+    config.add_route('metadata_resolved', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata/resolved/{standard}.{ext}', custom_predicates=(applist,standardslist,))
+    
     #route to maintain the v2 urls
     config.add_route('metadata_v2', '/apps/{app}/datasets/{id:\d+}/metadata/{did:\d+}.{ext}', custom_predicates=(applist,))
     config.add_route('add_metadata', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata', custom_predicates=(applist,))

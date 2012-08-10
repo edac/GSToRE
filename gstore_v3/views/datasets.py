@@ -87,48 +87,39 @@ def dataset(request):
     if not sources && vector && no cache - generate cache file
     '''  
     if d.taxonomy in ['services']:
-        src = [s for s in d.sources if s.extension == format and s.set == datatype and s.active]
+        src = d.get_source(datatype, format)
+        
         if not src:
             #not valid source information for the dataset
             return HTTPNotFound('No results')
 
-        src = src[0]
-        loc = src.src_files[0].location
+        loc = src.get_location()
+        if not loc:
+            return HTTPNotFound('')
+            
         return HTTPFound(location=loc)
 
     #TODO: refactor the heck out of this  
     if d.taxonomy in ['geoimage', 'file']:
-        src = [s for s in d.sources if s.extension == format and s.set == datatype and s.active]
+        src = d.get_source(datatype, format)
         if not src:
             #not valid source information for the dataset
             return HTTPNotFound('No results')
 
-        src = src[0]
         if src.is_external:
-            loc = src.src_files[0].location
+            loc = src.get_location()
             #redirect and bail
             return HTTPFound(location=loc)
 
         #get the mimetype (not as unicode)
         mimetype = str(src.file_mimetype)
-        
-        #get the files
-        files = src.src_files
-        if not files:
-            return HTTPNotFound('why are there no files?')
 
-        #TODO: add the metadata to the zip someday
 
         #for things that we don't actually want to emit as zips (pdf, etc)
         if format != 'zip' and mimetype != 'application/x-zip-compressed':
             #it's not a file we want to deliver as a zip anyway
+            f = src.get_location(format)
 
-            if len(files) > 1:
-                #we want the right one
-                f = [g for g in files if g.location.split('.')[-1] == format]
-                f = f[0] if f else None
-            else:
-                f = files[0]
             fr = FileResponse(f, content_type=mimetype)
             fr.content_disposition = 'attachment; filename=%s' % (f.split('/')[-1])
             return fr
@@ -139,17 +130,17 @@ def dataset(request):
             #to test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ccfc9523-4b9e-4c58-8cf5-7d727fc8a807.original.tif
             tmppath = get_current_registry().settings['TEMP_PATH']
             if not tmppath:
-                return HTTPNotFound('where is the temp!')
+                return HTTPNotFound()
             #get the name of the file from the url
-            zippath = os.path.join(tmppath, '%s/%s.%s.%s.zip' % (dataset_id, d.basename, datatype, format))
-            #make the zipfile
-            files = [f.location for f in files]
-            output = createZip(zippath, files)
-            outname = zippath.split('/')[-1]
+            outname = '%s.%s.%s.zip' % (d.basename, datatype, format)
+            zippath = os.path.join(tmppath, str(dataset_id), outname)
+
+            #make the zipfile (which returns the path that we already know. whatever.)
+            output = src.pack_source(zippath, outname)
         else:
             #it should already be a zip
-            output = files[0].location
-            outname = files[0].location
+            output = src.get_location(format)
+            outname = output.split('/')[-1]
 
         fr = FileResponse(output, content_type=mimetype)
         fr.content_disposition = 'attachment; filename=%s' % (outname)
@@ -161,22 +152,16 @@ def dataset(request):
         #deliver
         
         #check for the existing file in sources
-        src = [s for s in d.sources if s.extension == format and s.set == datatype and s.active]
+        src = d.get_source(datatype, format)
         if src:
-            src = src[0]
             #zip or not
             if src.is_external:
-                loc = src.src_files[0].location
+                loc = src.get_location(format)
                 #redirect and bail
                 return HTTPFound(location=loc)
 
             #get the mimetype (not as unicode)
             mimetype = str(src.file_mimetype)
-
-            #get the files
-            files = src.src_files
-            if not files:
-                return HTTPNotFound('why are there no files?')
 
             #zip'em up unless it's already a zip
             if format != 'zip':
@@ -185,12 +170,10 @@ def dataset(request):
                 tmppath = get_current_registry().settings['TEMP_PATH']
                 if not tmppath:
                     return HTTPNotFound('where is the temp!')
-                #get the name of the file from the url
-                zippath = os.path.join(tmppath, '%s/%s.%s.%s.zip' % (dataset_id, d.basename, datatype, format))
+                outname = '%s.%s.%s.zip' % (d.basename, datatype, format)
+                zippath = os.path.join(tmppath, str(dataset_id), outname)
                 #make the zipfile
-                files = [f.location for f in files]
-                output = createZip(zippath, files)
-                outname = zippath.split('/')[-1]
+                output = src.pack_source(zippath, outname)
             else:
                 #it should already be a zip
                 output = files[0].location
@@ -350,11 +333,9 @@ def update_dataset(request):
     add dataset to tileindex | bundle | collection | some other thing
     '''
     dataset_id = request.matchdict['id']
-    if not isinstance(dataset_id, (int, long)): 
-        #it's the uuid
-        dfilter = 'uuid = %s' % (dataset_id)
-    else:
-        dfilter = 'id = %s' % (dataset_id)
+    d = get_dataset(dataset_id)
+    if not d:
+        return HTTPNotFound()
 
     #get the dataset by the filter
 

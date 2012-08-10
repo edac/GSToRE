@@ -102,6 +102,8 @@ class Dataset(Base):
     #get the available formats for the dataset
     #use the excluded_formats & the taxonomy_list defaults to get the actual supported formats
     def get_formats(self):
+        if not self.is_available:
+            return []
         lst = getFormats()
         exc_lst = self.excluded_formats
 
@@ -111,6 +113,9 @@ class Dataset(Base):
 
     #get the supported web services for the dataset
     def get_services(self):
+        if not self.is_available:
+            return []
+
         lst = getServices()
         exc_lst = self.excluded_services
 
@@ -120,8 +125,10 @@ class Dataset(Base):
 
     #return a source by set & extension for this dataset
     #default to active sources only
-    def get_source(self, set, extension, active=True):
-        pass
+    def get_source(self, aset, extension, active=True):
+        src = [s for s in self.sources if s.extension == extension and s.set == aset and s.active == active]
+        return src[0] if src else None
+
 
     #get the source location (path) for the mapfile
     #return the source id (for the mapfile) and the data filepath
@@ -148,7 +155,8 @@ class Dataset(Base):
             srcs = self.sources
             src = None
             ext = ''
-            for r in ['tif', 'sid', 'ecw']:
+            #current supported formats
+            for r in ['tif', 'img', 'sid', 'ecw']:
                 src = [s for s in srcs if s.extension == r and s.active == True]
                 if src:
                     ext = r
@@ -211,11 +219,12 @@ class Dataset(Base):
         base_url += str(self.uuid)
     
         results = {'id': self.id, 'uuid': self.uuid, 'description': self.description, 
-                'spatial': {'bbox': string_to_bbox(self.box), 'epsg': 4326}, 'lastupdate': self.dateadded.strftime('%Y%m%d'), 'name': self.basename, 
+                'spatial': {'bbox': string_to_bbox(self.box), 'epsg': 4326}, 'lastupdate': self.dateadded.strftime('%Y%m%d'), 'name': self.basename, 'taxonomy': self.taxonomy,
                 'categories': [{'theme': t.theme, 'subtheme': t.subtheme, 'groupname': t.groupname} for t in self.categories]}
 
         if self.is_available:
             dlds = []
+            links = []
             fmts = self.get_formats()
             svcs = self.get_services()            
             #TODO: change the relate to only include active sources
@@ -224,7 +233,9 @@ class Dataset(Base):
             if self.taxonomy == 'geoimage':
                 #add the downloads by source
                 #TODO: maybe compare to the formats list?
-                dlds = [(s.set, s.extension) for s in srcs]
+                dlds = [(s.set, s.extension) for s in srcs if not s.is_external]
+
+                links = [{s.extension: s.get_location()} for s in srcs if s.is_external]
             elif self.taxonomy == 'vector':
                 #get the formats
                 #check for a source
@@ -238,14 +249,23 @@ class Dataset(Base):
                 #just the formats
                 for f in fmts:
                     sf = [s for s in srcs if s.extension == f]
-                    if sf:
+                    if not sf:
                         #if it's not in there, that's a whole other problem (i.e. why is it listed in the first place?)
-                        dlds.append((sf[0].set, f))
+                        continue
+                    sf = sf[0]
+                    if sf.is_external:
+                        links.append({f: sf.get_location()})
+                    else:
+                        dlds.append((sf.set, f))
             elif self.taxonomy == 'services':
                 #TODO: figure out what to put here
                 pass
 
-            results.update({'services': [{s: '%s/services/ogc/%s' % (base_url, s) for s in svcs}], 'downloads': [{s[1]: '%s/%s.%s.%s' % (base_url, self.basename, s[0], s[1]) for s in dlds}]})
+            #combine the links (don't change url) with downloads (build url)
+            dlds = [{s[1]: '%s/%s.%s.%s' % (base_url, self.basename, s[0], s[1]) for s in dlds}] if dlds else []
+            dlds = links + dlds
+
+            results.update({'services': [{s: '%s/services/ogc/%s' % (base_url, s) for s in svcs}], 'downloads': dlds})
 
             #add the link to the mapper 
             #TODO: when the mapper moves, get rid of this
@@ -446,7 +466,9 @@ class Dataset(Base):
         connstr = get_current_registry().settings['mongo_uri']
         collection = get_current_registry().settings['mongo_collection']
         gm = gMongo(connstr, collection)
-        vectors = gm.query({'d.id': self.id})
+
+        #only request as many as excel can handle
+        vectors = gm.query({'d.id': self.id}, {}, 65534, 0)
 
         #build the header
         atts = self.attributes
@@ -477,9 +499,10 @@ class Dataset(Base):
             #TODO: add the observed timestamp data
             
             y += 1
-            #TODO: do something else for this, instead of just stopping partway through
-            if y > 65535:
-                break
+
+#            #TODO: do something else for this, instead of just stopping partway through
+#            if y > 65535:
+#                break
 
         #write the file
         filename = os.path.join(basepath, '%s.xls' % (self.basename))

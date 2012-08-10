@@ -14,6 +14,7 @@ from zope.sqlalchemy import ZopeTransactionExtension
 
 from sqlalchemy.dialects.postgresql import UUID
 
+from ..lib.utils import *
 from datasets import *
 from hstore import HStore, HStoreColumn
 
@@ -59,6 +60,36 @@ class Source(Base):
         
     def __repr__(self):
         return '<Source (%s, %s, %s)>' % (self.extension, self.set, self.uuid)
+
+    def pack_source(self, outpath, outname):
+        #pack up the zip (if it's not a zip) with all files in the set
+        #and add the metadata based on the src.dataset ref
+        files = [f.location for f in self.src_files]
+
+        #now append the new metadata file to the list
+        md_output, md_contenttype = self.datasets.dataset_metadata[0].transform('fgdc', 'xml')
+        #add the metadata xml file unless there is one in the source list (good way to tell?)
+        #except we don't have any .xml listed in the source_files table so tada!
+        md_filename = os.path.join(outpath, '%s.xml' % (outname))
+        md_file = open(md_filename, 'w')
+        md_file.write(md_output)
+        md_file.close()
+
+        files.append(md_filename)
+        
+        output = createZip(outpath, files)
+        return output
+
+    #TODO: check if this will work with service loactions, i.e. links, that don't have a format
+    #      since we assume that a service source will only have one source_file. fyi.
+    def get_location(self, format=None):
+        #get a specific file from the src_files set for this source obj
+        if len(self.src_files) > 1 and format is not None:
+            f = [g for g in self.src_files if g.location.split('.')[-1] == format]
+            f = f[0] if f else None
+        else:
+            f = self.src_files[0]
+        return f.location if f is not None else ''
 
 '''
 and the actual file paths on the server (geodata, etc)

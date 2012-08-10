@@ -229,6 +229,66 @@ def getLayer(d, src, dataloc, bbox):
        
     return layer
 
+#set the default contact info for edac
+def set_contact_metadata(m):
+    m.web.metadata.set('ows_contactperson', 'Clearinghouse manager')
+    m.web.metadata.set('ows_contactposition', 'manager')
+    m.web.metadata.set('ows_contactinstructions', 'phone or email')
+    m.web.metadata.set('ows_contactorganization', 'Earth Data Analysis Center')
+    m.web.metadata.set('ows_address', 'Earth Data Analysis Center, MSC01 1110, 1 University of New Mexico')
+    m.web.metadata.set('ows_contactvoicetelephone', '(505) 277-3622 ext. 230')
+    m.web.metadata.set('ows_contactfacsimiletelephone', '(505) 277-3614')
+    m.web.metadata.set('ows_contactelectronicmailaddress', 'ADDRESS@edac.unm.edu')
+    m.web.metadata.set('ows_addresstype', 'Mailing address')
+    m.web.metadata.set('ows_hoursofservice', '9-5 MST, M-F')
+    m.web.metadata.set('ows_role', 'data provider')
+
+    m.web.metadata.set('ows_accessconstraints', 'none')
+    m.web.metadata.set('ows_fees', 'None')
+    m.web.metadata.set('ows_country', 'US')
+    m.web.metadata.set('ows_stateorprovince', 'NM')
+    m.web.metadata.set('ows_city', 'Albuquerque')  
+    m.web.metadata.set('ows_postcode', '87131')
+
+#the supported outputformats
+def get_outputformat(fmt):
+    #return the configured outputformat obj
+    if fmt == 'png':
+        of = mapscript.outputFormatObj('AGG/PNG', 'png')
+        of.setExtension('png')
+        of.setMimetype('image/png')
+        of.imagemode = mapscript.MS_IMAGEMODE_RGBA
+        of.transparent = mapscript.MS_TRUE
+        of.setOption('GAMMA', '0.70')
+    elif fmt == 'jpg':
+        of = mapscript.outputFormatObj('AGG/JPEG', 'jpg')
+        of.setExtension('jpg')
+        of.setMimetype('image/jpeg')
+        of.imagemode = mapscript.MS_IMAGEMODE_RGB
+    elif fmt == 'gif':
+        of = mapscript.outputFormatObj('GD/GIF', 'gif')
+        of.setExtension('gif')
+        of.setMimetype('image/gif')
+        of.imagemode = mapscript.MS_IMAGEMODE_PC256
+    elif fmt == 'tif':
+        of = mapscript.outputFormatObj('GDAL/GTiff', 'GEOTIFF_16')
+        of.setExtension('tif')
+        of.setMimetype('image/tiff')
+
+        #TODO: check on float32 vs. int16
+        #of.imagemode = mapscript.MS_IMAGEMODE_FLOAT32
+        of.imagemode = mapscript.MS_IMAGEMODE_INT16
+    elif fmt == 'aaigrid':
+        of = mapscript.outputFormatObj('GDAL/AAIGRID', 'AAIGRID')
+        of.setExtension('grd')
+        of.setMimetype('image/x-aaigrid')
+        of.imagemode = mapscript.MS_IMAGEMODE_INT16
+        #of.setOption('FILENAME','result.grd')
+    else:
+        of = None
+
+    return of
+    
 '''
 generic-ish mapserver response method
 '''
@@ -487,26 +547,13 @@ def datasets(request):
             m.web.metadata.set('wcs_name', 'imagery_wcs_%s' % (d.basename))
         if d.taxonomy == 'vector':
             m.web.metadata.set('WFS_ONLINERESOURCE', '%s/apps/%s/datasets/%s/services/ogc/wfs' % (base_url, app, d.uuid))
-        
-        #TODO: finish contact info
-        m.web.metadata.set('ows_contactperson', 'Clearinghouse manager')
-        m.web.metadata.set('ows_contactposition', 'manager')
-        m.web.metadata.set('ows_contactinstructions', 'phone or email')
-        m.web.metadata.set('ows_contactorganization', 'Earth Data Analysis Center')
-        m.web.metadata.set('ows_address', 'Earth Data Analysis Center, MSC01 1110, 1 University of New Mexico')
-        m.web.metadata.set('ows_contactvoicetelephone', '(505) 277-3622 ext. 230')
-        m.web.metadata.set('ows_contactfacsimiletelephone', '(505) 277-3614')
-        m.web.metadata.set('ows_contactelectronicmailaddress', 'ADDRESS@edac.unm.edu')
-        m.web.metadata.set('ows_addresstype', 'Mailing address')
-        m.web.metadata.set('ows_hoursofservice', '9-5 MST, M-F')
-        m.web.metadata.set('ows_role', 'data provider')
 
+        #add the edac info
+        set_contact_metadata(m) 
 
         m.web.metadata.set('wms_formatlist', 'image/png,image/gif,image/jpeg')
         m.web.metadata.set('wms_format', 'image/png')
         m.web.metadata.set('ows_keywordlist', '%s, New Mexico' % (app))
-        m.web.metadata.set('ows_accessconstraints', 'none')
-        m.web.metadata.set('ows_fees', 'None')
 
         #TODO: check on this
         m.web.metadata.set('wms_server_version', '1.3.0')
@@ -526,45 +573,27 @@ def datasets(request):
         #TODO: set up real templates (this doesn't even exist)
         m.web.template = tmppath + '/client.html'
 
-        #NOTE: no query format, legend format or browse format
+        #NOTE: no query format, legend format or browse format in mapscript
 
         #add the supported output formats
         #add an outputformat (start with png for kicks)
-        of = mapscript.outputFormatObj('AGG/PNG', 'png')
-        of.setExtension('png')
-        of.setMimetype('image/png')
-        of.imagemode = mapscript.MS_IMAGEMODE_RGBA
-        of.transparent = mapscript.MS_TRUE
-        of.setOption('GAMMA', '0.70')
+        of = get_outputformat('png')
         m.appendOutputFormat(of)
 
         #and the gif
-        of = mapscript.outputFormatObj('GD/GIF', 'gif')
-        of.setExtension('gif')
-        of.setMimetype('image/gif')
-        of.imagemode = mapscript.MS_IMAGEMODE_PC256
+        of = get_outputformat('gif')
         m.appendOutputFormat(of)
 
         #and the jpeg
-        of = mapscript.outputFormatObj('AGG/JPEG', 'jpg')
-        of.setExtension('jpg')
-        of.setMimetype('image/jpeg')
-        of.imagemode = mapscript.MS_IMAGEMODE_RGB
+        of = get_outputformat('jpg')
         m.appendOutputFormat(of)
+        
         if service == 'wcs':
             #add geotif and ascii grid
-            of = mapscript.outputFormatObj('GDAL/GTiff', 'GEOTIFF_16')
-            of.setExtension('tif')
-            of.setMimetype('image/tiff')
-            #of.imagemode = mapscript.MS_IMAGEMODE_FLOAT32
-            of.imagemode = mapscript.MS_IMAGEMODE_INT16
+            of = get_outputformat('tif')
             m.appendOutputFormat(of)
 
-            of = mapscript.outputFormatObj('GDAL/AAIGRID', 'AAIGRID')
-            of.setExtension('grd')
-            of.setMimetype('image/x-aaigrid')
-            of.imagemode = mapscript.MS_IMAGEMODE_INT16
-            #of.setOption('FILENAME','result.grd')
+            of = get_outputformat('aaigrid')
             m.appendOutputFormat(of)
         #elif service == 'wfs':
             #add gml and ?
@@ -688,7 +717,7 @@ def tileindexes(request):
 
         #add a bunch of metadata
 
-        #we need to make sure that all of hte srs for the tile index are in the supported srs list (i guess)
+        #we need to make sure that all of the srs for the tile index are in the supported srs list (i guess)
         check_list = []
         for epsg in tile_epsgs:
             supported_srs = build_supported_srs(epsg, check_list)
@@ -703,32 +732,15 @@ def tileindexes(request):
         m.web.metadata.set('wms_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wms' % (base_url, app, tile.uuid))
         m.web.metadata.set('wms_abstract', 'WMS Service for %s tile index %s' % (app, tile.name))
 
-        m.web.metadata.set('ows_contactperson', 'Clearinghouse manager')
-        m.web.metadata.set('ows_contactposition', 'manager')
-        m.web.metadata.set('ows_contactinstructions', 'phone or email')
-        m.web.metadata.set('ows_contactorganization', 'Earth Data Analysis Center')
-        m.web.metadata.set('ows_address', 'Earth Data Analysis Center, MSC01 1110, 1 University of New Mexico')
-        m.web.metadata.set('ows_contactvoicetelephone', '(505) 277-3622 ext. 230')
-        m.web.metadata.set('ows_contactfacsimiletelephone', '(505) 277-3614')
-        m.web.metadata.set('ows_contactelectronicmailaddress', 'ADDRESS@edac.unm.edu')
-        m.web.metadata.set('ows_addresstype', 'Mailing address')
-        m.web.metadata.set('ows_hoursofservice', '9-5 MST, M-F')
-        m.web.metadata.set('ows_role', 'data provider')
-
+        set_contact_metadata(m)
 
         m.web.metadata.set('wms_formatlist', 'image/png,image/gif,image/jpeg')
         m.web.metadata.set('wms_format', 'image/png')
         m.web.metadata.set('ows_keywordlist', '%s, New Mexico' % (app))
-        m.web.metadata.set('ows_accessconstraints', 'none')
-        m.web.metadata.set('ows_fees', 'None')
 
+        
         #TODO: check on this
         m.web.metadata.set('wms_server_version', '1.3.0')
-
-        m.web.metadata.set('ows_country', 'US')
-        m.web.metadata.set('ows_stateorprovince', 'NM')
-        m.web.metadata.set('ows_city', 'Albuquerque')  
-        m.web.metadata.set('ows_postcode', '87131')
 
         m.web.metadata.set('ows_title', '%s Tile Index (%s)' % (app, tile.uuid))
 
@@ -740,35 +752,32 @@ def tileindexes(request):
         m.web.template = tmppath + '/client.html'
 
         #add the output formats
-        of = mapscript.outputFormatObj('AGG/PNG', 'png')
-        of.setExtension('png')
-        of.setMimetype('image/png')
-        of.imagemode = mapscript.MS_IMAGEMODE_RGBA
-        of.transparent = mapscript.MS_TRUE
-        of.setOption('GAMMA', '0.70')
+        of = get_outputformat('png')
         m.appendOutputFormat(of)
 
         #and the gif
-        of = mapscript.outputFormatObj('GD/GIF', 'gif')
-        of.setExtension('gif')
-        of.setMimetype('image/gif')
-        of.imagemode = mapscript.MS_IMAGEMODE_PC256
+        of = get_outputformat('gif')
         m.appendOutputFormat(of)
 
         #and the jpeg
-        of = mapscript.outputFormatObj('AGG/JPEG', 'jpg')
-        of.setExtension('jpg')
-        of.setMimetype('image/jpeg')
-        of.imagemode = mapscript.MS_IMAGEMODE_RGB
+        of = get_outputformat('jpg')
         m.appendOutputFormat(of)
 
         #now for the tile index layers (at least two)
         for epsg in tile_epsgs:
             #we need to add two layers per spatial reference
+
+            #TODO: we need to reproject the bbox to the layer epsg for the correct extent
+            box_geom = bbox_to_geom(bbox, int(srid))
+            #reproject to the layer epsg
+            reproject_geom(box_geom, int(srid), int(epsg))
+            prj_bbox = geom_to_bbox(box_geom)
+            
             tilename = '%s_%s' % (tile.basename, epsg)
             layer = mapscript.layerObj()
             layer.name = tilename
             layer.status = mapscript.MS_ON
+            layer.setExtent(prj_bbox[0], prj_bbox[1], prj_bbox[2], prj_bbox[3])
             layer.setProjection('init=epsg:%s' % (epsg))
             layer.setProcessing('DITHER=YES')
             layer.metadata.set('layer_title', tilename)
@@ -792,6 +801,7 @@ def tileindexes(request):
             layer = mapscript.layerObj()
             layer.name = '%s_%s_index' % (tile.basename, epsg)
             layer.setProjection('init=epsg:%s' % (epsg))
+            layer.setExtent(prj_bbox[0], prj_bbox[1], prj_bbox[2], prj_bbox[3])
             layer.metadata.set('layer_title', '%s_index' % tilename)
             layer.metadata.set('base_layer', 'no')
             layer.metadata.set('wms_encoding', 'UTF-8')
@@ -805,10 +815,9 @@ def tileindexes(request):
             #get the postgres connection
             connstr = get_current_registry().settings['sqlalchemy.url']
             psql = urlparse(connstr)
+            #also, this is written into the mapfiles so hooray for security. or something
             layer.connection = 'dbname=%s host=%s port=%s user=%s password=%s' % (psql.path[1:], psql.hostname, psql.port, psql.username, psql.password)
-            sql = 'geom from (select gid, geom, tile_id, description, location from gstoredata.get_tileindexes where tile_id = %s and orig_epsg = %s) as aview using unique gid using srid=4326' % (tile.id, epsg)
-            layer.data = sql
-            #layer.filteritem = 'tile_id = %s and orig_epsg = %s' 
+            layer.data = 'the_geom from (select gid, st_transform(st_setsrid(geom, %s), %s) as the_geom, tile_id, description, location from gstoredata.get_tileindexes where tile_id = %s and orig_epsg = %s) as aview using unique gid using srid=%s' % (epsg, srid, tile.id, epsg, epsg)
 
             m.insertLayer(layer)
 
@@ -839,18 +848,10 @@ def base_services(request):
     #just point to the map file and do that
     maps_path = get_current_registry().settings['MAPS_PATH']
 
-    #TODO: change this so it isn't hardcoded in
-    #/clusterdata/gstore/maps/base/base.map
     basemap = '%s/base/base.map' % maps_path
-    #basemap = '/clusterdata/gstore/maps/base/base.map'
 
     #open it and send it on to render the map
     m = mapscript.mapObj(basemap)
-
-    #and get the type (if not there assume capabilities but really that should fail)
-    #ogc_req = params.get('request', 'GetCapabilities')
-
-    #return str(params['LAYERS'])
 
     return generateService(m, params, None)
 
