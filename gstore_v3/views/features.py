@@ -2,7 +2,6 @@ from pyramid.view import view_config
 from pyramid.response import Response
 from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError
 
-from pyramid.threadlocal import get_current_registry
 
 import json
 from ..models import DBSession
@@ -10,7 +9,7 @@ from ..models.features import (
     Feature,
     )
 
-from ..lib.mongo import gMongo
+from ..lib.mongo import gMongo, gMongoUri
 from ..lib.utils import normalize_params
 
 
@@ -37,8 +36,10 @@ def feature(request):
         return HTTPNotFound('Invalid feature request')
 
     #get the feature from mongo
-    connstr = get_current_registry().settings['mongo_uri']
-    gm = gMongo(connstr, 'vectors')
+    connstr = request.registry.settings['mongo_uri']
+    collection = request.registry.settings['mongo_collection']
+    mongo_uri = gMongoUri(connstr, collection)
+    gm = gMongo(mongo_uri)
     vectors = gm.query({'f.id': feature.fid})
 
     if not vectors:
@@ -54,7 +55,6 @@ def feature(request):
 
     #'observed': vector['obs'],
 
-
     #TODO: deal with observed values
     #rebuild some json from the other json (i like it)
     results = {'dataset': {'id': vector['d']['id'], 'uuid': vector['d']['u']}, 'feature': {'id': vector['f']['id'], 'uuid': vector['f']['u']}, 
@@ -62,6 +62,13 @@ def feature(request):
 
     return results
 
+'''
+the feature_streamer
+
+so, neat trick, the current_registry is empty when called as part of an app_iter request
+and get_current_registry is not supposed to be used at all even though it's all over the 
+pyramid docs. yeah, so. we introduce many varieties of suck.
+'''
 @view_config(route_name='features')
 def features(request):
     '''
@@ -85,7 +92,9 @@ def features(request):
 
     parameter (or parameters + units + frequency)
 
-    format
+    dataset_id (as uuid)
+
+    format (output format)
     geomtype !!! required
 
     
@@ -110,17 +119,19 @@ def features(request):
     end_valid = params.get('valid_end') if 'valid_end' in params else ''
 
     #check for OUTPUT format
-    format = params.get('format', '')
+    format = params.get('format', 'json').lower()
+    if format not in ['json', 'kml', 'csv', 'gml']:
+        return HTTPNotFound()
     
     #check for geomtype
     geomtype = params.get('geomtype', '')
 
     #keyword search
+    #TODO: chuck this. what would a keyword search be for data values (not searching every val obj, that's nuts)
     keyword = params.get('query') if 'query' in params else ''
     keyword = keyword.replace(' ', '%').replace('+', '%')
 
-    #TODO: set up for the georelevance sorting
-    #sort geometry
+    #search geometry
     box = params.get('box') if 'box' in params else ''
     epsg = params.get('epsg') if 'epsg' in params else ''
 
@@ -129,18 +140,171 @@ def features(request):
     subtheme = params.get('subtheme') if 'subtheme' in params else ''
     groupname = params.get('groupname') if 'groupname' in params else ''
 
+    #TODO: parameter search
+    param = params.get('param', '')
+
+    #sort (observed and ?)
+    sort_flag = params.get('sortby', 'observed')
+    sort_order = params.get('order', 'desc')
+    if sort_flag not in ['observed', 'dataset']:
+        return HTTPNotFound()
+    sort_order = -1 if sort_order.lower() == 'desc' else 1
+
+    #dataset_ids
+    dataset_ids = params.get('datasets', '').split(',')
+    #limit it to something?
+
     #set up the postgres checks
     dataset_clauses = [Dataset.inactive==False, "'%s'=ANY(apps_cache)" % (app)]
+    
+    if geomtype and geomtype.upper() in ['POLYGON', 'POINT', 'LINESTRING', 'MULTIPOLYGON', '3D POLYGON', '3D LINESTRING']:
+        dataset_clauses.append(Dataset.geomtype==geomtype.upper())
+    else:
+        #let's not mix-and-match geometry types
+        return HTTPNotFound()
 
+    #add the dateadded
+    if start_added or end_added:
+        c = getSingleDateClause(Dataset.dateadded, start_added, end_added)
+        if c is not None:
+            dataset_clauses.append(c)
+
+    #and the valid data range
+    if start_valid or end_valid:
+        c = getOverlapDateClause(Dataset.begin_datetime, Dataset.end_datetime, start_valid, end_valid)
+        if c is not None:
+            dataset_clauses.append(c)
+
+    if param:
+        #do that too
+        pass
+
+    #TODO: build the shapes query if there's a bbox
+    #      except this is awkward - can't sort on what we probably
+    #      want to sort by because it's not in the shapes table anymore
+    #      but this is where limits would be handy but they are not possible
+    #      without being able to sort here
+    #      so we'd get an enormous list of fids to compare to the sorted mongo results
+    #      and the performance hit from that would be... unpleasant
+
+    #so, for now, a quick search on the datasets extent and hope for the best
+    if box:
+        srid = int(request.registry.settings['SRID'])
+        epsg = int(epsg) if epsg else srid
+
+        #convert the box to a bbox
+        bbox = string_to_bbox(box)
+
+        #and to a geom
+        bbox_geom = bbox_to_geom(bbox, epsg)
+
+        #and reproject to the srid if the epsg doesn't match the srid
+        if epsg != srid:
+            reproject_geom(bbox_geom, epsg, srid)
+
+        #i don't remember why we're converting the geom back to wkt, probably the srid mismatch thing
+        dataset_clauses.append(func.st_intersects(func.st_setsrid(Dataset.geom, srid), func.st_geometryfromtext(geom_to_wkt(bbox_geom, srid))))
+
+    #and add the dataset id list
+    if dataset_ids:
+        dataset_clauses.append(Dataset.uuid.in_(dataset_ids))
+
+    #get matching datasets
+    query = DBSession.query(Dataset.id).filter(and_(*dataset_clauses))
+
+    #and add the categories
+    category_clauses = []
+    if theme:
+        category_clauses.append(Category.theme.ilike(theme))
+    if subtheme:
+        category_clauses.append(Category.subtheme.ilike(subtheme))
+    if groupname:
+        category_clauses.append(Category.groupname.ilike(groupname))
+
+    #join to categories if we need to
+    if category_clauses:
+        query = query.join(Dataset.categories).filter(and_(*category_clauses))
+
+    #get the dataset_ids that match our filters
+    filtered_ids = [d.id for d in query]
 
     #TODO: QUERY SHAPES BY FID? limit to the number of fids in a list - check on that (cannot query for millions of things)
 
     #use the filters to build the mongo filters
+    #dataset_ids, valid start and end
+    #TODO: add operators for param search (val >=, <=, >, <, ==, !=, !NODATA)
+    connstr = request.registry.settings['mongo_uri']
+    collection = request.registry.settings['mongo_collection']
+    mongo_uri = gMongoUri(connstr, collection)
+    gm = gMongo(mongo_uri)
 
+    mongo_clauses = {'d.id': {'$in': filtered_ids}}
+    #TODO: check date format
+    if start_valid and end_valid:
+        mongo_clauses.append({'obs': {'$gte': start_valid, '$lte': end_valid}})
+    elif start_valid and not end_valid:
+        mongo_clauses.append({'obs': {'$gte': start_valid}})
+    elif not start_valid and end_valid:
+        mongo_clauses.append({'obs': {'$lte': end_valid}})
+
+    #need to set up the AND
+    if len(mongo_clauses) > 1:
+        mongo_clauses = {'$and': mongo_clauses}
+
+    #set up the sort
+    sort_dict = {}
+    if sort_flag == 'observed':
+        sort_dict = {'obs': sort_order}
+    else:
+        sort_dict = {'d.id': sort_order, 'obs': sort_order}
+        
+    #running without limits FOR FUN
+    vectors = gm.query(mongo_clauses, {}, sort_dict)
 
     #export as the format somehow
+    if format == 'json':
+        content_type = 'application/json; charset=UTF-8'
+        head = """{"type": "FeatureCollection", "features": ["""
+        tail = "\n]}"
+    elif format == 'kml':
+        content_type = 'application/vnd.google-earth.kml+xml; charset=UTF-8'
+        head = """<?xml version="1.0" encoding="UTF-8"?>
+                        <kml xmlns="http://earth.google.com/kml/2.2">
+                        <Document>"""
+        tail = """\n</Document>\n</kml>"""
+    elif format == 'csv':
+        content_type = 'text/csv; charset=UTF-8'
+        head = '' 
+        tail = ''
+    elif format == 'gml':
+        content_type = 'application/xml; subtype="gml/3.1.1; charset=UTF-8"'
+        head = """<?xml version="1.0" encoding="UTF-8"?>
+                                <gml:FeatureCollection 
+                                    xmlns:gml="http://www.opengis.net/gml" 
+                                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+                                    xmlns:xlink="http://www.w3.org/1999/xlink">
+                                <gml:description>GSTORE API 3.0 Vector Stream</gml:description>\n""" 
+        tail = """\n</gml:FeatureCollection>"""
+    else:
+        #which it should have done by now anyway
+        return HTTPNotFound()
+
+    def yield_results():
+        yield head
+
+        for vector in vectors:
+            
+
+            #get the geometry
+            #and convert to geojson, kml, or gml
+
+            yield ''
     
-    return Response('features')
+    #let's yield stuff
+    response = Response()
+    response.content_type = content_type()
+    response.app_iter = yield_results()
+    return response
 
 @view_config(route_name='add_features', request_method='POST')
 def add_feature(request):

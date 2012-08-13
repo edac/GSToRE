@@ -2,8 +2,6 @@ from pyramid.view import view_config
 from pyramid.response import Response, FileResponse
 from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError
 
-from pyramid.threadlocal import get_current_registry
-
 from sqlalchemy.exc import DBAPIError
 
 #from the models init script
@@ -16,7 +14,7 @@ from ..models.datasets import (
 
 from ..lib.utils import *
 from ..lib.database import *
-
+from ..lib.mongo import gMongoUri
 
 '''
 datasets
@@ -41,7 +39,7 @@ def show_html(request):
 #    g_app = request.script_name[1:]
 #    base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
 
-    load_balancer = get_current_registry().settings['BALANCER_URL']
+    load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
     
     rsp = d.get_full_service_dict(base_url)
@@ -100,6 +98,8 @@ def dataset(request):
         return HTTPFound(location=loc)
 
     #TODO: refactor the heck out of this  
+
+    xslt_path = request.registry.settings['XSLT_PATH']
     if d.taxonomy in ['geoimage', 'file']:
         src = d.get_source(datatype, format)
         if not src:
@@ -128,7 +128,7 @@ def dataset(request):
         if format != 'zip':
 
             #to test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ccfc9523-4b9e-4c58-8cf5-7d727fc8a807.original.tif
-            tmppath = get_current_registry().settings['TEMP_PATH']
+            tmppath = request.registry.settings['TEMP_PATH']
             if not tmppath:
                 return HTTPNotFound()
             #get the name of the file from the url
@@ -136,7 +136,7 @@ def dataset(request):
             zippath = os.path.join(tmppath, str(dataset_id), outname)
 
             #make the zipfile (which returns the path that we already know. whatever.)
-            output = src.pack_source(zippath, outname)
+            output = src.pack_source(zippath, outname, xslt_path)
         else:
             #it should already be a zip
             output = src.get_location(format)
@@ -167,13 +167,13 @@ def dataset(request):
             if format != 'zip':
 
                 #to test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ccfc9523-4b9e-4c58-8cf5-7d727fc8a807/{basename}.original.tif
-                tmppath = get_current_registry().settings['TEMP_PATH']
+                tmppath = request.registry.settings['TEMP_PATH']
                 if not tmppath:
                     return HTTPNotFound('where is the temp!')
                 outname = '%s.%s.%s.zip' % (d.basename, datatype, format)
                 zippath = os.path.join(tmppath, str(dataset_id), outname)
                 #make the zipfile
-                output = src.pack_source(zippath, outname)
+                output = src.pack_source(zippath, outname, xslt_path)
             else:
                 #it should already be a zip
                 output = files[0].location
@@ -188,7 +188,7 @@ def dataset(request):
 
         #TODO: probably something about the KML -> KMZ situation (UNLESS we're packing some metadata in the zip)
         #check for the existing file in formats
-        fmtpath = get_current_registry().settings['FORMATS_PATH']
+        fmtpath = request.registry.settings['FORMATS_PATH']
         cachepath = os.path.join(fmtpath, str(d.uuid), format)
         #don't forget the actual packed zip
         cachefile = os.path.join(cachepath, str(d.uuid) + '.' + format + '.zip')
@@ -204,11 +204,20 @@ def dataset(request):
             if not os.path.isdir(os.path.join(fmtpath, str(d.uuid))):
                 os.mkdir(os.path.join(fmtpath, str(d.uuid)))
             os.mkdir(os.path.join(fmtpath, str(d.uuid), format))
-        success = d.build_vector(format, cachepath)
+
+
+        #set up the mongo connection
+        mconn = request.registry.settings['mongo_uri']
+        mcoll = request.registry.settings['mongo_collection']
+        mongo_uri = gMongoUri(mconn, mcoll)
+
+        srid = int(request.registry.settings['SRID'])
+        
+        success = d.build_vector(format, cachepath, mongo_uri, srid)
         if success[0] != 0:
             return HTTPServerError('failed to build vector')
 
-        #return the file (already been zipped)
+        #return the file (already been zipped) and only has metadata if it's a shapefile
         fr = FileResponse(cachefile, content_type=mimetype)
         fr.content_disposition = 'attachment; filename=%s' % (str(d.basename) + '.' + format + '.zip')
         return fr
@@ -256,10 +265,10 @@ def services(request):
 #    g_app = request.script_name[1:]
 #    base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
 
-    load_balancer = get_current_registry().settings['BALANCER_URL']
+    load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
 
-    rsp = d.get_full_service_dict(base_url)
+    rsp = d.get_full_service_dict(base_url, request)
 
     return rsp
 

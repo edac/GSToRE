@@ -1,7 +1,10 @@
 import os, re, zipfile
 import hashlib
 
-from pyramid.threadlocal import get_current_registry
+from sqlalchemy.sql.expression import and_
+from sqlalchemy.sql import between
+
+from datetime import datetime
 
 
 '''
@@ -71,27 +74,17 @@ def matchPattern(pattern, test):
 get the default format lists - vector, raster, file
 update: all one list now
 '''
-def getFormats():
-    fmts = get_current_registry().settings['DEFAULT_FORMATS']
+def getFormats(req):
+    fmts = req.registry.settings['DEFAULT_FORMATS']
     if not fmts:
         return []
     return fmts.split(',')
     
-#def getFormats(taxonomy):
-#    key = 'FILE_FORMATS' if taxonomy == 'file' else 'RASTER_FORMATS'
-#    key = 'VECTOR_FORMATS' if taxonomy == 'vector' else key
-#    fmts = get_current_registry().settings[key]
-
-#    if not fmts:
-#        return []
-
-#    return fmts.split(',')
-
 '''
 get default services
 '''
-def getServices():
-    svcs = get_current_registry().settings['DEFAULT_SERVICES']
+def getServices(req):
+    svcs =  req.registry.settings['DEFAULT_SERVICES']
     if not svcs:
         return []
     return svcs.split(',')
@@ -106,4 +99,52 @@ def normalize_params(params):
     for k in params.keys():
         new_params[k.lower()] = params[k]
     return new_params 
+
+
+'''
+datetime utils
+mostly for the sqla queries
+
+dates as yyyyMMdd{THHMMss} (date with time optional)
+and UTC time - interfaces should do the conversion
+'''
+def convertTimestamp(in_timestamp):
+    sfmt = '%Y%m%dT%H:%M:%S'
+    if not in_timestamp:
+        return None
+    try:
+        if 'T' not in in_timestamp:
+            in_timestamp += 'T00:00:00'
+        out_timestamp = datetime.strptime(in_timestamp, sfmt)
+        return out_timestamp
+    except:
+        return None
+#to compare a date (single column) with a search range
+def getSingleDateClause(column, start_range, end_range):
+    start_range = convertTimestamp(start_range)
+    end_range = convertTimestamp(end_range)
+
+    if start_range and not end_range:
+        clause = column >= start_range
+    elif not start_range and end_range:
+        clause = column < end_range
+    elif start_range and end_range:
+        clause = between(column, start_range, end_range)
+    else:
+        clause = None
+    return clause
+#to compare two sets of date ranges, one in table and one from search
+def getOverlapDateClause(start_column, end_column, start_range, end_range):
+    start_range = convertTimestamp(start_range)
+    end_range = convertTimestamp(end_range)
+
+    if start_range and not end_range:
+        clause = start_column >= start_range
+    elif not start_range and end_range:
+        clause = end_column < end_range
+    elif start_range and end_range:
+        clause = and_(start_column <= end_range, end_column >= start_range)
+    else:
+        clause = None
+    return clause
     

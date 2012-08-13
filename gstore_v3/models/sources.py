@@ -61,13 +61,13 @@ class Source(Base):
     def __repr__(self):
         return '<Source (%s, %s, %s)>' % (self.extension, self.set, self.uuid)
 
-    def pack_source(self, outpath, outname):
+    def pack_source(self, outpath, outname, xslt_path):
         #pack up the zip (if it's not a zip) with all files in the set
         #and add the metadata based on the src.dataset ref
         files = [f.location for f in self.src_files]
 
         #now append the new metadata file to the list
-        md_output, md_contenttype = self.datasets.dataset_metadata[0].transform('fgdc', 'xml')
+        md_output, md_contenttype = self.datasets.dataset_metadata[0].transform('fgdc', 'xml', xslt_path)
         #add the metadata xml file unless there is one in the source list (good way to tell?)
         #except we don't have any .xml listed in the source_files table so tada!
         md_filename = os.path.join(outpath, '%s.xml' % (outname))

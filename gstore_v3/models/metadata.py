@@ -3,8 +3,6 @@ from sqlalchemy import MetaData, Table, ForeignKey
 from sqlalchemy import Column, String, Integer, Boolean, FetchedValue, TIMESTAMP, Numeric
 from sqlalchemy.orm import relationship, backref
 
-from pyramid.threadlocal import get_current_registry
-
 import os
 from lxml import etree
 
@@ -41,10 +39,9 @@ class DatasetMetadata(Base):
     #generate the metadata for standard + format
     #except it's onyl fgdc today
     #TODO: fix the to text transform (empty? response)
-    def transform(self, standard, format):
+    def transform(self, standard, format, xslt_path):
         #TODO: update this for iso, fgdc, dc, etc
         #TODO: xml-to-text transform iffy? or esri metadata in database so not valid fgdc
-        xslt_path = get_current_registry().settings['XSLT_PATH']
         xslt = 'fgdc_classic_rgis.xsl' if format == 'html' else 'xml-to-text.xsl'
 
         xml = self.original_xml

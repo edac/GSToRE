@@ -2,7 +2,6 @@ from pyramid.view import view_config
 from pyramid.response import Response
 
 from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPBadRequest
-from pyramid.threadlocal import get_current_registry
 
 import os 
 from email.parser import Parser 
@@ -68,9 +67,9 @@ def isAsciigrid(content_type):
 
 #so, neat trick, the order of the srs matters for wcs.describecoverage
 #this rebuilds the list so that the check_srs (the dataset srs, for example) is listed once and is listed first
-def build_supported_srs(check_srs, supported_srs=[]):
+def build_supported_srs(check_srs, supported_srs):
     if not supported_srs:
-        supported_srs = get_current_registry().settings['OGC_SRS'].split(',')
+        return ''
     if check_srs:
         supported_srs = [s for s in supported_srs if s != 'EPSG:%s' % (check_srs)]
         supported_srs.insert(0, 'EPSG:%s' % (check_srs))
@@ -447,26 +446,37 @@ def datasets(request):
         return HTTPNotFound('just plain ogc requests today')
 
 
-    #need to identify the data source file
-    #so a tif, sid, ecw for a geoimage
-    #or a shapefile for vector (or build if not there)
-    mapsrc, srcloc = d.get_mapsource() # the source obj, the file path
-
-    #need both for a raster, but just the file path for the vector (we made it!)
-    if ((not mapsrc or not srcloc) and d.taxonomy == 'geoimage') or (d.taxonomy == 'vector' and not srcloc):
-        return HTTPNotFound('Invalid map source')
-
     #get some config stuff
-    mappath = get_current_registry().settings['MAPS_PATH']
-    tmppath = get_current_registry().settings['TEMP_PATH']
-    srid = get_current_registry().settings['SRID']
+    mappath = request.registry.settings['MAPS_PATH']
+    tmppath = request.registry.settings['TEMP_PATH']
+    srid = request.registry.settings['SRID']
     
 #    host = request.host_url
 #    g_app = request.script_name[1:]
 #    base_url = '%s/%s' % (host, g_app)
 
-    load_balancer = get_current_registry().settings['BALANCER_URL']
+    load_balancer = request.registry.settings['BALANCER_URL']
     base_url = load_balancer
+
+    #need to identify the data source file
+    #so a tif, sid, ecw for a geoimage
+    #or a shapefile for vector (or build if not there)
+    if d.taxonomy == 'vector':
+        #set up the mongo bits
+        fmtpath = request.registry.settings['FORMATS_PATH']
+        mconn = request.registry.settings['mongo_uri']
+        mcoll = request.registry.settings['mongo_collection']
+        mongo_uri = gMongoUri(mconn, mcoll)
+    else:
+        fmtpath = ''
+        mongo_uri = None
+        
+    mapsrc, srcloc = d.get_mapsource(fmtpath, mongo_uri, int(srid)) # the source obj, the file path
+
+    #need both for a raster, but just the file path for the vector (we made it!)
+    if ((not mapsrc or not srcloc) and d.taxonomy == 'geoimage') or (d.taxonomy == 'vector' and not srcloc):
+        return HTTPNotFound('Invalid map source')
+
 
     #NOTE: skipping tilecache and just running with wms services here
     #maybe it's for the tile cache
@@ -525,11 +535,11 @@ def datasets(request):
         #TODO: set a good name for the data (remember how it appears in arc/qgis) and also, not all rgis
         m.name = '%s_Dataset' % (app.upper())
 
-        #m.setProjection('+init=epsg:4326')
         m.setProjection(init_proj)
 
         #add some metadata
-        m.web.metadata.set('ows_srs', build_supported_srs(d.orig_epsg))
+        srs_list = request.registry.settings['OGC_SRS'].split(',')
+        m.web.metadata.set('ows_srs', build_supported_srs(d.orig_epsg, srs_list))
         #m.web.metadata.set('wms_srs', 'EPSG:4326 EPSG:4269 EPSG:4267 EPSG:26913 EPSG:26912 EPSG:26914 EPSG:26713 EPSG:26712 EPSG:26714')
 
         #enable the ogc services
@@ -683,11 +693,11 @@ def tileindexes(request):
     if service_type.lower() != 'ogc':
         return HTTPNotFound()
         
-    mappath = get_current_registry().settings['MAPS_PATH']
-    tmppath = get_current_registry().settings['TEMP_PATH']
-    srid = get_current_registry().settings['SRID']
+    mappath = request.registry.settings['MAPS_PATH']
+    tmppath = request.registry.settings['TEMP_PATH']
+    srid = request.registry.settings['SRID']
 
-    load_balancer = get_current_registry().settings['BALANCER_URL']
+    load_balancer = request.registry.settings['BALANCER_URL']
     base_url = load_balancer
     
    
@@ -718,7 +728,7 @@ def tileindexes(request):
         #add a bunch of metadata
 
         #we need to make sure that all of the srs for the tile index are in the supported srs list (i guess)
-        check_list = []
+        check_list = request.registry.settings['OGC_SRS'].split(',')
         for epsg in tile_epsgs:
             supported_srs = build_supported_srs(epsg, check_list)
             check_list = supported_srs.split(' ')
@@ -767,7 +777,7 @@ def tileindexes(request):
         for epsg in tile_epsgs:
             #we need to add two layers per spatial reference
 
-            #TODO: we need to reproject the bbox to the layer epsg for the correct extent
+            #reproject the bbox to the layer epsg for the correct extent
             box_geom = bbox_to_geom(bbox, int(srid))
             #reproject to the layer epsg
             reproject_geom(box_geom, int(srid), int(epsg))
@@ -813,7 +823,7 @@ def tileindexes(request):
             layer.setProcessing('CLOSE_CONNECTION=DEFER')
 
             #get the postgres connection
-            connstr = get_current_registry().settings['sqlalchemy.url']
+            connstr = request.registry.settings['sqlalchemy.url']
             psql = urlparse(connstr)
             #also, this is written into the mapfiles so hooray for security. or something
             layer.connection = 'dbname=%s host=%s port=%s user=%s password=%s' % (psql.path[1:], psql.hostname, psql.port, psql.username, psql.password)
@@ -846,7 +856,7 @@ def base_services(request):
         service = 'wms'
 
     #just point to the map file and do that
-    maps_path = get_current_registry().settings['MAPS_PATH']
+    maps_path = request.registry.settings['MAPS_PATH']
 
     basemap = '%s/base/base.map' % maps_path
 
@@ -891,13 +901,13 @@ def mapper(request):
     + the Layers and Description objects (for the javascript)
     '''
 
-    media_url = get_current_registry().settings['MEDIA_URL']
+    media_url = request.registry.settings['MEDIA_URL']
     
 #    host = request.host_url
 #    g_app = request.script_name[1:]
 #    base_url = '%s/%s/apps/%s/datasets/%s' % (host, g_app, app, d.uuid)
 
-    load_balancer = get_current_registry().settings['BALANCER_URL']
+    load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/apps/%s/datasets/%s' % (load_balancer, app, d.uuid)
 
     c = {'MEDIA_URL': media_url, 'AppId': app}    

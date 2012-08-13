@@ -2,7 +2,6 @@ from pyramid.view import view_config
 from pyramid.response import Response, FileResponse
 
 from pyramid.httpexceptions import HTTPNotFound, HTTPServerError
-from pyramid.threadlocal import get_current_registry
 
 import logging
 from datetime import datetime
@@ -17,7 +16,7 @@ from ..models.datasets import (
 
 from ..lib.utils import *
 from ..lib.database import *
-from ..lib.mongo import gMongo
+from ..lib.mongo import gMongo, gMongoUri
 
 #log = logging.getLogger(__name__)
 
@@ -56,22 +55,21 @@ def datetime_to_http(dt):
 '''
 dataone logging in mongodb
 '''
-def log_entry(identifier, ip, event, useragent=None):
-    connstr = get_current_registry().settings['dataone_mongo_uri']
-    collection = get_current_registry().settings['dataone_mongo_collection']
-    gm = gMongo(connstr, collection)
+def log_entry(identifier, ip, event, mongo_uri, useragent=None):
+    gm = gMongo(mongo_uri)
 
     #TODO: possible that identifier is just the pid?
     gm.insert({"identifier": "" + identifier, "ip": ip, "useragent": useragent, "subject": SUBJECT, "date": datetime.utcnow(), "event": event, "node": NODE})
 
-def query_log(querydict, limit=0, offset=0):
-    connstr = get_current_registry().settings['dataone_mongo_uri']
-    collection = get_current_registry().settings['dataone_mongo_collection']
-    gm = gMongo(connstr, collection)
+    gm.close()
+
+def query_log(mongo_uri, querydict, limit=0, offset=0):
+    gm = gMongo(mongo_uri)
     if limit:
-        logs = gm.query(querydict).limit(limit).skip(offset)
+        logs = gm.query(querydict, {}, {}, limit, offset)
     else:
         logs = gm.query(querydict)
+    gm.close()
     return logs
 
 #TODO: modify the cache settings
@@ -180,7 +178,11 @@ def log(request):
     event = request.params.get('event') if 'event' in request.params else ''
 
     querydict = {}
-    logs = query_logs(querydict, limit, offset)
+
+    connstr = request.registry.settings['dataone_mongo_uri']
+    collection = request.registry.settings['dataone_mongo_collection']
+    mongo_uri = gMongoUri(connstr, collection)
+    logs = query_logs(mongo_uri, querydict, limit, offset)
 
     results = logs.count()
     #TODO: what is total? the number of all log entries? or what?
@@ -450,7 +452,7 @@ def metadata(request):
 #    g_app = request.script_name[1:]
 #    base_url = '%s/%s/apps/dataone/' % (host, g_app)
 
-    load_balancer = get_current_registry().settings['BALANCER_URL']
+    load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/apps/dataone/' % (load_balancer)
 
     #TODO: fix all of this

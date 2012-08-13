@@ -101,10 +101,10 @@ class Dataset(Base):
 
     #get the available formats for the dataset
     #use the excluded_formats & the taxonomy_list defaults to get the actual supported formats
-    def get_formats(self):
+    def get_formats(self, req):
         if not self.is_available:
             return []
-        lst = getFormats()
+        lst = getFormats(req)
         exc_lst = self.excluded_formats
 
         #get all from one not in the other
@@ -112,11 +112,11 @@ class Dataset(Base):
         return fmts
 
     #get the supported web services for the dataset
-    def get_services(self):
+    def get_services(self, req):
         if not self.is_available:
             return []
 
-        lst = getServices()
+        lst = getServices(req)
         exc_lst = self.excluded_services
 
         #get all from one not in the other
@@ -132,7 +132,7 @@ class Dataset(Base):
 
     #get the source location (path) for the mapfile
     #return the source id (for the mapfile) and the data filepath
-    def get_mapsource(self):
+    def get_mapsource(self, fmtpath='', mongo_uri=None, srid=4326):
         '''
         if file:
             return null
@@ -191,7 +191,9 @@ class Dataset(Base):
                     return src, f[0].location
 
             #nope, check for the cached file
-            fmtpath = get_current_registry().settings['FORMATS_PATH']
+            if not fmtpath:
+                return None, None
+                
             fmtfile = os.path.join(fmtpath, str(self.uuid), 'shp', '%s.%s' % (self.basename, 'shp'))
             if os.path.isfile(fmtfile):
                 #TODO: fix this - no set source but need src info
@@ -203,7 +205,7 @@ class Dataset(Base):
                 if not os.path.isdir(os.path.join(fmtpath, str(self.uuid))):
                     os.mkdir(os.path.join(fmtpath, str(self.uuid)))
                 os.mkdir(os.path.join(fmtpath, str(self.uuid), 'shp'))
-            success, message = self.build_vector('shp', os.path.join(fmtpath, str(self.uuid), 'shp'))
+            success, message = self.build_vector('shp', os.path.join(fmtpath, str(self.uuid), 'shp'), mongo_uri, srid)
             if success != 0: 
                 return None, None
                 
@@ -214,7 +216,7 @@ class Dataset(Base):
 
     #build the dict for the full service description
     #see the service view, search v3 results
-    def get_full_service_dict(self, base_url):
+    def get_full_service_dict(self, base_url, req):
         #update the url
         base_url += str(self.uuid)
     
@@ -225,8 +227,8 @@ class Dataset(Base):
         if self.is_available:
             dlds = []
             links = []
-            fmts = self.get_formats()
-            svcs = self.get_services()            
+            fmts = self.get_formats(req)
+            svcs = self.get_services(req)            
             #TODO: change the relate to only include active sources
             srcs = [s for s in self.sources if s.active]
 
@@ -241,6 +243,7 @@ class Dataset(Base):
                 #check for a source
                 #if none, derived + fmt
                 #if one, set + fmt
+                #TODO: what if a vector dataset has external links?
                 for f in fmts:
                     sf = [s for s in srcs if s.extension == f]
                     st = sf[0].set if sf else 'derived'
@@ -265,7 +268,7 @@ class Dataset(Base):
             dlds = [{s[1]: '%s/%s.%s.%s' % (base_url, self.basename, s[0], s[1]) for s in dlds}] if dlds else []
             dlds = links + dlds
 
-            results.update({'services': [{s: '%s/services/ogc/%s' % (base_url, s) for s in svcs}], 'downloads': dlds})
+            results.update({'services': [{s: '%s/services/ogc/%s' % (base_url, s) for s in svcs}] if svcs else [], 'downloads': dlds})
 
             #add the link to the mapper 
             #TODO: when the mapper moves, get rid of this
@@ -284,19 +287,22 @@ class Dataset(Base):
             as {fgdc: {ext: url}}
             '''
             mt = [{s: {e: '%s/metadata/%s.%s' % (base_url, s, e) for e in exts} for s in standards}]
-      
-            results.update({'metadata': mt})
+
+        else:
+            mt = []
+        results.update({'metadata': mt})
+        
 
         #TODO: add the html card view also maybe
 
         #TODO: add related datasets
 
-        #TODO: add link to collections its in?
+        #TODO: add link to collections it's in?
 
         return results
 
     #build any vector format that comes from OGR (shp, kml, csv, gml, geojson)
-    def build_vector(self, format, basepath):
+    def build_vector(self, format, basepath, mongo_uri, epsg):
         '''
         pull the data from mongo
         get the attribute data
@@ -315,12 +321,10 @@ class Dataset(Base):
 
         if format == 'xls':
             #do something else
-            return self.build_excel(basepath)
+            return self.build_excel(basepath, mongo_uri)
 
         #get the data
-        connstr = get_current_registry().settings['mongo_uri']
-        collection = get_current_registry().settings['mongo_collection']
-        gm = gMongo(connstr, collection)
+        gm = gMongo(mongo_uri)
         vectors = gm.query({'d.id': self.id})
 
         #for everything else, we can use the ogr file formats
@@ -338,8 +342,6 @@ class Dataset(Base):
         datasource = driver.CreateDataSource(str(tmp_file))
 
         #get the default projection
-        epsg = get_current_registry().settings['SRID']
-        epsg = int(epsg)
         sr = epsg_to_sr(epsg)
         
         #set up the layer
@@ -453,7 +455,7 @@ class Dataset(Base):
         return (0, 'success')
 
     #build an excel file for the data
-    def build_excel(self, basepath):
+    def build_excel(self, basepath, mongo_uri):
         style = xlwt.easyxf('font: name Times New Roman, color-index black, bold on', num_format_str='#,##0.00')
         workbook = xlwt.Workbook()
         sheetname = self.basename[0:29]
@@ -463,9 +465,7 @@ class Dataset(Base):
         y = 0
 
         #get the data
-        connstr = get_current_registry().settings['mongo_uri']
-        collection = get_current_registry().settings['mongo_collection']
-        gm = gMongo(connstr, collection)
+        gm = gMongo(mongo_uri)
 
         #only request as many as excel can handle
         vectors = gm.query({'d.id': self.id}, {}, 65534, 0)

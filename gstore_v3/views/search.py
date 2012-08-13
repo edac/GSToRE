@@ -22,58 +22,11 @@ from ..models.features import Feature
 from ..models.vocabs import geolookups
 from ..lib.spatial import *
 from ..lib.mongo import gMongo
-from ..lib.utils import normalize_params
+from ..lib.utils import normalize_params, convertTimestamp, getSingleDateClause, getOverlapDateClause
 
 '''
 search
 '''
-
-
-'''
-date utils
-dates as yyyyMMdd{THHMMss} (date with time optional)
-and UTC time - interfaces should do the conversion
-'''
-def convertTimestamp(in_timestamp):
-    sfmt = '%Y%m%dT%H:%M:%S'
-    if not in_timestamp:
-        return None
-    try:
-        if 'T' not in in_timestamp:
-            in_timestamp += 'T00:00:00'
-        out_timestamp = datetime.strptime(in_timestamp, sfmt)
-        return out_timestamp
-    except:
-        return None
-#to compare a date (single column) with a search range
-def getSingleDateClause(column, start_range, end_range):
-    start_range = convertTimestamp(start_range)
-    end_range = convertTimestamp(end_range)
-
-    if start_range and not end_range:
-        clause = column >= start_range
-    elif not start_range and end_range:
-        clause = column < end_range
-    elif start_range and end_range:
-        clause = between(column, start_range, end_range)
-    else:
-        clause = None
-    return clause
-#to compare two sets of date ranges, one in table and one from search
-def getOverlapDateClause(start_column, end_column, start_range, end_range):
-    start_range = convertTimestamp(start_range)
-    end_range = convertTimestamp(end_range)
-
-    if start_range and not end_range:
-        clause = start_column >= start_range
-    elif not start_range and end_range:
-        clause = end_column < end_range
-    elif start_range and end_range:
-        clause = and_(start_column <= end_range, end_column >= start_range)
-    else:
-        clause = None
-    return clause
-
 #return the category tree
 @view_config(route_name='search', match_param='resource=categories', renderer='json')
 @view_config(route_name='search', match_param='resource=datasets', request_param='categories=1', renderer='json')
@@ -252,7 +205,7 @@ def search_datasets(request):
     dataset_clauses = [Dataset.inactive==False, "'%s'=ANY(apps_cache)" % (app)]
     if format:
         #check that it's a supported format
-        default_formats = get_current_registry().settings['DEFAULT_FORMATS'].split(',')
+        default_formats = request.registry.settings['DEFAULT_FORMATS'].split(',')
         if format not in default_formats:
             return HTTPNotFound('Invalid request') 
         #add the filter
@@ -287,7 +240,7 @@ def search_datasets(request):
     georel_column = None
     has_georel = False
     if box:
-        srid = int(get_current_registry().settings['SRID'])
+        srid = int(request.registry.settings['SRID'])
         #make sure we have a valid epsg
         epsg = int(epsg) if epsg else srid
         
@@ -369,12 +322,12 @@ def search_datasets(request):
 #    g_app = request.script_name[1:]
 #    base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
 
-    load_balancer = get_current_registry().settings['BALANCER_URL']
+    load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
 
-    #TODO: sort out yield and streaming results (this threw an error - can't return generator as response)
-    #def stream_results():
-    #yield """{"total": %s, "results": [""" % total
+    #NOTE: calls to get_current_registry during the app_iter yield part returns NONE so there's an error and we can't get what we need
+    #def yield_results():
+        #yield """{"total": %s, "results": [""" % total
 
     rsp = {"total": total}
     results = []
@@ -383,7 +336,8 @@ def search_datasets(request):
         '''
         {"box": [-109.114059, 31.309483, -102.98925, 37.044096000000003], "lastupdate": "02/29/12", "gr": 0.0, "text": "NM Property Tax Rates - September 2011", "config": {"what": "dataset", "taxonomy": "vector", "formats": ["zip", "shp", "gml", "kml", "json", "csv", "xls"], "services": ["wms", "wfs"], "tools": [1, 1, 1, 1, 0, 0], "id": 130043}, "id": 130043, "categories": "Boundaries__|__General__|__New Mexico"}
         ''' 
-        
+
+        cnt = 0
         for ds in datas:
             if has_georel:
                 d = ds[0]
@@ -403,17 +357,32 @@ def search_datasets(request):
             if d.has_metadata_cache:
                 tools[2] = 1
 
-            services = d.get_services()
-            fmts = d.get_formats()
+            services = d.get_services(request)
+            fmts = d.get_formats(request)
                 
             #let's build some json
             results.append({"text": d.description, "categories": '%s__|__%s__|__%s' % (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
                             "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
                             "box": [float(b) for b in d.box], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id, "gr": gr})
 
-#            yield json.dumps({"text": d.description, "categories": '%s__|__%s__|__%s' % (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
-#                            "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
-#                            "box": [float(b) for b in d.box], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id, "gr": 0.0})
+#                if cnt == 0:
+#                    rst = """{"total": %s, "results": [""" % (total) + json.dumps({"text": d.description, "categories": '%s__|__%s__|__%s' % 
+#                                (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
+#                                "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
+#                                "box": [float(b) for b in d.box], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id, "gr": gr}) + ','
+#                elif cnt == total - 1:
+#                    rst = json.dumps({"text": d.description, "categories": '%s__|__%s__|__%s' % 
+#                                (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
+#                                "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
+#                                "box": [float(b) for b in d.box], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id, "gr": gr}) + ']}'
+#                else:
+#                    rst = json.dumps({"text": d.description, "categories": '%s__|__%s__|__%s' % 
+#                                (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
+#                                "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
+#                                "box": [float(b) for b in d.box], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id, "gr": gr}) + ','
+#                cnt += 1
+
+#                yield rst
     elif version == 3:
         '''
         new format
@@ -425,13 +394,18 @@ def search_datasets(request):
             else:
                 d = ds
                 gr = 0.0
-            rst = d.get_full_service_dict(base_url)
+            rst = d.get_full_service_dict(base_url, request)
             rst.update({'gr': gr})
             results.append(rst)
             #rsp = d.get_full_service_dict(base_url)
-            #yield json.dumps(rsp)
-            
-    #yield "]}"
+            #yield json.dumps(rsp) + ','
+                
+        #yield "]}"
+
+#    response = Response()
+#    response.content_type = 'application/json'
+#    response.app_iter = yield_results()
+#    return response
 
     #return stream_results()
     rsp.update({"results": results})
@@ -535,7 +509,7 @@ def search_features(request):
 
     if box:
         #or go hit up shapes, bad idea, very bad idea
-        srid = int(get_current_registry().settings['SRID'])
+        srid = int(request.registry.settings['SRID'])
         #make sure we have a valid epsg
         epsg = int(epsg) if epsg else srid
         
@@ -562,11 +536,11 @@ def search_features(request):
     #TODO: ADD DATETIME clause builder for before, after, between 
     if start_valid or end_valid:
         #go hit up mongo, high style    
-        connstr = get_current_registry().settings['mongo_uri']
-        collection = get_current_registry().settings['mongo_collection']
-        gm = gMongo(connstr, collection)
-
-        
+        connstr = request.registry.settings['mongo_uri']
+        collection = request.registry.settings['mongo_collection']
+        mongo_uri = gMongoUri(connstr, collection)
+        gm = gMongo(mongo_uri)
+  
         mongo_clauses = {'d.id': {'$in': dataset_ids}}
 
         #add the date clauses

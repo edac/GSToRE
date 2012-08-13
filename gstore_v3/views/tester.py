@@ -4,6 +4,8 @@ from pyramid.httpexceptions import HTTPNotFound, HTTPFound
 
 from pyramid.threadlocal import get_current_registry
 
+from pyramid.config import Configurator
+
 import json
 import pymongo
 #from urlparse import urlparse
@@ -224,83 +226,100 @@ def url_tester(request):
     
     return {'id': dataset_id, 'basename': basename, 'set': dataset_type, 'extension': ext}
 
-@view_config(route_name='test', renderer='dataone_logs.mako')
+
+#, renderer='dataone_logs.mako'
+@view_config(route_name='test')
 def tester(request):
-    dataset_id = request.matchdict['id']
-    ext = request.matchdict['ext']
 
-    '''
-    ids to test
+    config = Configurator()
+    def y():
+        yield config.registry.settings['TEMP_PATH']
+        #which stops it here so can't do what was in v2
+        for i in range(1,10):
+            yield x
+        yield 'bye'
 
-    52218: 32517de4-5301-4e45-aa4d-580591165cca
-    55355
-    55356
-    107352: a4e33c15-849c-4a02-a0ff-78d72b52daff
-    107353
-    107365: c329d0f6-ca5f-47bc-ad98-41cd52f614c6
-    107405
+    response = Response()
+    response.content_type = 'plain/text'
+    response.app_iter = y()
+    return response
+    
 
-    '''
+#    dataset_id = request.matchdict['id']
+#    ext = request.matchdict['ext']
 
-    #for the dataone log renderers
-    #2012-02-29T23:26:38.828+00:00
-    fmt = '%Y-%m-%dT%H:%M:%S+00:00'
-    post = {'total': 45, 'results': 3, 'offset': 0}
-    docs = [
-            {'id': 1, 'identifier': dataset_id, 'ip': '129.24.63.165', 'useragent': 'null', 'subject': 'CN=GStore,dc=informatics,dc=org', 'event':'read', 'dateLogged':datetime.utcnow().strftime(fmt), 'node': 'GSTORE'},
-            {'id': 2, 'identifier': dataset_id, 'ip': '129.24.63.55', 'useragent': 'null', 'subject': 'CN=GStore,dc=informatics,dc=org', 'event':'read', 'dateLogged':datetime.utcnow().strftime(fmt), 'node': 'GSTORE'},
-            {'id': 3, 'identifier': dataset_id, 'ip': '129.24.63.235', 'useragent': 'null', 'subject': 'CN=GStore,dc=informatics,dc=org', 'event':'read', 'dateLogged':datetime.utcnow().strftime(fmt), 'node': 'GSTORE'}
-        ]
-    post.update({'docs': docs})
-    return post
+#    '''
+#    ids to test
 
-#    #for mongo
-#    #go get the dataset
-#    d = get_dataset(dataset_id)
+#    52218: 32517de4-5301-4e45-aa4d-580591165cca
+#    55355
+#    55356
+#    107352: a4e33c15-849c-4a02-a0ff-78d72b52daff
+#    107353
+#    107365: c329d0f6-ca5f-47bc-ad98-41cd52f614c6
+#    107405
 
-#    if not d:
-#        return HTTPNotFound('No results')
+#    '''
 
-#    #make sure it's available
-#    #TODO: replace this with the right status code
-#    if d.is_available == False:
-#        return HTTPNotFound('Temporarily unavailable')
+#    #for the dataone log renderers
+#    #2012-02-29T23:26:38.828+00:00
+#    fmt = '%Y-%m-%dT%H:%M:%S+00:00'
+#    post = {'total': 45, 'results': 3, 'offset': 0}
+#    docs = [
+#            {'id': 1, 'identifier': dataset_id, 'ip': '129.24.63.165', 'useragent': 'null', 'subject': 'CN=GStore,dc=informatics,dc=org', 'event':'read', 'dateLogged':datetime.utcnow().strftime(fmt), 'node': 'GSTORE'},
+#            {'id': 2, 'identifier': dataset_id, 'ip': '129.24.63.55', 'useragent': 'null', 'subject': 'CN=GStore,dc=informatics,dc=org', 'event':'read', 'dateLogged':datetime.utcnow().strftime(fmt), 'node': 'GSTORE'},
+#            {'id': 3, 'identifier': dataset_id, 'ip': '129.24.63.235', 'useragent': 'null', 'subject': 'CN=GStore,dc=informatics,dc=org', 'event':'read', 'dateLogged':datetime.utcnow().strftime(fmt), 'node': 'GSTORE'}
+#        ]
+#    post.update({'docs': docs})
+#    return post
 
-#    #with the new class
-#    connstr = get_current_registry().settings['mongo_uri']
-#    gm = gMongo(connstr, 'vectors')
+##    #for mongo
+##    #go get the dataset
+##    d = get_dataset(dataset_id)
 
-#    vectors = gm.query({'d.id': d.id})
+##    if not d:
+##        return HTTPNotFound('No results')
 
-#    #let's do stuff with stuff
-#    atts = d.attributes
+##    #make sure it's available
+##    #TODO: replace this with the right status code
+##    if d.is_available == False:
+##        return HTTPNotFound('Temporarily unavailable')
 
-#    fields = []
-#    res = []
-#    for v in vectors:
-#        if ext == 'json':
-#            r = to_json(v)
-#        elif ext == 'csv':
-#            flds, r = to_csv(v)
-#            if not fields:
-#                fields = flds
-#            r = ','.join(r)
+##    #with the new class
+##    connstr = get_current_registry().settings['mongo_uri']
+##    gm = gMongo(connstr, 'vectors')
 
-#        res.append(r)
+##    vectors = gm.query({'d.id': d.id})
 
-#    #close the mongo connection
-#    gm.close()
+##    #let's do stuff with stuff
+##    atts = d.attributes
 
-#    if ext == 'json':
-#        content_type = 'application/json'
-#        rsp = json.dumps({'total': vectors.count(), 'results': res})
-#    elif ext == 'csv':
-#        content_type = 'text/csv; charset=UTF-8' #or application/csv
-#        rsp = (','.join(fields) + '\n' + '\n'.join(res)).encode('utf8')
+##    fields = []
+##    res = []
+##    for v in vectors:
+##        if ext == 'json':
+##            r = to_json(v)
+##        elif ext == 'csv':
+##            flds, r = to_csv(v)
+##            if not fields:
+##                fields = flds
+##            r = ','.join(r)
+
+##        res.append(r)
+
+##    #close the mongo connection
+##    gm.close()
+
+##    if ext == 'json':
+##        content_type = 'application/json'
+##        rsp = json.dumps({'total': vectors.count(), 'results': res})
+##    elif ext == 'csv':
+##        content_type = 'text/csv; charset=UTF-8' #or application/csv
+##        rsp = (','.join(fields) + '\n' + '\n'.join(res)).encode('utf8')
 
 
-#    return Response(rsp, content_type=content_type)
-#    #end mongo
+##    return Response(rsp, content_type=content_type)
+##    #end mongo
 
 
 

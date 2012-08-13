@@ -3,7 +3,6 @@ from pyramid.response import Response
 
 from pyramid.httpexceptions import HTTPNotFound, HTTPFound
 
-from pyramid.threadlocal import get_current_registry
 
 from sqlalchemy.exc import DBAPIError
 
@@ -64,7 +63,8 @@ def metadata(request):
     #this should only be valid xml (<?xml or <metadata)
     #get the xml metadata
     #TODO: the standard is a lie
-    output, content_type = d.dataset_metadata[0].transform(standard, format) 
+    xslt_path = request.registry.settings['XSLT_PATH']
+    output, content_type = d.dataset_metadata[0].transform(standard, format, xslt_path) 
 
     return Response(output, content_type=content_type)
 
