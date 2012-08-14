@@ -24,6 +24,7 @@ from ..lib.database import *
 #from ..lib.spatial import tilecache_service
 from ..lib.utils import get_image_mimetype, normalize_params
 from ..lib.spatial import *
+from ..lib.mongo import gMongoUri
 
 
 '''
@@ -914,7 +915,7 @@ def mapper(request):
 
     svcs = []
     dlds = []
-    fmts = d.get_formats()
+    fmts = d.get_formats(request)
     srcs = d.sources
     srcs = [s for s in srcs if s.active]
     

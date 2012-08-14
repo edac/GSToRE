@@ -326,90 +326,96 @@ def search_datasets(request):
     base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
 
     #NOTE: calls to get_current_registry during the app_iter yield part returns NONE so there's an error and we can't get what we need
-    #def yield_results():
-        #yield """{"total": %s, "results": [""" % total
+    head = """{"total": %s, "results": [""" % (total)
+    tail = ']}'
 
-    rsp = {"total": total}
-    results = []
+    limit = total if total < limit else limit
+    
+    def yield_results():
+    
+#    rsp = {"total": total}
+#    results = []
+
     #note: georelevance is added not as an extra field but as the second element in a tuple. the first element is the dataset object. hence the wonkiness.
-    if version == 2:
-        '''
-        {"box": [-109.114059, 31.309483, -102.98925, 37.044096000000003], "lastupdate": "02/29/12", "gr": 0.0, "text": "NM Property Tax Rates - September 2011", "config": {"what": "dataset", "taxonomy": "vector", "formats": ["zip", "shp", "gml", "kml", "json", "csv", "xls"], "services": ["wms", "wfs"], "tools": [1, 1, 1, 1, 0, 0], "id": 130043}, "id": 130043, "categories": "Boundaries__|__General__|__New Mexico"}
-        ''' 
+        if version == 2:
+            '''
+            {"box": [-109.114059, 31.309483, -102.98925, 37.044096000000003], "lastupdate": "02/29/12", "gr": 0.0, "text": "NM Property Tax Rates - September 2011", "config": {"what": "dataset", "taxonomy": "vector", "formats": ["zip", "shp", "gml", "kml", "json", "csv", "xls"], "services": ["wms", "wfs"], "tools": [1, 1, 1, 1, 0, 0], "id": 130043}, "id": 130043, "categories": "Boundaries__|__General__|__New Mexico"}
+            ''' 
 
-        cnt = 0
-        for ds in datas:
-            if has_georel:
-                d = ds[0]
-                gr = ds[1]
-            else:
-                d = ds
-                gr = 0.0
-        
-            #TODO: not this REVISE 
-            tools = [0 for i in range(6)]
-            if d.formats_cache:
-                tools[0] = 1
-            if d.taxonomy in ['vector', 'geoimage']:
-                tools[1] = 1
-                tools[2] = 1
-                tools[3] = 1
-            if d.has_metadata_cache:
-                tools[2] = 1
+            cnt = 0
+            for ds in datas:
+                if has_georel:
+                    d = ds[0]
+                    gr = ds[1]
+                else:
+                    d = ds
+                    gr = 0.0
+            
+                #TODO: not this REVISE 
+                tools = [0 for i in range(6)]
+                if d.formats_cache:
+                    tools[0] = 1
+                if d.taxonomy in ['vector', 'geoimage']:
+                    tools[1] = 1
+                    tools[2] = 1
+                    tools[3] = 1
+                if d.has_metadata_cache:
+                    tools[2] = 1
 
-            services = d.get_services(request)
-            fmts = d.get_formats(request)
-                
-            #let's build some json
-            results.append({"text": d.description, "categories": '%s__|__%s__|__%s' % (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
-                            "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
-                            "box": [float(b) for b in d.box], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id, "gr": gr})
+                services = d.get_services(request)
+                fmts = d.get_formats(request)
+                    
+                #let's build some json
+                rst = json.dumps({"text": d.description, "categories": '%s__|__%s__|__%s' % 
+                                (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
+                                "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
+                                "box": [float(b) for b in d.box], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id, "gr": gr})
+                if cnt == 0:
+                    rst = head + rst + ','
+                elif cnt == limit - 1:
+                    rst += tail
+                else:
+                    rst += ','
+                cnt += 1
 
-#                if cnt == 0:
-#                    rst = """{"total": %s, "results": [""" % (total) + json.dumps({"text": d.description, "categories": '%s__|__%s__|__%s' % 
-#                                (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
-#                                "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
-#                                "box": [float(b) for b in d.box], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id, "gr": gr}) + ','
-#                elif cnt == total - 1:
-#                    rst = json.dumps({"text": d.description, "categories": '%s__|__%s__|__%s' % 
-#                                (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
-#                                "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
-#                                "box": [float(b) for b in d.box], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id, "gr": gr}) + ']}'
-#                else:
-#                    rst = json.dumps({"text": d.description, "categories": '%s__|__%s__|__%s' % 
-#                                (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
-#                                "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
-#                                "box": [float(b) for b in d.box], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id, "gr": gr}) + ','
-#                cnt += 1
+                yield rst
+        elif version == 3:
+            '''
+            new format
+            '''
+            cnt = 0
+            for ds in datas:
+                if has_georel:
+                    d = ds[0]
+                    gr = ds[1]
+                else:
+                    d = ds
+                    gr = 0.0
+                rst = d.get_full_service_dict(base_url, request)
+                rst.update({'gr': gr})
+                #results.append(rst)
+                #rsp = d.get_full_service_dict(base_url)
 
-#                yield rst
-    elif version == 3:
-        '''
-        new format
-        '''
-        for ds in datas:
-            if has_georel:
-                d = ds[0]
-                gr = ds[1]
-            else:
-                d = ds
-                gr = 0.0
-            rst = d.get_full_service_dict(base_url, request)
-            rst.update({'gr': gr})
-            results.append(rst)
-            #rsp = d.get_full_service_dict(base_url)
-            #yield json.dumps(rsp) + ','
-                
-        #yield "]}"
+                rst = json.dumps(rst)
+                if cnt == 0:
+                    rst = head + rst + ','
+                elif cnt == limit - 1:
+                    rst += tail
+                else:
+                    rst += ','
 
-#    response = Response()
-#    response.content_type = 'application/json'
-#    response.app_iter = yield_results()
-#    return response
+                cnt += 1
+                yield rst
+                    
+            #yield "]}"
 
-    #return stream_results()
-    rsp.update({"results": results})
-    return rsp
+    response = Response()
+    response.content_type = 'application/json'
+    response.app_iter = yield_results()
+    return response
+
+#    rsp.update({"results": results})
+#    return rsp
 
 
 #TODO: finish this

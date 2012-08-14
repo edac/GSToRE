@@ -3,8 +3,6 @@ from sqlalchemy import MetaData, Table, ForeignKey
 from sqlalchemy import Column, String, Integer, Boolean, FetchedValue, TIMESTAMP, Numeric
 from sqlalchemy.orm import relationship, backref
 
-from pyramid.threadlocal import get_current_registry
-
 from sqlalchemy.ext.declarative import declarative_base
 
 from sqlalchemy.orm import (
@@ -32,12 +30,14 @@ class DataoneCore(Base):
     )
     '''
     dataone_uuid = new immutable dataone uuid
-    object_uuid = dataset uuid (from datasets) or metadata uuid (from metadata) or package uuid (from datapackages)
-    object_type = dataset | metadata | package (this is not great)
+    object_uuid = dataset source uuid (from sources) or metadata uuid (from metadata) or package uuid (from datapackages)
+    object_type = dataset source | metadata | package (this is not great)
 
     each data object in d1 has to have its own identifier so we'll make one set for any dataone thing
     these uuids dont' change - if something is updated, see _obsoletes
     '''
+
+    obsoletes = relationship('DataoneObsolete', backref='core')
 
     def __init(self, object_uuid, object_type):
         self.object_uuid = object_uuid
@@ -75,7 +75,7 @@ class DataonePackage(Base):
 class DataoneObsolete(Base):
     __table__ = Table('dataone_obsoletes', Base.metadata,
         Column('id', Integer, primary_key=True),
-        Column('dataone_uuid', UUID),
+        Column('dataone_uuid', UUID, ForeignKey('gstoredata.dataone_core.dataone_uuid')),
         Column('obsolete_uuid', UUID, FetchedValue()),
         Column('date_changed', TIMESTAMP, default="now()"),
         schema='gstoredata'
@@ -100,9 +100,9 @@ class DataoneObsolete(Base):
         self.dataone_uuid = dataone_uuid
     
     def __repr__(self):
-        return '<DataONE Obsolete (%s, %s)>' % (self.obsoloete_uuid, self.dataone_uuid)
+        return '<DataONE Obsolete (%s, %s)>' % (self.obsolete_uuid, self.dataone_uuid)
 
-
+  
 
 
 

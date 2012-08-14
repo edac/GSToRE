@@ -2,15 +2,21 @@ from pyramid.view import view_config
 from pyramid.response import Response
 from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError
 
+from sqlalchemy import desc, asc, func
+from sqlalchemy.sql.expression import and_
+from sqlalchemy.sql import between
 
 import json
 from ..models import DBSession
 from ..models.features import (
     Feature,
     )
+from ..models.datasets import Dataset, Category
 
 from ..lib.mongo import gMongo, gMongoUri
 from ..lib.utils import normalize_params
+from ..lib.spatial import *
+from ..lib.database import get_dataset
 
 
 '''
@@ -100,9 +106,12 @@ def features(request):
     
     '''
 
+    #TODO: make this a post request with json chunk so that we can have better sorting (although getting the sort by values in attribute where attribute = x is unlikely from mongo)
+
     #TO START, GEOMETRY TYPE IS REQUIRED
     #id the datasets that match the filters
     app = request.matchdict['app']
+    format = request.matchdict['ext'].lower()
 
     params = normalize_params(request.params)
 
@@ -119,8 +128,8 @@ def features(request):
     end_valid = params.get('valid_end') if 'valid_end' in params else ''
 
     #check for OUTPUT format
-    format = params.get('format', 'json').lower()
-    if format not in ['json', 'kml', 'csv', 'gml']:
+    #format = params.get('format', 'json').lower()
+    if format not in ['json', 'kml', 'csv', 'gml', 'geojson']:
         return HTTPNotFound()
     
     #check for geomtype
@@ -151,7 +160,7 @@ def features(request):
     sort_order = -1 if sort_order.lower() == 'desc' else 1
 
     #dataset_ids
-    dataset_ids = params.get('datasets', '').split(',')
+    dataset_ids = params['datasets'].split(',') if 'datasets' in params else []
     #limit it to something?
 
     #set up the postgres checks
@@ -238,7 +247,8 @@ def features(request):
     mongo_uri = gMongoUri(connstr, collection)
     gm = gMongo(mongo_uri)
 
-    mongo_clauses = {'d.id': {'$in': filtered_ids}}
+    #mongo_clauses = {'d.id': {'$in': filtered_ids}}
+    mongo_clauses = []
     #TODO: check date format
     if start_valid and end_valid:
         mongo_clauses.append({'obs': {'$gte': start_valid, '$lte': end_valid}})
@@ -248,8 +258,8 @@ def features(request):
         mongo_clauses.append({'obs': {'$lte': end_valid}})
 
     #need to set up the AND
-    if len(mongo_clauses) > 1:
-        mongo_clauses = {'$and': mongo_clauses}
+#    if len(mongo_clauses) > 1:
+#        mongo_clauses = {'$and': mongo_clauses}
 
     #set up the sort
     sort_dict = {}
@@ -257,25 +267,34 @@ def features(request):
         sort_dict = {'obs': sort_order}
     else:
         sort_dict = {'d.id': sort_order, 'obs': sort_order}
-        
-    #running without limits FOR FUN
-    vectors = gm.query(mongo_clauses, {}, sort_dict)
+
+    #so just going to lie about this
+    #until we run map/reduce to group by dataset id
+    sort_dict = {'obs': sort_order}   
+    sort_dict = {}
 
     #export as the format somehow
-    if format == 'json':
+    folder_head = ''
+    folder_tail = ''
+    delimiter = '\n'
+    if format == 'geojson':
         content_type = 'application/json; charset=UTF-8'
         head = """{"type": "FeatureCollection", "features": ["""
         tail = "\n]}"
+        delimiter = ','
     elif format == 'kml':
         content_type = 'application/vnd.google-earth.kml+xml; charset=UTF-8'
         head = """<?xml version="1.0" encoding="UTF-8"?>
                         <kml xmlns="http://earth.google.com/kml/2.2">
                         <Document>"""
         tail = """\n</Document>\n</kml>"""
+        folder_head = "<Folder><name>%s</name>"
+        folder_tail = "</Folder>"
     elif format == 'csv':
         content_type = 'text/csv; charset=UTF-8'
         head = '' 
         tail = ''
+        #TODO: add some metadata/header info for each csv chunk 
     elif format == 'gml':
         content_type = 'application/xml; subtype="gml/3.1.1; charset=UTF-8"'
         head = """<?xml version="1.0" encoding="UTF-8"?>
@@ -283,26 +302,154 @@ def features(request):
                                     xmlns:gml="http://www.opengis.net/gml" 
                                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
                                     xmlns:xlink="http://www.w3.org/1999/xlink">
+                                    xmlns:ogr="http://ogr.maptools.org/"
                                 <gml:description>GSTORE API 3.0 Vector Stream</gml:description>\n""" 
         tail = """\n</gml:FeatureCollection>"""
+    elif format == 'json':
+        content_type = 'application/json; charset=UTF-8'
+        head = """{"features": ["""
+        tail = "]}"
+        delimiter = ','
     else:
         #which it should have done by now anyway
         return HTTPNotFound()
 
+    #total = vectors.count()
+    #limit = total if total < limit else limit
+
+    #running without limits FOR FUN
+    #vectors = gm.query(mongo_clauses, {}, sort_dict)
+
+    encode_as = 'utf-8'   
+    epsg = int(request.registry.settings['SRID']) 
+    
     def yield_results():
-        yield head
-
-        for vector in vectors:
+        #run through each dataset_id as a chunk of stuff (folder for kml, etc)
+        dataset_cnt = 0
+        
+        for d in filtered_ids:
+            result = ''
             
+            mongo_clauses.append({'d.id': d})
 
-            #get the geometry
+            #and go get the attribute data for the dataset
+            the_dataset = get_dataset(d)
+            fields = the_dataset.attributes
+
+            field_set = ''
+            if format == 'kml':
+                kml_flds = [{'type': ogr_to_kml_fieldtype(f.ogr_type), 'name': f.name} for f in fields]
+                kml_flds.append({'type': 'string', 'name': 'observed'})
+                field_set = """<Schema name="%(name)s" id="%(id)s">%(sfields)s</Schema>""" % {'name': str(the_dataset.uuid), 'id': str(the_dataset.uuid), 
+                    'sfields': '\n'.join(["""<SimpleField type="%s" name="%s"><displayName>%s</displayName></SimpleField>""" % (k['type'], k['name'], k['name']) for k in kml_flds])
+                }
+            elif format == 'csv':
+                #and add the dataset id, the fid and the observed datetime fields
+                field_set = ','.join([f.name for f in fields]) + ',fid,dataset,observed\n'
+
+            fhead = folder_head % (the_dataset.description) if format == 'kml' else ''
+            
+            vectors = gm.query({'$and': mongo_clauses}, {}, sort_dict)
+            total = vectors.count()
+
+            if dataset_cnt == 0:
+                #we need to make sure we set up the file correctly
+                result = head
+                
+            #so we'll yield each dataset instead (eek, that's a lot of stuff)
+            cnt = 0
+            for vector in vectors:
+                #what we can't do is yield all the time - it stops at the first and then NOTHING else gets sent
+
+                vector_result = convert_vector(vector, fields, format, the_dataset.basename, epsg)
+
+                #if it's the first, add the HEAD and a DELIMITER
+                #if it's the last, add the TAIL
+                #if it's neither, add a DELIMITER
+                if cnt == 0:
+                    vector_result = fhead + field_set + vector_result + delimiter
+                elif cnt == total - 1:
+                    vector_result += folder_tail
+                else:
+                    vector_result += delimiter
+                    
+                #add it to everything
+                result += vector_result
+                cnt += 1
+                #yield rst
+
+            #last dataset, we're done
+            if dataset_cnt == len(filtered_ids) - 1:
+                result += tail
+
+            dataset_cnt += 1
+            yield result.encode(encode_as)
+
+
+    def convert_vector(vector, fields, fmt, basename, epsg):
+        #convert the mongo to a chunk of something based on the format
+        fid = int(vector['f']['id'])
+        did = int(vector['d']['id'])
+        obs = vector['obs'] if 'obs' in vector else ''
+
+        #get the geometry
+        if not format == 'csv':
+            wkb = vector['geom']['g'] if 'geom' in vector else ''
+            if not wkb:
+                #need to get it from shapes
+                
+                feature = DBSession.query(Feature).filter(Feature.fid==fid).first()
+                wkb = feature.geom
+                
             #and convert to geojson, kml, or gml
+            geom_repr = wkb_to_output(wkb, epsg, fmt)
+            if not geom_repr:
+                return ''
 
-            yield ''
+        #deal with the attributes
+        #where it's important, esp. for the csv, that the attributes are exported int he order of the fields
+        atts = vector['atts']
+        if format == 'kml': 
+            vals = [(a['name'], a['val']) for a in atts]
+            feature = "\n".join(["""<SimpleData name="%s">%s</SimpleData>""" % (v[0], v[1]) for v in vals])
+
+            feature = """<Placemark id="%s">
+                        <name>%s</name>
+                        %s\n%s
+                        <ExtendedData><SchemaData schemaUrl="%s">%s</SchemaData></ExtendedData>
+                        <Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+                        </Placemark>""" % (fid, fid, geom_repr, '', '', feature)
+        elif format == 'gml':
+            #going to match the gml from the dataset downloader
+            #need a list of values as <ogr:{att name}>VAL</ogr:{att name}>
+            vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a['name'], a['val'], a['name']) for a in atts])
+            feature = """<gml:featureMember><ogr:%(basename)s><ogr:geometryProperty>%(geom)s</ogr:geometryProperty>%(values)s</ogr:%(basename)s></gml:featureMember>""" % {
+                   'basename': basename, 'geom': geom_repr, 'values': vals} 
+        elif format == 'geojson':
+            #so we don't care about the facgt that the fields change?
+            #or we do and we will deal with the consequences shortly
+            vals = dict([(a['name'], a['val']) for a in atts])
+            vals.update({'fid':fid, 'dataset_id': did, 'observed': obs})
+            feature = json.dumps({"type": "Feature", "properties": vals, "geometry": json.loads(geom_repr)})
+        elif format == 'csv':
+            vals = []
+            for f in fields:
+                att = [a for a in atts if a['name'] == f.name]
+                if not att:
+                    continue
+                vals.append(str(att[0]['val']))
+            vals += [str(fid), str(did), obs]
+            feature = ','.join(vals)
+        elif format == 'json':
+            feature = ''
+        else:
+            feature = ''
+           
+        return feature
     
     #let's yield stuff
     response = Response()
-    response.content_type = content_type()
+    response.content_type = content_type
     response.app_iter = yield_results()
     return response
 

@@ -3,8 +3,6 @@ from sqlalchemy import MetaData, Table, ForeignKey
 from sqlalchemy import Column, String, Integer, Boolean, FetchedValue, TIMESTAMP, Numeric
 from sqlalchemy.orm import relationship, backref
 
-from pyramid.threadlocal import get_current_registry
-
 from sqlalchemy.ext.declarative import declarative_base
 
 from sqlalchemy.orm import (

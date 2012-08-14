@@ -81,6 +81,14 @@ def ogr_to_postgis(ogrgeom):
     pass
 
 
+def ogr_to_kml_fieldtype(ogr_type):
+    if ogr_type in [ogr.OFTInteger]:
+        return 'int'
+    elif ogr_type in [ogr.OFTReal]:
+        return 'double'
+    else:
+        return 'string'
+    pass
 
 #convert to python by ogr_type
 #probably want to make sure it's not null and not nodata (as defined by the attribute)
@@ -232,6 +240,21 @@ def reproject_geom(geom, in_epsg, out_epsg):
     except OGRError as err:
         return None
 
+#convert the wkb string to an ogr string (kml, gml, geojson)
+def wkb_to_output(wkb, epsg, output_type='kml'):
+    #convert wkb to geom
+    geom = wkb_to_geom(wkb, epsg)
+    
+    #convert it to the right output type 
+    #geojson, kml, or gml
+    if output_type == 'kml':
+        return geom.ExportToKML()
+    elif output_type == 'gml':
+        return geom.ExportToGML()
+    elif output_type == 'geojson':
+        return geom.ExportToJson()
+    else:
+        return ''
 
 '''
 any other bbox stuff
