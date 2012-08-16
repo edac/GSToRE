@@ -65,7 +65,6 @@ standardslist = any_standard('standard', 'fgdc', 'iso', 'dc')
 #def any_version():
 #versionlist = any_version('version', 2, 3)
 
-
 '''
 all the routing
 '''
@@ -145,8 +144,8 @@ def main(global_config, **settings):
 
 #to the dataset
     #use the integer dataset_id or the uuid
-    config.add_route('html_dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.html', custom_predicates=(applist,))
     config.add_route('dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}', custom_predicates=(applist, typelist,))
+    config.add_route('html_dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.html', custom_predicates=(applist,))
     config.add_route('zip_dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}.zip', custom_predicates=(applist, typelist,))
     config.add_route('add_dataset', '/apps/{app}/datasets', custom_predicates=(applist,)) #POST
     config.add_route('update_dataset', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,)) #PUT

@@ -2,8 +2,6 @@ from pyramid.response import Response
 from pyramid.view import view_config
 from pyramid.httpexceptions import HTTPNotFound, HTTPFound
 
-from pyramid.threadlocal import get_current_registry
-
 from sqlalchemy.exc import DBAPIError
 
 #from the models init script
@@ -13,6 +11,7 @@ from ..models.attributes import (
     Attribute,
     )
 
+import json
 
 from ..lib.utils import *
 from ..lib.database import *
@@ -21,7 +20,7 @@ from ..lib.spatial import *
 '''
 attribute
 '''
-@view_config(route_name='dataset_attributes', renderer='json')
+@view_config(route_name='dataset_attributes')
 def attributes(request):
     '''
     return attributes for a dataset by dataset uuid
@@ -30,22 +29,40 @@ def attributes(request):
     '''
 
     dataset_id = request.matchdict['id']
-    format = request.matchdict['ext'] #that we are ignoring right now (what should the formats be?)
+    format = request.matchdict['ext'] 
+
+    if format not in ['json', 'kml']:
+        return HTTPNotFound()
 
     d = get_dataset(dataset_id)
     if not d:
-        return HTTPNotFound('No dataset')
+        return HTTPNotFound()
 
-    atts = d.attributes
+    fields = d.attributes
 
-    if not atts:
-        return {'total': 0, 'results': []}
+    if not fields:
+        return HTTPNotFound()
 
-    rsp = {'total': len(atts), 'dataset': {'id': d.id, 'uuid': d.uuid}}
-    res = [{'uuid': a.uuid, 'name': a.name, 'original_name': a.orig_name, 'description': a.description, 'datatype': 'insert type'} for a in atts] #ogr_to_psql(a.ogr_type)
-    rsp.update({'results': res})
+    if format == 'json':
+        rsp = {'total': len(fields), 'dataset': {'id': d.id, 'uuid': d.uuid}}
+        res = [{'uuid': a.uuid, 'name': a.name, 'original_name': a.orig_name, 'description': a.description, 'datatype': ogr_to_kml_fieldtype(a.ogr_type)} for a in fields] #ogr_to_psql(a.ogr_type)
+        rsp.update({'results': res})
+
+        rsp = json.dumps(rsp)
+
+        content_type = 'application/json'
+    elif format == 'kml':
+        #do we need a kml schema response?
+        #maybe?
+        kml_flds = [{'type': ogr_to_kml_fieldtype(f.ogr_type), 'name': f.name} for f in fields]
+        kml_flds.append({'type': 'string', 'name': 'observed'})
+        rsp = """<?xml version="1.0" encoding="UTF-8"?><Schema name="%(name)s" id="%(id)s">%(sfields)s</Schema>""" % {'name': str(d.uuid), 
+                    'id': str(d.uuid), 
+                    'sfields': '\n'.join(["""<SimpleField type="%s" name="%s"><displayName>%s</displayName></SimpleField>""" % (k['type'], k['name'], k['name']) for k in kml_flds])
+        }
+        content_type = 'application/vnd.google-earth.kml+xml'
     
-    return rsp
+    return Response(rsp, content_type=content_type, charset='UTF-8')
 
 
 @view_config(route_name='attributes', renderer='json')

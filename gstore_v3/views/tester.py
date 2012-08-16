@@ -4,8 +4,6 @@ from pyramid.httpexceptions import HTTPNotFound, HTTPFound
 
 from pyramid.threadlocal import get_current_registry
 
-from pyramid.config import Configurator
-
 import json
 import pymongo
 #from urlparse import urlparse
@@ -13,7 +11,6 @@ import pymongo
 from sqlalchemy import desc, asc, func
 from sqlalchemy.sql.expression import and_, or_
 from sqlalchemy.orm import defer
-
 
 from ..lib.mongo import gMongo
 
@@ -231,9 +228,9 @@ def url_tester(request):
 @view_config(route_name='test')
 def tester(request):
 
-    config = Configurator()
+
     def y():
-        yield config.registry.settings['TEMP_PATH']
+        yield request.registry.settings['TEMP_PATH']
         #which stops it here so can't do what was in v2
         for i in range(1,10):
             yield x

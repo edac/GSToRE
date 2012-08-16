@@ -42,7 +42,7 @@ def show_html(request):
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
     
-    rsp = d.get_full_service_dict(base_url)
+    rsp = d.get_full_service_dict(base_url, request)
 
     return rsp
     #return Response('html ' + str(d.uuid))

@@ -6,7 +6,9 @@ from sqlalchemy import desc, asc, func
 from sqlalchemy.sql.expression import and_
 from sqlalchemy.sql import between
 
-import json
+import json, re
+from xml.sax.saxutils import escape
+
 from ..models import DBSession
 from ..models.features import (
     Feature,
@@ -22,7 +24,7 @@ from ..lib.database import get_dataset
 '''
 features
 '''
-#TODO: add formats? why would anyone want it as a shapefile though?
+
 #TODO: update some indexes for better performance in both queries
 @view_config(route_name='feature', renderer='json')
 def feature(request):
@@ -36,6 +38,10 @@ def feature(request):
     so ping shapes for the fid before pinging mongo (and then we already have our geom just in case)
     '''
     feature_id = request.matchdict['id']
+    format = request.matchdict['ext']
+
+    if format not in ['json', 'geojson', 'kml', 'gml']:
+        return HTTPNotFound()
 
     feature = DBSession.query(Feature).filter(Feature.uuid==feature_id).first()
     if not feature:
@@ -53,20 +59,84 @@ def feature(request):
 
     vector = vectors[0]
 
-    #add the check for the geometry (larger than 1.5mb not stored there - go to postgres)
-    if not 'geom' in vector:        
-        geom = feature.geom if feature else ''     
+    #this is basically the same as the convert_vector method in the streamer
+    #but the streamer fails if that method is outside of the request method
+    #so it lives there and this is here and let's not speak of it again.
+    fid = int(vector['f']['id'])
+    did = int(vector['d']['id'])
+    obs = vector['obs'] if 'obs' in vector else ''
+
+    #get the geometry
+    if not format in ['json']:
+        wkb = vector['geom']['g'] if 'geom' in vector else ''
+        if not wkb:
+            #need to get it from shapes
+            feat = DBSession.query(Feature).filter(Feature.fid==fid).first()
+            wkb = feat.geom
+
+        epsg = int(request.registry.settings['SRID'])
+        
+        #and convert to geojson, kml, or gml
+        geom_repr = wkb_to_output(wkb, epsg, format)
+        if not geom_repr:
+            geom_repr = ''
+
+    #deal with the attributes
+    #where it's important, esp. for the csv, that the attributes are exported in the order of the fields
+    atts = vector['atts']
+
+    #there's some wackiness with a unicode char and mongo (and also a bad char in the data, see fid 6284858)
+    #convert atts to name, value tuples so we only have to deal with the wackiness once
+    atts = [(a['name'], unicode(a['val']).encode('ascii', 'xmlcharrefreplace')) for a in atts]
+    
+    if format == 'kml': 
+        load_balancer = request.registry.settings['BALANCER_URL']
+        base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
+
+        schema_url = '%s%s/attributes.kml' % (base_url, vector['d']['u'])
+    
+        #make sure we've encoded the value string correctly for kml
+        feature = "\n".join(["""<SimpleData name="%s">%s</SimpleData>""" % (v[0], re.sub(r'[^\x20-\x7E]', '', escape(str(v[1])))) for v in atts])
+
+        #and no need for a schema url since it can be an internal schema linked by uuid here
+        feature = """<Placemark id="%s">
+                    <name>%s</name>
+                    %s\n%s
+                    <ExtendedData><SchemaData schemaUrl="%s">%s</SchemaData></ExtendedData>
+                    <Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+                    </Placemark>""" % (fid, fid, geom_repr, '', schema_url, feature)
+
+        content_type = 'application/xml'
+    elif format == 'gml':
+        #going to match the gml from the dataset downloader
+        #need a list of values as <ogr:{att name}>VAL</ogr:{att name}>
+        vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0], re.sub(r'[^\x20-\x7E]', '', escape(str(a[1]))), a[0]) for a in atts])
+
+        #and the dataset basename IS NOT used as the ogr id, instead it's g_{FID}
+        feature = """<gml:featureMember><ogr:g_%(basename)s><ogr:geometryProperty>%(geom)s</ogr:geometryProperty>%(values)s</ogr:g_%(basename)s></gml:featureMember>""" % {
+                'basename': fid, 'geom': geom_repr, 'values': vals} 
+
+        content_type = 'application/xml'
+    elif format == 'geojson':
+        #TODO: qgis won't read a geojson from multiple datasets
+        #so we don't care about the fact that the fields change?
+        #or we do and we will deal with the consequences shortly
+        vals = dict([(a[0], a[1]) for a in atts])
+        vals.update({'fid':fid, 'dataset_id': did, 'observed': obs})
+        feature = json.dumps({"type": "Feature", "properties": vals, "geometry": json.loads(geom_repr)})
+
+        content_type = 'application/json'
+    elif format == 'json':
+        #no geometry, just attributes (good for timeseries requests)
+        vals = dict([(a[0], a[1]) for a in atts])
+        feature = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals, 'observed': obs})
+        content_type = 'application/json'
     else:
-        geom = vector['geom']['g']
+        feature = ''
+        content_type = 'plain/text'
 
-    #'observed': vector['obs'],
 
-    #TODO: deal with observed values
-    #rebuild some json from the other json (i like it)
-    results = {'dataset': {'id': vector['d']['id'], 'uuid': vector['d']['u']}, 'feature': {'id': vector['f']['id'], 'uuid': vector['f']['u']}, 
-                'attributes': vector['atts'], 'geometry': geom}
-
-    return results
+    return Response(feature, content_type=content_type)
 
 '''
 the feature_streamer
@@ -133,7 +203,7 @@ def features(request):
         return HTTPNotFound()
     
     #check for geomtype
-    geomtype = params.get('geomtype', '')
+    geomtype = params.get('geomtype', '').replace('+', ' ')
 
     #keyword search
     #TODO: chuck this. what would a keyword search be for data values (not searching every val obj, that's nuts)
@@ -165,12 +235,12 @@ def features(request):
 
     #set up the postgres checks
     dataset_clauses = [Dataset.inactive==False, "'%s'=ANY(apps_cache)" % (app)]
-    
+                                                                                              
     if geomtype and geomtype.upper() in ['POLYGON', 'POINT', 'LINESTRING', 'MULTIPOLYGON', '3D POLYGON', '3D LINESTRING']:
         dataset_clauses.append(Dataset.geomtype==geomtype.upper())
     else:
         #let's not mix-and-match geometry types
-        return HTTPNotFound()
+        return HTTPNotFound('no geomtype')
 
     #add the dateadded
     if start_added or end_added:
@@ -281,7 +351,7 @@ def features(request):
         content_type = 'application/json; charset=UTF-8'
         head = """{"type": "FeatureCollection", "features": ["""
         tail = "\n]}"
-        delimiter = ','
+        delimiter = ',\n'
     elif format == 'kml':
         content_type = 'application/vnd.google-earth.kml+xml; charset=UTF-8'
         head = """<?xml version="1.0" encoding="UTF-8"?>
@@ -290,26 +360,45 @@ def features(request):
         tail = """\n</Document>\n</kml>"""
         folder_head = "<Folder><name>%s</name>"
         folder_tail = "</Folder>"
+
+
+        load_balancer = request.registry.settings['BALANCER_URL']
+        base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
+
+        schema_base = base_url + '%s/attributes.kml'
+        
     elif format == 'csv':
         content_type = 'text/csv; charset=UTF-8'
         head = '' 
         tail = ''
-        #TODO: add some metadata/header info for each csv chunk 
+        delimiter = '\n'
+        #some metadata to help people parse what is effectively a honking big text file of csv chunks
+        '''
+        dataset
+        {description}
+        {link to dataset metadata}
+        {link to dataset description}
+        '''
+        load_balancer = request.registry.settings['BALANCER_URL']
+        base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
+
+        #template: dataset.description, dataset.uuid, dataset.uuid
+        folder_head = '\n\nDATASET\n%s\nMetadata: '+base_url+'%s/metadata/fgdc.html\nServices: '+base_url+'%s/services.json\n'
     elif format == 'gml':
         content_type = 'application/xml; subtype="gml/3.1.1; charset=UTF-8"'
         head = """<?xml version="1.0" encoding="UTF-8"?>
                                 <gml:FeatureCollection 
                                     xmlns:gml="http://www.opengis.net/gml" 
                                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
-                                    xmlns:xlink="http://www.w3.org/1999/xlink">
-                                    xmlns:ogr="http://ogr.maptools.org/"
+                                    xmlns:xlink="http://www.w3.org/1999/xlink"
+                                    xmlns:ogr="http://ogr.maptools.org/">
                                 <gml:description>GSTORE API 3.0 Vector Stream</gml:description>\n""" 
         tail = """\n</gml:FeatureCollection>"""
     elif format == 'json':
         content_type = 'application/json; charset=UTF-8'
         head = """{"features": ["""
         tail = "]}"
-        delimiter = ','
+        delimiter = ',\n'
     else:
         #which it should have done by now anyway
         return HTTPNotFound()
@@ -326,16 +415,21 @@ def features(request):
     def yield_results():
         #run through each dataset_id as a chunk of stuff (folder for kml, etc)
         dataset_cnt = 0
-        
+
+        yield head
+       
         for d in filtered_ids:
             result = ''
-            
-            mongo_clauses.append({'d.id': d})
+
+            feature_clauses = [{'d.id': d}]
+            if mongo_clauses:
+                feature_clauses.append(mongo_clauses)
 
             #and go get the attribute data for the dataset
             the_dataset = get_dataset(d)
             fields = the_dataset.attributes
 
+            schema_url = ''
             field_set = ''
             if format == 'kml':
                 kml_flds = [{'type': ogr_to_kml_fieldtype(f.ogr_type), 'name': f.name} for f in fields]
@@ -343,25 +437,31 @@ def features(request):
                 field_set = """<Schema name="%(name)s" id="%(id)s">%(sfields)s</Schema>""" % {'name': str(the_dataset.uuid), 'id': str(the_dataset.uuid), 
                     'sfields': '\n'.join(["""<SimpleField type="%s" name="%s"><displayName>%s</displayName></SimpleField>""" % (k['type'], k['name'], k['name']) for k in kml_flds])
                 }
+
+                field_set = ''
+                schema_url = schema_base % (the_dataset.uuid)
             elif format == 'csv':
                 #and add the dataset id, the fid and the observed datetime fields
                 field_set = ','.join([f.name for f in fields]) + ',fid,dataset,observed\n'
 
-            fhead = folder_head % (the_dataset.description) if format == 'kml' else ''
-            
-            vectors = gm.query({'$and': mongo_clauses}, {}, sort_dict)
-            total = vectors.count()
+            if format == 'kml':
+                fhead = folder_head % (the_dataset.description)
+            elif format == 'csv':
+                fhead = folder_head % (the_dataset.description, the_dataset.uuid, the_dataset.uuid)
+            else:
+                fhead = folder_head
 
-            if dataset_cnt == 0:
-                #we need to make sure we set up the file correctly
-                result = head
+            if len(feature_clauses) > 1:
+                feature_clauses = {'$and': feature_clauses}
+            else:
+                feature_clauses = feature_clauses[0]
+            vectors = gm.query(feature_clauses, {}, sort_dict)
+            total = vectors.count()
                 
-            #so we'll yield each dataset instead (eek, that's a lot of stuff)
+            #so we'll yield each vector instead (eek, that's a lot of stuff)
             cnt = 0
             for vector in vectors:
-                #what we can't do is yield all the time - it stops at the first and then NOTHING else gets sent
-
-                vector_result = convert_vector(vector, fields, format, the_dataset.basename, epsg)
+                vector_result = convert_vector(vector, fields, format, the_dataset.basename, schema_url, epsg)
 
                 #if it's the first, add the HEAD and a DELIMITER
                 #if it's the last, add the TAIL
@@ -374,32 +474,28 @@ def features(request):
                     vector_result += delimiter
                     
                 #add it to everything
-                result += vector_result
+                #result += vector_result
                 cnt += 1
-                #yield rst
-
-            #last dataset, we're done
-            if dataset_cnt == len(filtered_ids) - 1:
-                result += tail
+                yield vector_result.encode(encode_as)
 
             dataset_cnt += 1
-            yield result.encode(encode_as)
+            #yield '\n\nDATASET_COUNT: %s (%s, %s)\n\n' % (dataset_cnt, total, json.dumps(feature_clauses))
+        yield tail
 
-
-    def convert_vector(vector, fields, fmt, basename, epsg):
+    #build a feature chunk based on the given format (json (no geom), geojson, kml or gml)
+    def convert_vector(vector, fields, fmt, basename, schema_url, epsg):
         #convert the mongo to a chunk of something based on the format
         fid = int(vector['f']['id'])
         did = int(vector['d']['id'])
         obs = vector['obs'] if 'obs' in vector else ''
 
         #get the geometry
-        if not format == 'csv':
+        if not format in ['csv', 'json']:
             wkb = vector['geom']['g'] if 'geom' in vector else ''
             if not wkb:
                 #need to get it from shapes
-                
-                feature = DBSession.query(Feature).filter(Feature.fid==fid).first()
-                wkb = feature.geom
+                feat = DBSession.query(Feature).filter(Feature.fid==fid).first()
+                wkb = feat.geom
                 
             #and convert to geojson, kml, or gml
             geom_repr = wkb_to_output(wkb, epsg, fmt)
@@ -407,44 +503,53 @@ def features(request):
                 return ''
 
         #deal with the attributes
-        #where it's important, esp. for the csv, that the attributes are exported int he order of the fields
+        #where it's important, esp. for the csv, that the attributes are exported in the order of the fields
         atts = vector['atts']
-        if format == 'kml': 
-            vals = [(a['name'], a['val']) for a in atts]
-            feature = "\n".join(["""<SimpleData name="%s">%s</SimpleData>""" % (v[0], v[1]) for v in vals])
 
+        #there's some wackiness with a unicode char and mongo (and also a bad char in the data, see fid 6284858)
+        #convert atts to name, value tuples so we only have to deal with the wackiness once
+        atts = [(a['name'], unicode(a['val']).encode('ascii', 'xmlcharrefreplace')) for a in atts]
+        
+        if format == 'kml': 
+            #make sure we've encoded the value string correctly for kml
+            feature = "\n".join(["""<SimpleData name="%s">%s</SimpleData>""" % (v[0], re.sub(r'[^\x20-\x7E]', '', escape(str(v[1])))) for v in atts])
+
+            #and no need for a schema url since it can be an internal schema linked by uuid here
             feature = """<Placemark id="%s">
                         <name>%s</name>
                         %s\n%s
                         <ExtendedData><SchemaData schemaUrl="%s">%s</SchemaData></ExtendedData>
                         <Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
-                        </Placemark>""" % (fid, fid, geom_repr, '', '', feature)
+                        </Placemark>""" % (fid, fid, geom_repr, '', schema_url, feature)
         elif format == 'gml':
             #going to match the gml from the dataset downloader
             #need a list of values as <ogr:{att name}>VAL</ogr:{att name}>
-            vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a['name'], a['val'], a['name']) for a in atts])
-            feature = """<gml:featureMember><ogr:%(basename)s><ogr:geometryProperty>%(geom)s</ogr:geometryProperty>%(values)s</ogr:%(basename)s></gml:featureMember>""" % {
-                   'basename': basename, 'geom': geom_repr, 'values': vals} 
+            vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0], re.sub(r'[^\x20-\x7E]', '', escape(str(a[1]))), a[0]) for a in atts])
+            feature = """<gml:featureMember><ogr:g_%(basename)s><ogr:geometryProperty>%(geom)s</ogr:geometryProperty>%(values)s</ogr:g_%(basename)s></gml:featureMember>""" % {
+                    'basename': basename, 'geom': geom_repr, 'values': vals} 
         elif format == 'geojson':
-            #so we don't care about the facgt that the fields change?
+            #TODO: qgis won't read a geojson from multiple datasets
+            #so we don't care about the fact that the fields change?
             #or we do and we will deal with the consequences shortly
-            vals = dict([(a['name'], a['val']) for a in atts])
+            vals = dict([(a[0], a[1]) for a in atts])
             vals.update({'fid':fid, 'dataset_id': did, 'observed': obs})
             feature = json.dumps({"type": "Feature", "properties": vals, "geometry": json.loads(geom_repr)})
         elif format == 'csv':
             vals = []
             for f in fields:
-                att = [a for a in atts if a['name'] == f.name]
+                att = [a for a in atts if a[0] == f.name]
                 if not att:
                     continue
-                vals.append(str(att[0]['val']))
+                vals.append(att[0][1])
             vals += [str(fid), str(did), obs]
             feature = ','.join(vals)
         elif format == 'json':
-            feature = ''
+            #no geometry, just attributes (good for timeseries requests)
+            vals = dict([(a[0], a[1]) for a in atts])
+            feature = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals, 'observed': obs})
         else:
             feature = ''
-           
+            
         return feature
     
     #let's yield stuff

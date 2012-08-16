@@ -3,6 +3,8 @@ from sqlalchemy import MetaData, Table, ForeignKey
 from sqlalchemy import Column, String, Integer, Boolean, FetchedValue, TIMESTAMP, Numeric
 from sqlalchemy.orm import relationship, backref
 
+from sqlalchemy import desc, asc, func
+
 from sqlalchemy.ext.declarative import declarative_base
 
 from sqlalchemy.orm import (
@@ -30,22 +32,36 @@ class DataoneCore(Base):
     )
     '''
     dataone_uuid = new immutable dataone uuid
-    object_uuid = dataset source uuid (from sources) or metadata uuid (from metadata) or package uuid (from datapackages)
-    object_type = dataset source | metadata | package (this is not great)
+    object_uuid = dataset source uuid (from sources) or metadata uuid (from metadata) or package uuid (from datapackages) or vector uuid (from vectors)
+    object_type = source | vector | metadata | package (this is not great)
 
     each data object in d1 has to have its own identifier so we'll make one set for any dataone thing
     these uuids dont' change - if something is updated, see _obsoletes
     '''
 
-    obsoletes = relationship('DataoneObsolete', backref='core')
+    obsoletes = relationship('DataoneObsolete', backref='core', order_by='DataoneObsolete.date_changed')
 
     def __init(self, object_uuid, object_type):
         self.object_uuid = object_uuid
         self.object_type = object_type
 
+        #TODO: on insert, also insert new dataone_obsoletes object for this uuid so that everything starts there
 
     def __repr__(self):
         return '<DateONE Object (%s, %s, %s)>' % (self.dataone_uuid, self.object_uuid, self.object_type)
+
+
+    def get_current_object(self):
+        #return the obsolete_uuid for the set of uuids 
+        #where current object is the uuid with the most recent date-modified value in dataone_obsoletes
+        #THIS IS THE OBSOLETED_BY VALUE IN THE SYSTEM METADATA
+
+
+        
+
+        pass
+        
+    
 
 class DataonePackage(Base):
     __table__ = Table('dataone_datapackages', Base.metadata,
@@ -59,8 +75,9 @@ class DataonePackage(Base):
     set up a package object (returns that rdf chunk) where a package here is a dataset and a metadata file. 
     this is not going to handle the collections if we decide to do that.
 
-    dataset_object = the dataone_uuid for a record in dataone_core where dataone_uuid == dataset_object and object_type == dataset
+    dataset_object = the dataone_uuid for a record in dataone_core where dataone_uuid == dataset_object and object_type == source
     metadata_object = the dataone_uuid for a record in dataone_core where dataone_uuid == metadata_object and object_type == metadata
+    
 
     not great
     '''
@@ -71,6 +88,33 @@ class DataonePackage(Base):
 
     def __repr__(self):
         return '<DataONE Package (%s, %s, %s)>' % (self.package_uuid, self.dataset_object, self.metadata_object)
+
+    def build_rdf(self):
+        return ''
+
+class DataoneVector(Base):
+    __table__ = Table('dataone_vectors', Base.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('vector_uuid', UUID, FetchedValue()),
+        Column('dataset_uuid', UUID),
+        Column('format', String(20)),
+        Column('date_added', TIMESTAMP, default="now()"),
+        schema='gstoredata'
+    )
+    '''
+    container for uuids to represent the vector datasets
+    which, i guess, could just be the dataone_uuid but that
+    doesn't get us to the dataset+format so 
+    so we'll just do this to explicitly define what gets to be a 
+    dataone object
+    '''
+
+    def __init__(self, dataset_uuid, format):
+        self.dataset_uuid = dataset_uuid
+        self.format = format
+
+    def __repr__(self):
+        return '<DataONE Vector (%s, %s, %s)>' % (self.vector_uuid, self.format, self.dataset_uuid)
 
 class DataoneObsolete(Base):
     __table__ = Table('dataone_obsoletes', Base.metadata,
@@ -102,8 +146,20 @@ class DataoneObsolete(Base):
     def __repr__(self):
         return '<DataONE Obsolete (%s, %s)>' % (self.obsolete_uuid, self.dataone_uuid)
 
-  
+    def current_object(self):
+        #figure out if this is the active uuid for the object
+        #so if this obs uuid == uuid of [all obs uuids for d1 uuid][1] (i.e. if uiid == uuid of the first list item)
+        #if not, we need to get the current uuid for obsoleted_by
 
+        obsoleteds = DBSession.query(DataoneObsolete).filter(DataoneObsolete.dataone_uuid==self.dataone_uuid).order_by(desc(DataoneObsolete.date_changed))        
+        current_obsoleted = obsoleteds[0]
 
+        if current_obsoleted.obsolete_uuid != self.obsolete_uuid:
+            return False, current_obsoleted.obsolete_uuid
+
+        #it's the current uuid
+        return True, None
+
+    
 
     
