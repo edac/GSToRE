@@ -3,8 +3,12 @@ from pyramid.response import Response, FileResponse
 
 from pyramid.httpexceptions import HTTPNotFound, HTTPServerError
 
-import logging
+from sqlalchemy import desc, asc, func
+from sqlalchemy.sql.expression import and_
+from sqlalchemy.sql import between
+
 from datetime import datetime
+import urllib2
 
 #from the models init script
 from ..models import DBSession
@@ -12,13 +16,13 @@ from ..models import DBSession
 from ..models.datasets import (
     Dataset,
     )
-
+from ..models.dataone import *
 
 from ..lib.utils import *
 from ..lib.database import *
 from ..lib.mongo import gMongo, gMongoUri
 
-#log = logging.getLogger(__name__)
+import os
 
 '''
 make sure that the general errors are being posted correctly (404, 500, etc)
@@ -52,6 +56,25 @@ def datetime_to_http(dt):
     fmt = '%a, %d %b %Y %H:%M:%S GMT'
     return dt.strftime(fmt)
 
+def dataone_to_datetime(dt):
+    #TODO: deal with more datetime issues (could be gmt or utc, with or without milliseconds)
+    fmt = '%Y-%m-%dT%H:%M:%S'
+    dt = dt.replace('+00:00', '') if '+00:00' in dt else dt
+    return datetime.strptime(dt, fmt)
+
+
+#some generic error handling 
+#that would be nicer if dataone was consistent in their error handling (or their documentation was consistent, i don't know which)
+def return_error(error_type, detail_code, error_code, error_message='', pid=''):  
+    if error_code == 404 and error_type == 'object':
+        xml = '<?xml version="1.0" encoding="UTF-8"?><error detailCode="%s" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: DOESNTEXIST</description></error>' % (detail_code, error_code)
+        return Response(xml, content_type='text/xml; charset=UTF-8', status='404')
+
+    elif error_code == 404 and error_type == 'metadata':
+        xml = '<?xml version="1.0" encoding="UTF-8"?><error detailCode="%s" errorCode="404"><description>No system metadata could be found for given PID: %s</description></error>' % (detail_code, pid)
+        return Response(xml, content_type='text/xml; charset=UTF-8', status='404')
+
+    return Response()
 '''
 dataone logging in mongodb
 '''
@@ -92,9 +115,6 @@ def ping(request):
     #TODO: add check for insufficient resources (except we don't seem to know that)
     #      (413)
 
-#    #TODO: why isn't the logger writing to the stupid file?
-#    logging.getLogger('dataone').debug('ping dataone')
-
     return Response()
 	
 @view_config(route_name='dataone', match_param='app=dataone', renderer='../templates/dataone_node.pt')
@@ -127,10 +147,14 @@ def dataone(request):
     #TODO: check the synchronization part 
     #TODO: check all the other parts, i.e. subject and contact subject and identifier
 
+
+    load_balancer = request.registry.settings['BALANCER_URL']
+    base_url = '%s/apps/dataone/' % (load_balancer)
+
     #set up the dict
     rsp = {'name': 'GSTORE Node',
            'description': 'DATAONE member node for GSTORE',
-           'baseUrl': '%s/%s/apps/dataone/' % (request.host_url, request.script_name[1:]),
+           'baseUrl': base_url,
            'subject': SUBJECT,
            'contactsubject': CONTACTSUBJECT
         }
@@ -166,6 +190,8 @@ def log(request):
 
     '''
 
+    params = normalize_params(request.params)
+
     offset = int(request.params.get('start')) if 'start' in request.params else 0
     limit = int(request.params.get('count')) if 'count' in request.params else 1000
 
@@ -182,7 +208,7 @@ def log(request):
     connstr = request.registry.settings['dataone_mongo_uri']
     collection = request.registry.settings['dataone_mongo_collection']
     mongo_uri = gMongoUri(connstr, collection)
-    logs = query_logs(mongo_uri, querydict, limit, offset)
+    logs = query_log(mongo_uri, querydict, limit, offset)
 
     results = logs.count()
     #TODO: what is total? the number of all log entries? or what?
@@ -210,7 +236,7 @@ def log(request):
     rsp.update({'docs': docs})
     return rsp
 	
-@view_config(route_name='dataone_search', match_param='app=dataone')
+@view_config(route_name='dataone_search', match_param='app=dataone', renderer='dataone_search.mako')
 def search(request):
     '''
     <?xml version="1.0"?>
@@ -236,19 +262,84 @@ def search(request):
 
     '''
 
-    offset = int(request.params.get('start')) if 'start' in request.params else 0
-    limit = int(request.params.get('count')) if 'count' in request.params else 1000
+    params = normalize_params(request.params)
 
-    fromDate = request.params.get('fromDate') if 'fromDate' in request.params else ''
-    toDate = request.params.get('toDate') if 'toDate' in request.params else ''
+    offset = int(params.get('start')) if 'start' in params else 0
+    limit = int(params.get('count')) if 'count' in params else 1000
 
-    #the pid
-    formatId = request.params.get('formatId') if 'formatId' in request.params else ''
+    fromDate = params.get('fromDate', '') 
+    toDate = request.params.get('toDate', '') 
 
-    replicaStatus = request.params.get('replicaStatus') if 'replicaStatus' in request.params else ''
+    formatId = params.get('formatId', '')
 
 
-    return Response('dataone search')
+    #TODO: add replica status somewhere (but we're not replicating stuff yet)
+    replicaStatus = params.get('replicaStatus', '')
+
+    #set up the clauses
+    #AND we're going for dataone_uuids NOT obsolete_uuids
+    #so that we're only querying for the most recent obsolete_uuid (we don't care about previous ones here)
+    #and we can return the correct uuid from the core objects anyway
+
+    #this returns a tuple that is... awkward to use
+    #query = DBSession.query(DataoneObsolete.dataone_uuid, func.max(DataoneObsolete.date_changed).group_by(DataoneObsolete.dataone_uuid)
+
+    search_clauses = []
+
+    if fromDate or toDate:
+        #make them dates
+        #build the clauses
+        if fromDate and not toDate:
+            #greater than from
+            fd = dataone_to_datetime(fromDate)
+            search_clauses.append(DataoneSearch.the_date >= fd)
+        elif not fromDate and toDate:
+            #less than to
+            ed = dataone_to_datetime(toDate)
+            search_clauses.append(DataoneSearch.the_date < ed)
+        else:
+            #between
+            fd = dataone_to_datetime(fromDate)
+            ed = dataone_to_datetime(toDate)
+            search_clauses.append(between(DataoneSearch.the_date, fd, ed))
+
+    if formatId:
+        #join the formats so we can query that
+        #TODO: deal with http escaping from the request
+        formatId = urllib2.unquote(formatId)
+        search_clauses.append(DataoneSearch.format==formatId)
+        
+    #and add the limit/offset for fun
+    query = DBSession.query(DataoneSearch, DataoneCore).join(DataoneCore, DataoneSearch.the_uuid==DataoneCore.dataone_uuid).filter(and_(*search_clauses))
+    total = query.count()
+
+    objects = query.limit(limit).offset(offset).all()
+
+    #now go do stuff with our tuple of search, core
+    #where we really kinda just care about the core (because we want the hash, the size and the most recent uuid)
+
+    dataone_path = request.registry.settings['DATAONE_PATH']
+
+    #convert to the dict needed for the template
+    cnt = total if total < limit else limit
+    
+    docs = []
+    for obj in objects:
+        #get the core obj
+        core = obj[1]
+        algo = 'md5'
+        #f = core.get_object(dataone_path)
+        h = core.get_hash(algo, dataone_path)
+        #h = 500
+        size = core.get_size(dataone_path)
+        #size = 30
+
+        #get the current id
+        current = core.get_current()
+        
+        docs.append({'identifier': current, 'format': core.format.format, 'algo': algo, 'checksum': h, 'date': datetime_to_dataone(obj[0].the_date), 'size': size})
+
+    return {'total': total, 'count': cnt, 'start': offset, 'docs': docs}
 	
 @view_config(route_name='dataone_object', request_method='GET', match_param='app=dataone')
 def show(request):
@@ -262,39 +353,32 @@ def show(request):
     </error>
     '''
     pid = request.matchdict['pid']
-
-    #get the dataset
-    d = get_dataset(pid)
-
-    if not d:
+    
+    #go check in the obsolete table
+    obsolete = DBSession.query(DataoneObsolete).filter(DataoneObsolete.obsolete_uuid==pid).first()
+    if not obsolete:
         #emit that xml
-#        request.response.content_type = 'text/xml; charset=UTF-8'
-#        request.response.status = 404
-        return Response('<?xml version="1.0" encoding="UTF-8"?><error detailCode="1800" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: DOESNTEXIST</description></error>',
-                        content_type='text/xml; charset=UTF-8', status='404')
+        return_error('object', 1800, 404)
 
-    #get the file we want to serve as the dataset
-    #for file + geomimage, should be set==original
-    #NOPE - just sources with a hash right now
-    src = [s for s in d.sources if s.file_hash != None]
-    if not src:
-        #emit that xml
-        return Response('<?xml version="1.0" encoding="UTF-8"?><error detailCode="1800" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: DOESNTEXIST</description></error>',
-                        content_type='text/xml; charset=UTF-8', status='404')
-        #this just gets worse
+    #get the object path 
+    core_object = obsolete.core
 
-    srcfiles = src[0].src_files
-    file_size = src[0].file_filesize_mb
-    file_hash = src[0].file_hash
+    dataone_path = request.registry.settings['DATAONE_PATH']
+    obj_path = core_object.get_object(dataone_path)
 
-    #TODO: add some header stuff and check that we need to add some header stuff
-    #dump the file
-    #TODO: check the file name stuff
-    fname = pid + '.zip'
-    if src[0].extension in ['pdf']:
-        fname = fname.replace('.zip', src[0].extension)
-    fr = FileResponse(srcfiles[0].location, content_type='application/octet-stream')
-    fr.headers['Content-disposition'] = str('attachment; filename=%s' % (fname))
+    if not obj_path:    
+        return_error('object', 1800, 404)
+
+    #should be xml or zip only
+    #TODO: check on the RDF mimetype if it's not xml
+    mimetype = 'application/xml'
+    if core_object.object_type in ['source', 'vector']:
+        mimetype = 'application/x-zip-compressed'
+
+    fr = FileResponse(obj_path, content_type=mimetype)
+    #make the download filename be the obsolete_uuid that was requested just to be consistent
+    ext = obj_path.split('.')[-1]
+    fr.content_disposition = 'attachment; filename=%s.%s' % (pid, ext)
     return fr
 
 @view_config(route_name='dataone_object', request_method='HEAD', match_param='app=dataone')
@@ -325,9 +409,10 @@ def head(request):
 
     pid = request.matchdict['pid']
 
-    d = get_dataset(pid)
+    #go check in the obsolete table
+    obsolete = DBSession.query(DataoneObsolete).filter(DataoneObsolete.obsolete_uuid==pid).first()
     
-    if not d:
+    if not obsolete:
         lst = [('Content-Type', 'text/xml'), 
                ('DataONE-Exception-Name', 'NotFound'), 
                ('DataONE-Exception-DetailCode', '1380'), 
@@ -338,31 +423,30 @@ def head(request):
         rsp.headerlist = lst
         return rsp
 
-    src = [s for s in d.sources if s.file_hash != None]
-    if not src:
-        lst = [('Content-Type', 'text/xml'), 
-               ('DataONE-Exception-Name', 'NotFound'), 
-               ('DataONE-Exception-DetailCode', '1380'), 
-               ('DataONE-Exception-Description', 'The specified object does not exist on this node.'),
-               ('DataONE-Exception-PID', str(pid))]
-        rsp = Response()
-        rsp.status = 404
-        rsp.headerlist = lst
-        return rsp
+    #get the object path 
+    core_object = obsolete.core
 
-    lastmodified = d.dateadded
-    file_mb = src[0].file_filesize_mb
-    file_hash = src[0].file_hash
-    file_hashtype = src[0].file_hash_type
-    mimetype = src[0].file_mimetype
+    dataone_path = request.registry.settings['DATAONE_PATH']
+    #obj_path = core_object.get_object(dataone_path)
 
-    #1 Megabyte (MB) = 1 048 576 Byte
-    file_b = file_mb * 1048576
+    #get the file info
+    file_hashtype = 'md5'
+    file_hash = core_object.get_hash(file_hashtype, dataone_path)
+    file_size = core_object.get_size(dataone_path)
+
+    #convert to the expectged d1 datetime
+    lastmodified = obsolete.date_changed
+
+    content_type = 'application/xml'
+    if core_object.object_type in ['source', 'vector']:
+        content_type = 'application/x-zip-compressed' 
+
+    #get the d1 object identifier value
+    obj_format = core_object.format.format
 
     #TODO: deal with all the strings (can't be unicode from postgres)
-    lst = [('Last-Modified','%s' % (str(datetime_to_http(lastmodified)))), ('Content-Type','application/octet-stream'), ('Content-Length','%s' % (int(file_b)))]
-    #TODO: change this
-    lst.append(('DataONE-ObjectFormat',str(mimetype)))
+    lst = [('Last-Modified','%s' % (str(datetime_to_http(lastmodified)))), ('Content-Type', content_type), ('Content-Length','%s' % (int(file_size)))]
+    lst.append(('DataONE-ObjectFormat', str(obj_format)))
     lst.append(('DataONE-Checksum', '%s,%s' % (str(file_hashtype), str(file_hash))))
     #TODO: change this to something
     lst.append(('DataONE-SerialType', '1234'))
@@ -371,99 +455,93 @@ def head(request):
     rsp.headerlist = lst
     return rsp
 
-@view_config(route_name='dataone_meta', match_param='app=dataone', renderer='../templates/dataone_metadata.pt')
+@view_config(route_name='dataone_meta', match_param='app=dataone', renderer='dataone_metadata.mako')
 def metadata(request):
     '''
     <?xml version="1.0" encoding="UTF-8"?>
-    <d1:systemMetadata xmlns:d1="http://dataone.org/coordinating_node_sysmeta_0.1"
-     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-     xsi:schemaLocation="http://dataone.org/coordinating_node_sysmeta_0.1 https://repository.dataone.org/software/cicore/trunk/schemas/coordinating_node_sysmeta.xsd">
-        <!-- This instance document was auto generated by oXygen XML for testing purposes.
-             It contains no useful information.
-        -->
-        <identifier>Identifier0</identifier>
-        <objectFormat>eml://ecoinformatics.org/eml-2.0.1</objectFormat>
-        <size>0</size>
-        <submitter>uid=jones,o=NCEAS,dc=ecoinformatics,dc=org</submitter>
-        <rightsHolder>uid=jones,o=NCEAS,dc=ecoinformatics,dc=org</rightsHolder>
-        <describes>XYZ333</describes>
-        <checksum algorithm="SHA-1">2e01e17467891f7c933dbaa00e1459d23db3fe4f</checksum>
-        <embargoExpires>2006-05-04T18:13:51.0Z</embargoExpires>
-        <accessRule rule="allow" service="read" principal="Principal0"/>
-        <accessRule rule="allow" service="read" principal="Principal1"/>
-        <replicationPolicy replicationAllowed="true" numberReplicas="2">
-            <preferredMemberNode>MemberNode12</preferredMemberNode>
-            <preferredMemberNode>MemberNode13</preferredMemberNode>
-            <blockedMemberNode>MemberNode6</blockedMemberNode>
-            <blockedMemberNode>MemberNode7</blockedMemberNode>
-        </replicationPolicy>
-        <dateUploaded>2006-05-04T18:13:51.0Z</dateUploaded>
-        <dateSysMetadataModified>2009-05-04T18:13:51.0Z</dateSysMetadataModified>
-        <originMemberNode>mn1.dataone.org/</originMemberNode>
-        <authoritativeMemberNode>mn1.dataone.org/</authoritativeMemberNode>
+    <d1:systemMetadata xmlns:d1="http://ns.dataone.org/service/types/v1">
+      <serialVersion>1</serialVersion>
+      <identifier>XYZ332</identifier>
+      <formatId>eml://ecoinformatics.org/eml-2.1.0</formatId>
+      <size>20875</size>
+      <checksum algorithm="MD5">e7451c1775461b13987d7539319ee41f</checksum>
+      <submitter>uid=mbauer,o=NCEAS,dc=ecoinformatics,dc=org</submitter>
+      <rightsHolder>uid=mbauer,o=NCEAS,dc=ecoinformatics,dc=org</rightsHolder>
+      <accessPolicy>
+        <allow>
+          <subject>uid=jdoe,o=NCEAS,dc=ecoinformatics,dc=org</subject>
+          <permission>read</permission>
+          <permission>write</permission>
+          <permission>changePermission</permission>
+        </allow>
+        <allow>
+          <subject>public</subject>
+          <permission>read</permission>
+        </allow>
+        <allow>
+          <subject>uid=nceasadmin,o=NCEAS,dc=ecoinformatics,dc=org</subject>
+          <permission>read</permission>
+          <permission>write</permission>
+          <permission>changePermission</permission>
+        </allow>
+      </accessPolicy>
+      <replicationPolicy replicationAllowed="false"/>
+      <obsoletes>XYZ331</obsoletes>
+      <obsoletedBy>XYZ333</obsoletedBy>
+      <archived>true</archived>
+      <dateUploaded>2008-04-01T23:00:00.000+00:00</dateUploaded>
+      <dateSysMetadataModified>2012-06-26T03:51:25.058+00:00</dateSysMetadataModified>
+      <originMemberNode>urn:node:TEST</originMemberNode>
+      <authoritativeMemberNode>urn:node:TEST</authoritativeMemberNode>
     </d1:systemMetadata>
 
     error = 
-    <error errorCode='404' detailCode='4060'>
-      <description>The specified object does not exist on this node.</description>
-      <traceInformation>
-        <value key='identifier'>SomeObjectID</value>
-        <value key='method'>cn.getSystemMetadat</value>
-        <value key='hint'>http://cn.dataone.org/cn/resolve/SomeObjectID</value>
-      </traceInformation>
+    <?xml version="1.0" encoding="UTF-8"?>
+    <error detailCode="1800" errorCode="404" name="NotFound">
+      <description>No system metadata could be found for given PID: SomeObjectID</description>
     </error>
     '''
     pid = request.matchdict['pid']
-    d = get_dataset(pid)
+    
+    #go check in the obsolete table
+    obsolete = DBSession.query(DataoneObsolete).filter(DataoneObsolete.obsolete_uuid==pid).first()
+    
+    if not obsolete:
+        return return_error('metadata', 1800, 404, '', pid)
 
-    #TODO: create a dataone 404 error method for these
-    if not pid:
-        request.response.content_type = 'text/xml; charset=UTF-8'
-        request.response.status = 404
-        #TODO: hint url?
-        return '''<?xml version="1.0" encoding="UTF-8"?><error detailCode="4060" errorCode="404"><description>The specified object does not exist on this node.</description>
-                <traceInformation>
-                    <value key="identifier">%s</value>
-                    <value key="method">cn.getSystemMetadata</value>
-                    <value key="hint">Unknown</value>
-                </traceInformation>
-                </error>''' % (pid)
+    #get the object path 
+    core_object = obsolete.core
 
-    src = [s for s in d.sources if s.file_hash != None]
-    if not src:
-        #emit that xml
-        request.response.content_type = 'text/xml; charset=UTF-8'
-        request.response.status = 404
-        return '''<?xml version="1.0" encoding="UTF-8"?><error detailCode="4060" errorCode="404"><description>The specified object does not exist on this node.</description>
-                <traceInformation>
-                    <value key="identifier">%s</value>
-                    <value key="method">cn.getSystemMetadata</value>
-                    <value key="hint">Unknown</value>
-                </traceInformation>
-                </error>''' % (pid)
-        #this just gets worse
+    dataone_path = request.registry.settings['DATAONE_PATH']
 
-    srcfiles = src[0].src_files
-    file_size = src[0].file_filesize_mb
-    file_hash = src[0].file_hash
-    file_hash_type = src[0].file_hash_type
+    #get the file info
+    file_hashtype = 'md5'
+    file_hash = core_object.get_hash(file_hashtype, dataone_path)
+    file_size = core_object.get_size(dataone_path)
 
-#    host = request.host_url
-#    g_app = request.script_name[1:]
-#    base_url = '%s/%s/apps/dataone/' % (host, g_app)
+    #convert to the expectged d1 datetime
+    lastmodified = obsolete.date_changed
+
+    #get the d1 object identifier value
+    obj_format = core_object.format.format
+
+    #need the list of any obsoleted objects
+    obsoletes = core_object.get_obsoletes(obsolete.obsolete_uuid)
+
+    #and the latest and greatest
+    obsoletedby = core_object.get_current()
 
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/apps/dataone/' % (load_balancer)
 
-    #TODO: fix all of this
-    rsp = {'pid': pid, 'dateadded': datetime_to_dataone(d.dateadded), 'obj_format': src[0].extension, 'file_size': file_size, 
-           'uid': 'GSTORE', 'o': 'EDAC', 'dc': 'everything', 'org': 'EDAC', 'hash_type': file_hash_type,
-           'hash': file_hash, 'embargo': '', 'metadata_modified': datetime_to_dataone(datetime.now()), 'mn': host}
+    #TODO: fix the date formats, i think
+    rsp = {'pid': pid, 'dateadded': datetime_to_dataone(core_object.date_added), 'obj_format': obj_format, 'file_size': file_size, 
+           'uid': 'GSTORE', 'o': 'EDAC', 'dc': 'everything', 'org': 'EDAC', 'hash_type': file_hashtype,
+           'hash': file_hash, 'metadata_modified': datetime_to_dataone(obsolete.date_changed), 'mn': base_url, 'obsoletes': obsoletes, 'obsoletedby': obsoletedby}
 
     request.response.content_type = 'text/xml; charset=UTF-8'
     return rsp
 
-#TODO: change to dynamic hashing based on either SHA-1 or MD5
 @view_config(route_name='dataone_checksum', match_param='app=dataone')
 def checksum(request):
     '''
@@ -472,25 +550,25 @@ def checksum(request):
 
     pid = request.matchdict['pid']
 
-    d = get_dataset(pid)
-    if not d:
-        return HTTPNotFound('no dataset')
-    if d.is_available == False:
-        return HTTPNotFound('not available')
+    algo = request.params.get('checksumAlgorithm', '')
+    if not algo:
+        return HTTPNotFound()
 
-    #need to get the source that has a hash (original + zip)
-    #TODO: what happens when more sources have hashes?
+    obsolete = DBSession.query(DataoneObsolete).filter(DataoneObsolete.obsolete_uuid==pid).first()
+    if not obsolete:
+        #emit that xml
+        return return_error('object', 1800, 404)
 
-    src = [s for s in d.sources if s.extension == 'zip' and s.set == 'original' and s.active and s.file_hash is not None]
-    if not src:
-        return HTTPNotFound('not available')
+    #get the object path 
+    core_object = obsolete.core
 
-    h = src[0].file_hash
-    htype = src[0].file_hash_type
+    dataone_path = request.registry.settings['DATAONE_PATH']
 
+    h = core_object.get_hash(algo, dataone_path)
+    
     #TODO: double check output
     #TODO: double-check list of hash algorithm terms
-    return Response('<checksum algorithm="%s">%s</checksum>' % (htype, h), content_type='application/xml')
+    return Response('<checksum algorithm="%s">%s</checksum>' % (algo, h), content_type='application/xml')
 
 @view_config(route_name='dataone_error', request_method='POST', match_param='app=dataone')
 def error(request):
@@ -505,3 +583,14 @@ def replica(request):
     '''
     pid = request.matchdict['pid']
     return Response('dataone replica')
+
+
+'''
+dataone management methods
+
+- create dataone vector object
+- create dataone package object
+- create dataone core object (after vector made if it's for a vector and after package made if it's a package widget)
+- add new obsolete record for a dataone core object
+'''
+#TODO: add methods
