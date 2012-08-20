@@ -18,6 +18,9 @@ from sqlalchemy.dialects.postgresql import UUID, ARRAY
 
 import os
 
+from foresite import *
+from rdflib import URIRef, Namespace
+
 from ..lib.utils import getHash
 
 
@@ -75,7 +78,7 @@ class DataoneCore(Base):
         prev = obs[:obs.index(test_uuid)]
         return prev
 
-    def get_object(self, path):
+    def get_object(self, path, base_url=''):
         '''
         get the object by type for the uuid
 
@@ -84,7 +87,6 @@ class DataoneCore(Base):
 
         return the file path to the obj (so cache the rdf package)
         '''
-        #TODO: change this to the right uuid (dataone uuid won't exist when the dataset is promoted to dataone)
 
         #need to get objects by their object id 
         if self.object_type in ['source', 'vector']:
@@ -100,7 +102,7 @@ class DataoneCore(Base):
                 pkg = DBSession.query(DataonePackage).filter(DataonePackage.package_uuid==self.object_uuid).first()
                 if not pkg:
                     return None
-                pkg.build_rdf(package_loc)
+                pkg.build_rdf(package_loc, base_url)
                 
             obj = package_loc
         else:
@@ -115,7 +117,6 @@ class DataoneCore(Base):
         '''
         only supports md5 and sha-1 right now (because that's all dataone supports)
         '''
-    
         #let's get the path (that is the object)
         f = self.get_object(path)
 
@@ -148,7 +149,6 @@ class DataonePackage(Base):
     dataset_object = the dataone_uuid for a record in dataone_core where dataone_uuid == dataset_object and object_type == source
     metadata_object = the dataone_uuid for a record in dataone_core where dataone_uuid == metadata_object and object_type == metadata
     
-
     not great
     '''
 
@@ -159,8 +159,115 @@ class DataonePackage(Base):
     def __repr__(self):
         return '<DataONE Package (%s, %s, %s)>' % (self.package_uuid, self.dataset_object, self.metadata_object)
 
-    def build_rdf(self, location):
-        return ''
+    def build_rdf(self, location, base_url):
+        '''
+        <?xml version="1.0" encoding="UTF-8"?>
+        <rdf:RDF
+           xmlns:cito="http://purl.org/spar/cito/"
+           xmlns:dc="http://purl.org/dc/elements/1.1/"
+           xmlns:dcterms="http://purl.org/dc/terms/"
+           xmlns:foaf="http://xmlns.com/foaf/0.1/"
+           xmlns:ore="http://www.openarchives.org/ore/terms/"
+           xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+           xmlns:rdfs1="http://www.w3.org/2001/01/rdf-schema#"
+        >
+          <rdf:Description rdf:about="http://foresite-toolkit.googlecode.com/#pythonAgent">
+            <foaf:mbox>foresite@googlegroups.com</foaf:mbox>
+            <foaf:name>Foresite Toolkit (Python)</foaf:name>
+          </rdf:Description>
+          <rdf:Description rdf:about="https://cn.dataone.org/cn/v1/resolve/scimeta_id">
+            <cito:documents rdf:resource="https://cn.dataone.org/cn/v1/resolve/scidata_id"/>
+            <dcterms:identifier>scimeta_id</dcterms:identifier>
+            <dcterms:description>A reference to a science metadata document using a DataONE identifier.</dcterms:description>
+          </rdf:Description>
+          <rdf:Description rdf:about="http://www.openarchives.org/ore/terms/ResourceMap">
+            <rdfs1:isDefinedBy rdf:resource="http://www.openarchives.org/ore/terms/"/>
+            <rdfs1:label>ResourceMap</rdfs1:label>
+          </rdf:Description>
+          <rdf:Description rdf:about="https://cn.dataone.org/cn/v1/resolve/resource_map_id">
+            <dcterms:identifier>resource_map_id</dcterms:identifier>
+            <dcterms:modified>2011-08-12T12:55:16Z</dcterms:modified>
+            <rdf:type rdf:resource="http://www.openarchives.org/ore/terms/ResourceMap"/>
+            <dc:format>application/rdf+xml</dc:format>
+            <ore:describes rdf:resource="aggregation_id"/>
+            <dcterms:created>2011-08-12T12:55:16Z</dcterms:created>
+            <dcterms:creator rdf:resource="http://foresite-toolkit.googlecode.com/#pythonAgent"/>
+          </rdf:Description>
+          <rdf:Description rdf:about="http://www.openarchives.org/ore/terms/Aggregation">
+            <rdfs1:isDefinedBy rdf:resource="http://www.openarchives.org/ore/terms/"/>
+            <rdfs1:label>Aggregation</rdfs1:label>
+          </rdf:Description>
+          <rdf:Description rdf:about="aggregation_id">
+            <rdf:type rdf:resource="http://www.openarchives.org/ore/terms/Aggregation"/>
+            <dcterms:title>Simple aggregation of science metadata and data</dcterms:title>
+            <ore:aggregates rdf:resource="https://cn.dataone.org/cn/v1/resolve/scidata_id"/>
+            <ore:aggregates rdf:resource="https://cn.dataone.org/cn/v1/resolve/scimeta_id"/>
+          </rdf:Description>
+          <rdf:Description rdf:about="https://cn.dataone.org/cn/v1/resolve/scidata_id">
+            <cito:isDocumentedBy rdf:resource="https://cn.dataone.org/cn/v1/resolve/scimeta_id"/>
+            <dcterms:identifier>scidata_id</dcterms:identifier>
+            <dcterms:description>A reference to a science data object using a DataONE identifier</dcterms:description>
+          </rdf:Description>
+        </rdf:RDF>
+
+        using the rdf+xml type and build it with foresite/rdflib
+        
+        '''
+
+        md_core = DBSession.query(DataoneCore).filter(DataoneCore.dataone_uuid==self.metadata_object).first()
+        if not md_core:
+            return ''
+        d_core = DBSession.query(DataoneCore).filter(DataoneCore.dataone_uuid==self.dataset_object).first()
+        if not d_core:
+            return ''
+        pkg_core = DBSession.query(DataoneCore).filter(DataoneCore.object_uuid==self.package_uuid).first()        
+        if not pkg_core:
+            return ''
+
+        #need the most recent obsolete uuid for the correct paths to the data objects
+        md_current = md_core.get_current()
+        d_current = d_core.get_current()
+        pkg_current = pkg_core.get_current()
+
+        if not md_current or not d_current or not pkg_current:
+            return ''
+    
+        #get the metadata object
+        #where the about ref is gstore/apps/dataone/object/uuid
+        md = AggregatedResource('%s/object/%s' % (base_url, md_current))
+        md.title = 'Metadata: %s' % (md_current)
+        md._dcterms.identifier = str(md_current)
+        md._dcterms.description = 'Science metadata object (%s) for Data object (%s)' % (md_current, d_current)
+        md._cito.documents = '%s/object/%s' % (base_url, d_current)
+
+        #get the data object
+        d = AggregatedResource('%s/object/%s' % (base_url, d_current))
+        d.title = 'Dataset: %s' % (md_current)
+        d._dcterms.identifier = str(d_current)
+        d._dcterms.description = 'Data object (%s)' % (d_current)
+        d._cito.isDocumentedBy = '%s/object/%s' % (base_url, md_current)
+
+        #build the aggregate
+        aggregate = Aggregation('GStore-Aggregate')
+        aggregate.add_resource(d)
+        aggregate.add_resource(md)
+
+        #build the rdf
+        rem = ResourceMap('%s/object/%s' % (base_url, pkg_current))
+        rem.set_aggregation(aggregate)
+
+        #use the rdf+xml format
+        rdfxml = RdfLibSerializer('rdf')
+        rem.register_serialization(rdfxml)
+
+        #and finally, get the generated rdf
+        doc = rem.get_serialization()
+        location = os.path.join(location, '%s.xml' % (self.package_uuid))
+        #TODO: fix permissions issue with the dataone dirs (needs to be web-dev as well?)
+        with open(location, 'w') as pkg:
+            pkg.write(doc.data)
+        
+        return 'success'
 
 class DataoneVector(Base):
     __table__ = Table('dataone_vectors', Base.metadata,

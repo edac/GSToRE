@@ -19,6 +19,7 @@ from ..lib.mongo import gMongoUri
 '''
 datasets
 '''
+#TODO: add dataset statistics view - min/max per attribute, histogram info, etc
 
 ##TODO: add the html renderer to this
 @view_config(route_name='html_dataset', renderer='dataset_card.mako')
@@ -272,6 +273,25 @@ def services(request):
 
     return rsp
 
+
+@view_config(route_name='dataset_statistics')
+def statistics(request):
+    '''
+    return some dataset-level stats:
+
+    vector:
+        for each attribute (that is int or real)
+            min/max
+            basic histogram info
+
+    raster
+        min/max
+        basic histogram info
+
+
+    in part to help with classification (although that requires sld support)
+    '''
+    pass
 
 '''
 dataset maintenance

@@ -142,6 +142,12 @@ def main(global_config, **settings):
     config.add_route('dataone_replica', '/apps/{app}/replica/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
     config.add_route('dataone_error', '/apps/{app}/error', custom_predicates=(applist,)) 
 
+    #maintenance routes
+    config.add_route('dataone_addcore', '/apps/{app}/core/add', custom_predicates=(applist,))
+    config.add_route('dataone_addvector', '/apps/{app}/vector/add', custom_predicates=(applist,))
+    config.add_route('dataone_addpackage', '/apps/{app}/package/add', custom_predicates=(applist,))
+    config.add_route('dataone_addobsolete', '/apps/{app}/obsolete/add', custom_predicates=(applist,))
+
 #to the dataset
     #use the integer dataset_id or the uuid
     config.add_route('dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}', custom_predicates=(applist, typelist,))
@@ -150,6 +156,8 @@ def main(global_config, **settings):
     config.add_route('add_dataset', '/apps/{app}/datasets', custom_predicates=(applist,)) #POST
     config.add_route('update_dataset', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,)) #PUT
     config.add_route('dataset_services', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/services.{ext}', custom_predicates=(applist,))
+
+    config.add_route('dataset_statistics', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/statistics.{ext}', custom_predicates=(applist,))
 
 #to hydroserver
     #services (MODIFY FOR WSDL VS REST)

@@ -24,7 +24,7 @@ metadata
 
 
 #intermediate table
-class DatasetMetadata(Base):
+class OriginalMetadata(Base):
     __table__ = Table('original_metadata', Base.metadata,
         Column('id', Integer, primary_key=True),
         Column('original_xml', String),
@@ -32,6 +32,8 @@ class DatasetMetadata(Base):
         Column('dataset_id', Integer, ForeignKey('gstoredata.datasets.id')),
         schema='gstoredata'
     )
+
+    migrated_metadata = relationship('DatasetMetadata')
 
     def __repr__(self):
         return '<Original Metadata (%s)>' % (self.id)
@@ -61,9 +63,19 @@ class DatasetMetadata(Base):
             output = transform(xml_enc)
             output = etree.tostring(output, encoding='utf8')
 
+            if not output:
+                return xml.encode('utf8'), 'text/xml; charset=UTF-8'
             return output, content_type
         except:
             return xml.encode('utf8'), 'text/xml; charset=UTF-8'
 
 
 #TODO: implement the full metadata schema
+#this is not that schema. it's just an intermediate widget for dataone uuids
+class DatasetMetadata(Base):
+    __table__ = Table('metadata', Base.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('uuid', UUID, FetchedValue()),
+        Column('original_id', Integer, ForeignKey('gstoredata.original_metadata.id')),
+        schema = 'gstoredata'
+    )

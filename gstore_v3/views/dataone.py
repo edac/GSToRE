@@ -267,14 +267,14 @@ def search(request):
     offset = int(params.get('start')) if 'start' in params else 0
     limit = int(params.get('count')) if 'count' in params else 1000
 
-    fromDate = params.get('fromDate', '') 
-    toDate = request.params.get('toDate', '') 
+    fromDate = params.get('fromdate', '') 
+    toDate = request.params.get('todate', '') 
 
-    formatId = params.get('formatId', '')
+    formatId = params.get('formatid', '')
 
 
     #TODO: add replica status somewhere (but we're not replicating stuff yet)
-    replicaStatus = params.get('replicaStatus', '')
+    replicaStatus = params.get('replicastatus', '')
 
     #set up the clauses
     #AND we're going for dataone_uuids NOT obsolete_uuids
@@ -283,6 +283,18 @@ def search(request):
 
     #this returns a tuple that is... awkward to use
     #query = DBSession.query(DataoneObsolete.dataone_uuid, func.max(DataoneObsolete.date_changed).group_by(DataoneObsolete.dataone_uuid)
+
+    '''
+>>> from gstore_v3.models import *
+>>> from sqlalchemy.sql.expression import and_
+>>> from datetime import datetime
+>>> d = datetime(2012, 8, 14)
+>>> search_clauses = [dataone.DataoneSearch.the_date>d, dataone.DataoneSearch.format=='FGDC-STD-001-1998']
+    
+ query = DBSession.query(dataone.DataoneSearch, dataone.DataoneCore).join(dataone.DataoneCore, dataone.DataoneCore.dataone_uuid==dataone.DataoneSearch.the_uuid).filter(and_(*search_clauses)).all()
+
+
+    '''
 
     search_clauses = []
 
@@ -310,7 +322,7 @@ def search(request):
         search_clauses.append(DataoneSearch.format==formatId)
         
     #and add the limit/offset for fun
-    query = DBSession.query(DataoneSearch, DataoneCore).join(DataoneCore, DataoneSearch.the_uuid==DataoneCore.dataone_uuid).filter(and_(*search_clauses))
+    query = DBSession.query(DataoneSearch, DataoneCore).join(DataoneCore, DataoneCore.dataone_uuid==DataoneSearch.the_uuid).filter(and_(*search_clauses))
     total = query.count()
 
     objects = query.limit(limit).offset(offset).all()

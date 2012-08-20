@@ -16,7 +16,7 @@ from ..models.datasets import (
     Dataset,
     )
 
-from ..models.metadata import DatasetMetadata
+from ..models.metadata import OriginalMetadata
 
 from ..lib.database import *
 
@@ -64,7 +64,7 @@ def metadata(request):
     #get the xml metadata
     #TODO: the standard is a lie
     xslt_path = request.registry.settings['XSLT_PATH']
-    output, content_type = d.dataset_metadata[0].transform(standard, format, xslt_path) 
+    output, content_type = d.original_metadata[0].transform(standard, format, xslt_path) 
 
     return Response(output, content_type=content_type)
 
