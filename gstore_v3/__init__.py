@@ -86,6 +86,7 @@ def main(global_config, **settings):
     config.add_route('test_wcs', '/test/services/wcs')
     config.add_route('test_fmt', '/test/services/{fmt}')
     config.add_route('test_fidsearch', '/test/mongo')
+    config.add_route('test_insert', '/test/insert')
     
     #to the attributes
     config.add_route('attributes', '/apps/{app}/attributes/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))

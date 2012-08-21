@@ -284,7 +284,8 @@ class Dataset(Base):
         #check on the metadata
         if self.has_metadata_cache:
             standards = ['fgdc']
-            exts = ['html', 'txt', 'xml']
+            exts = ['html', 'xml'] 
+            #removing txt format as per karl (8/21/2012) - transform doesn't work properly and provides little benefit
             '''
             as {fgdc: {ext: url}}
             '''

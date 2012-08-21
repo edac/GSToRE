@@ -320,7 +320,63 @@ def tester(request):
 
 
 
+@view_config(route_name='test_insert', renderer='json')
+def insert(request):
+    '''
+    we are skipping the file upload - no one wanted to do that (or no one wanted it to post to ibrix)
+    so maybe add it again later if it comes up, but we're starting with the basic json post functionality
 
+    {
+        'description':
+        'basename':
+        'dates': {
+            'start': 
+            'end':
+        }
+        'uuid': 
+        'taxonomy': 
+        'spatial': {
+            'geomtype':
+            'epsg':
+            'bbox':
+            'geom': 
+            'features':
+            'records':
+        }
+        'metadata': {
+            'standard':
+            'file':
+        }
+        'apps': []
+        'formats': []
+        'services': []
+        'categories': [
+            {
+                'theme':
+                'subtheme':
+                'groupname':
+            }
+        ]
+        'sources': [
+            {
+                'set':
+                'extension':
+                'external':
+                'mimetype':
+                'identifier':
+                'identifier_type':
+                'files': []
+                
+            }
+        ]
+    }
+
+    '''
+
+    #get the data as json
+    post_data = request.json_body
+
+    return post_data
 
 
 

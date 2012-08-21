@@ -6,6 +6,8 @@ from sqlalchemy.sql import between
 
 from datetime import datetime
 
+import uuid
+
 
 '''
 image mimetypes (mostly for mapserver)
@@ -57,6 +59,11 @@ def getHash(zipfile, algo):
     zf.close()
     return m.hexdigest()
 
+'''
+uuid4 generator
+'''
+def generate_uuid4():
+    return str(uuid.uuid4())
 
 '''
 regex

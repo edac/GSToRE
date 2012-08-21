@@ -3,7 +3,6 @@ from pyramid.response import Response
 
 from pyramid.httpexceptions import HTTPNotFound, HTTPFound
 
-
 from sqlalchemy.exc import DBAPIError
 
 import os
@@ -46,8 +45,9 @@ def metadata(request):
 
     if standard not in ['fgdc']:
         return HTTPNotFound('Only running FGDC now')
-    if format not in ['html', 'xml', 'txt']:
-        return HTTPNotFound('Only FGDC as html, xml, or text.')
+    if format not in ['html', 'xml']:
+        #removing (, 'txt') from list - transform is busted and it provides little that's different from teh html representation (as per karl 8/21/2012)
+        return HTTPNotFound() 
     
     #go get the dataset
     d = get_dataset(dataset_id)    

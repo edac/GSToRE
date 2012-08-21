@@ -8,11 +8,14 @@ from sqlalchemy.exc import DBAPIError
 from ..models import DBSession
 #from the generic model loader (like meta from gstore v2)
 from ..models.datasets import (
-    Dataset,
+    Dataset, Category
     )
+from ..models.sources import Source, SourceFile
+from ..models.metadata import OriginalMetadata
 
 
 from ..lib.utils import *
+from ..lib.spatial import *
 from ..lib.database import *
 from ..lib.mongo import gMongoUri
 
@@ -308,50 +311,158 @@ def add_dataset(request):
     we are skipping the file upload - no one wanted to do that (or no one wanted it to post to ibrix)
     so maybe add it again later if it comes up, but we're starting with the basic json post functionality
 
-    description
-    taxonomy
-    geomtype
-    valid start
-    valid end
-    bbox
-    epsg
+    {
+        'description':
+        'basename':
+        'dates': {
+            'start': 
+            'end':
+        }
+        'uuid': 
+        'taxonomy': 
+        'spatial': {
+            'geomtype':
+            'epsg':
+            'bbox':
+            'geom': 
+            'features':
+            'records':
+        }
+        'metadata': {
+            'standard':
+            'file':
+        }
+        'apps': []
+        'formats': []
+        'services': []
+        'categories': [
+            {
+                'theme':
+                'subtheme':
+                'groupname':
+            }
+        ]
+        'sources': [
+            {
+                'set':
+                'extension':
+                'external':
+                'mimetype':
+                'identifier':
+                'identifier_type':
+                'files': []
+                
+            }
+        ]
+    }
 
-    {uuid} (optional and add it later)
-
-    apps
-    formats
-    services
-    
-    record count
-    feature count
-
-    metadata (stays the same until we have the migration widget running)
-    sources
-    categories
-    
-    
     '''
 
     #get the data as json
     post_data = request.json_body
 
+    SRID = int(request.registry.settings['SRID'])
+    excluded_formats = getFormats(request)
+    excluded_services = getServices(request)
+
     #do stuff
+    description = post_data['description']
+    basename = post_data['basename']
+    taxonomy = post_data['taxonomy']
+    apps = post_data['apps'] if 'apps' in post_data else []
+    validdates = post_data['dates']
+    spatials = post_data['spatial']
+    formats = post_data['formats']
+    services = post_data['services']
+    categories = post_data['categories']
+    sources = post_data['sources']
+    metadatas = post_data['metadata']
 
+    box = map(float, spatials['bbox'].split(','))
+    epsg = spatials['epsg']
+    geomtype = spatials['geomtype'] if 'geomtype' in spatials else ''
+    geom = spatials['geom'] if 'geom' in spatials else ''
+    features = spatials['features'] if 'features' in spatials else 0
+    records = spatials['records'] if 'records' in spatials else 0
 
-    #create the new dataset
+    #we may have instances where we have an external dataset (tri-state replices for example)
+    #and we want to keep the uuid for that dataset so we can provide a uuid or make one here
+    provided_uuid = post_data['uuid'] if 'uuid' in post_data else generate_uuid4()
 
+    #like make the new dataset
+    new_dataset = Dataset(description)
+    new_dataset.basename = basename
+    new_dataset.taxonomy = taxonomy
+    if taxonomy == 'vector':
+        new_dataset.geomtype = geomtype
+        new_dataset.feature_count = features
+        new_dataset.record_count = records
+    new_dataset.orig_epsg = epsg
+
+    if not geom:
+        #go make one
+        geom = bbox_to_wkb(box, SRID)
+
+    new_dataset.geom = geom
+    new_dataset.box = box
+    
+    new_dataset.apps_cache = [app] + apps
+
+    #TODO: get rid of formats_cache (once v2 tools issue is resolved in search datasets)
+    new_dataset.formats_cache = ','.join(formats)
+    new_dataset.excluded_formats = [f for f in excluded_formats if f not in formats]
+    new_dataset.excluded_services = [s for s in excluded_services if s not in services]
+
+    new_dataset.uuid = provided_uuid
 
     #add the category set (if not in categories) and assign to dataset
+    for category in categories:
+        theme = category['theme']
+        subtheme = category['subtheme']
+        groupname = category['groupname']
 
+        c = DBSession.query(Category).filter(and_(Category.theme==theme, Category.subtheme==subtheme, Category.groupname==groupname)).first()
+        if not c:
+            #we'll need to add a new category BEFORE running this (?)
+            continue
+
+        new_dataset.categories.append(c)
 
     #add the metadata
-    
+    if metadatas:
+        o = OriginalMetadata()
+        o.original_xml = metadatas
+        new_dataset.original_metadata.append(o)
+        
 
     #add the sources to the sources
-    
-    
+        #add the source_files to the source
+    for src in sources:
+        ext = src['extension']
+        srcset = src['set']
+        external = src['external']
+        mimetype = src['mimetype']
+        s = Source(srcset, ext)
+        s.file_mimetype = mimetype
+        s.is_external = external
 
-    return Response('hooray for post')
+        files = src['files']
+        for f in files:
+            sf = SourceFile(f)
+            s.src_files.append(sf)
+
+        new_dataset.sources.append(s)        
+
+    #create the new dataset
+    try:
+        DBSession.add(new_dataset)
+        DBSession.commit()
+        DBSession.flush()
+        DBSession.refresh(new_dataset)
+    except Exception as err:
+        return HTTPServerError(err)
+
+    return Response(str(new_dataset.uuid))
 
 @view_config(route_name='update_dataset', request_method='PUT')
 def update_dataset(request):

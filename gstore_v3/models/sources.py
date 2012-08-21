@@ -40,9 +40,9 @@ class Source(Base):
         Column('set', String(25)),
         Column('is_external', Boolean),
         Column('active', Boolean),
-        Column('file_filesize_mb', Numeric),
-        Column('file_hash', String(150)),
-        Column('file_hash_type', String(20)),
+#        Column('file_filesize_mb', Numeric),
+#        Column('file_hash', String(150)),
+#        Column('file_hash_type', String(20)),
         Column('file_mimetype', String(100)),
         Column('uuid', UUID, FetchedValue()),
         Column('dataset_id', Integer, ForeignKey('gstoredata.datasets.id')), #foreign key to datasets
@@ -56,7 +56,8 @@ class Source(Base):
     map_settings = relationship('MapfileSetting')
     
     def __init__(self, set, extension):
-        self.description = description
+        self.set = set
+        self.extension = extension
         
     def __repr__(self):
         return '<Source (%s, %s, %s)>' % (self.extension, self.set, self.uuid)
@@ -112,6 +113,7 @@ class SourceFile(Base):
 map-related models
 
 '''
+#TDO: think about adding a set for layers (if we need to do something for the hdf4/5 bands or something)
 class MapfileSetting(Base):
     __table__ = Table('mapfile_settings', Base.metadata,
         Column('id', Integer, primary_key=True),

@@ -63,8 +63,10 @@ class OriginalMetadata(Base):
             output = transform(xml_enc)
             output = etree.tostring(output, encoding='utf8')
 
+            #if the transform failed without error
             if not output:
                 return xml.encode('utf8'), 'text/xml; charset=UTF-8'
+                
             return output, content_type
         except:
             return xml.encode('utf8'), 'text/xml; charset=UTF-8'
