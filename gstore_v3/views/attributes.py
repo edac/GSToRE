@@ -1,6 +1,6 @@
 from pyramid.response import Response
 from pyramid.view import view_config
-from pyramid.httpexceptions import HTTPNotFound, HTTPFound
+from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError
 
 from sqlalchemy.exc import DBAPIError
 
@@ -79,7 +79,7 @@ def attribute(request):
     a = DBSession.query(Attribute).filter(Attribute.uuid==attribute_id).first()   
 
     if not a:
-        return HTTPNotFound('No attribute')
+        return HTTPNotFound()
 
     rsp = {'total': 1, 'dataset': {'id': a.dataset.id, 'uuid': a.dataset.uuid}}
     res = [{'uuid': a.uuid, 'name': a.name, 'original_name': a.orig_name, 'description': a.description, 'datatype': 'insert type'} ] #ogr_to_psql(a.ogr_type)
@@ -93,4 +93,86 @@ attribute maintenance
 '''
 @view_config(route_name='add_attributes', request_method='POST')
 def attribute_new(request):
-    return Response('added new attribute')
+    '''
+    add a new set of attributes
+    for a dataset
+    {   
+        dataset: 
+        fields:
+            [
+                {
+                    name:
+                    description:
+                    orig_name:
+                    ogr_type:
+
+                    nodata:
+                    ogr_precision:
+                    ogr_width:
+                    ogr_justify:
+                },
+            ]
+    }
+    '''
+
+    #TODO: add the link to a parameter
+    #TODO: add the link to a representation (i.e. odm, etc)
+
+    post_data = request.json_body
+    if not 'dataset' in post_data:
+        return HTTPNotFound()
+        
+    dataset_id = post_data['dataset']
+    the_dataset = get_dataset(dataset_id)
+    if not the_dataset:
+        return HTTPNotFound()
+    dataset_id = the_dataset.id
+
+    fields = post_data['fields'] if 'fields' in post_data else []
+    if not fields:
+        return HTTPNotFound()
+
+    new_fields = []
+    for d in fields:
+        name = d['name']
+        desc = d['description']
+        orig_name = d['orig_name'] if 'orig_name' in d else ''
+        ogr_type = psql_to_ogr(d['ogr_type'])
+
+        ogr_precision = d['ogr_precision'] if 'ogr_precision' in d else ''
+        ogr_width = d['ogr_width'] if 'ogr_width' in d else ''
+        ogr_justify = d['ogr_justify'] if 'ogr_justify' in d else ''
+        nodata = d['nodata'] if 'nodata' in d else ''
+
+        field = Attribute(name, ogr_type)
+        field.description = desc
+        field.orig_name = orig_name
+
+        if ogr_precision:
+            field.ogr_precision = ogr_precision
+        if ogr_width:
+            field.ogr_width = ogr_width
+        if ogr_justify:
+            field.ogr_justify = ogr_justify
+
+        if nodata:
+            field.nodata = nodata
+
+        field.dataset_id = dataset_id
+        
+        new_fields.append(field)
+    try:
+        DBSession.add_all(new_fields)
+        DBSession.commit()
+    except Exception as err:
+        return HTTPServerError(err)
+
+    return Response()
+
+
+
+
+
+
+
+    

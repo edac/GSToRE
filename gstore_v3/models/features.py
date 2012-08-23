@@ -30,3 +30,8 @@ class Feature(Base):
         Column('uuid', UUID, FetchedValue()),
         schema = 'gstoredata'
     )
+
+    def __init__(self, gid, geom, dataset_id):
+        self.geom = geom
+        self.gid = gid
+        self.dataset_id = dataset_id

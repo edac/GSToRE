@@ -26,7 +26,7 @@ features
 '''
 
 #TODO: update some indexes for better performance in both queries
-@view_config(route_name='feature', renderer='json')
+@view_config(route_name='feature')
 def feature(request):
     '''
     get a feature
@@ -55,7 +55,7 @@ def feature(request):
     vectors = gm.query({'f.id': feature.fid})
 
     if not vectors:
-        return HTTPServerError('no cursor')
+        return HTTPServerError()
 
     vector = vectors[0]
 
@@ -178,6 +178,8 @@ def features(request):
 
     #TODO: make this a post request with json chunk so that we can have better sorting (although getting the sort by values in attribute where attribute = x is unlikely from mongo)
 
+    #TODO: develop some heuristic for limiting the response (if polygon and lots of dataset and lots of records, limit by x; if point, limit by y)
+
     #TO START, GEOMETRY TYPE IS REQUIRED
     #id the datasets that match the filters
     app = request.matchdict['app']
@@ -240,7 +242,7 @@ def features(request):
         dataset_clauses.append(Dataset.geomtype==geomtype.upper())
     else:
         #let's not mix-and-match geometry types
-        return HTTPNotFound('no geomtype')
+        return HTTPNotFound()
 
     #add the dateadded
     if start_added or end_added:
@@ -403,11 +405,10 @@ def features(request):
         #which it should have done by now anyway
         return HTTPNotFound()
 
-    #total = vectors.count()
-    #limit = total if total < limit else limit
 
-    #running without limits FOR FUN
-    #vectors = gm.query(mongo_clauses, {}, sort_dict)
+    #TODO: once the param search is added, have split tracks for the response
+    #      just return obs, value, fid, dataset id, qualifier
+    #      so have the mongo query NOT return the geom (or make that an option? or make that json only response?)
 
     encode_as = 'utf-8'   
     epsg = int(request.registry.settings['SRID']) 
@@ -558,14 +559,173 @@ def features(request):
     response.app_iter = yield_results()
     return response
 
-@view_config(route_name='add_features', request_method='POST')
+@view_config(route_name='add_features', request_method='POST', renderer='json')
 def add_feature(request):
     '''
     add features to a dataset
+
+    where this is posting one geometry (wkb.hex) to shapes and returning the fid, uuid
+
+    wkb should be reprojected (unprojected) to wgs84 BEFORE posting
+
+    THIS IS NOT A COMPLETE VECTOR WITHIN GSTORE
+    meaning this is only the geometry and the attribute data most be posted separately using the features.add_attributes method (see below)
+
+
+    {
+        gid:
+        geom: 
+        epsg:
+    }
+    or we could have geom + epsg and reproject here?
     '''
     dataset_id = request.matchdict['id']
+    the_dataset = get_dataset(dataset_id)
+    if not the_dataset:
+        return HTTPNotFound()
 
-    return Response('added new features')
+    post_data = request.json_body
+
+    if not 'geom' in post_data or not 'gid' in post_data:
+        return HTTPNotFound()
+
+    
+    gid = int(post_data['gid'])
+    geom = post_data['geom']
+
+    #TODO: add something for the epsg reprojection, if we want that
+
+    feature = Feature(gid, geom, the_dataset.id)
+
+    try:
+        DBSession.add(feature)
+        DBSession.commit()
+        DBSession.flush()
+        DBSession.refresh(feature)
+    except Exception as err:
+        return HTTPServerError(err)
+
+    return {'fid': feature.fid, 'uuid': feature.uuid}
+
+@view_config(route_name='add_feature_attributes', request_method='POST', renderer='json')
+def add_attributes(request):
+    '''
+    add attributes to a feature in a dataset
+
+    posting attribute data to mongo
+    each item in the post must have an fid/uuid for an existing feature!
+    but we fetch the wkb from shapes rather than from the post (which may not be great performance-wise, we should keep an eye on that)
+
+    fyi: this can be a bulk insert so the fid/uuid info is in the post data and not the route
+
+    {
+        fids: []  #if this is separate, then we can assume (ha) that the fid:record is not 1:1 so we can use this to fetch the geoms once instead of pinging shapes every time
+        records: [
+            {
+                fid:
+                uuid:  # we do not want to have to retrieve this again
+                observed: 
+                atts: [
+                    {
+                        name:
+                        u:
+                        val:
+                        qual: #optional 
+                    }
+                ]
+            },
+        ]
+    }
+    '''
+    dataset_id = request.matchdict['id']
+    the_dataset = get_dataset(dataset_id)
+    if not the_dataset:
+        return HTTPNotFound()
+    
+    post_data = request.json_body
+
+    fids = post_data['fids'] if 'fids' in post_data else []
+    records = post_data['records'] if 'records' in post_data else []
+
+    if not records:
+        return HTTPServerError()
+
+    #just get the dataset info once
+    dataset_id = the_dataset.id
+    dataset_uuid = the_dataset.uuid
+
+    geoms = []
+    if fids:
+        #let's get the fids (fid, geom) from shapes and it's a tuple==(fid, geom)
+        geoms = DBSession.query(Feature.fid, Feature.geom).filter(and_(Feature.dataset_id==dataset_id, Feature.fid.in_(fids)))
+
+    #get the attributes for the dataset so we can do at least some check against the inputs
+    fields = [f.name for f in the_dataset.attributes]
+
+    bad_recs = []
+    inserts = []
+    for rec in records:
+        fid = rec['fid']
+        uid = rec['uuid']
+        obs = rec['observed'] if 'observed' in rec else ''
+        atts = rec['atts']
+
+        invalid_fields = [a for a in atts if not a['name'] in fields]
+        if invalid_fields:  
+            r = rec
+            r.update({"err": "bad field"})
+            bad_recs.append(r)
+            continue
+
+        #fix the date and it needs to be utc already
+        #yyyyMMddTHH:MM:ss
+        fmt = '%Y%m%dT%H:%M:%s'
+        if obs:
+            try:
+                obsd = datetime.strptime(obs, fmt)
+            except:
+                r = rec
+                r.update({"err": "bad observed"})
+                bad_recs.append(r)
+                continue
+        else:
+            obsd = None
+
+        #and get the geom
+        if geoms:
+            geom = [g[1] for g in geoms if g[0] == fid]
+            geom = geom[0] if geom else ''
+        else:
+            geom = DBSession.query(Feature.geom).filter(Feature.fid==fid).first()
+            geom = geom[0] if geom else '' #for the tuple action
+        if not geom:
+            r = rec
+            r.update({"err": "bad geom"})
+            bad_recs.append(r)
+            continue
+
+        #build the mongo object
+        #we are including the year, month, day, hour, minute as separate items in case we want to 
+        #do aggregation later (easier now than trying to update a gajillion docs)
+        obj = {'f': {'id': fid, 'u': uid}, 'd': {'id': dataset_id, 'u': dataset_uuid}, 'atts': atts, 'geom': {'g': geom}}
+        if obsd:
+            obj.update({'obs': obsd, 'year': obsd.year, 'mon': obsd.month, 'day': obsd.day, 'hour': obsd.hour, 'mnt': obsd.minute})
+        inserts.append(obj)
+
+    #insert everything to mongo
+    connstr = request.registry.settings['mongo_uri']
+    collection = request.registry.settings['mongo_collection']
+    mongo_uri = gMongoUri(connstr, collection)
+    gm = gMongo(mongo_uri)
+    fail = gm.insert(inserts)
+    gm.close()
+
+    if fail:
+        return HTTPServerError(fail)
+        
+    if bad_recs:
+        return {'errors': bad_recs}
+    return {'features': len(inserts)}
 
 @view_config(route_name='update_feature', request_method='PUT')
 def update_feature(request):
@@ -573,3 +733,11 @@ def update_feature(request):
     modify an existing feature - add qualty flag or something
     '''
     return Response('')
+
+
+
+
+
+
+
+    

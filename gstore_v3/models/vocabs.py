@@ -28,10 +28,16 @@ class Parameter(Base):
         Column('name', String(20)),
         Column('description', String(250)),
         Column('nodata', String(20)),
-        Column('source_type', String(25)),
+        #Column('source_type', String(25)),
         Column('time_frequency', String(50)),
         Column('unit_id', Integer, ForeignKey('gstoredata.cv_units.id')),
         Column('timeunit_id', Integer, ForeignKey('gstoredata.cv_timeunits.id')),
+        Column('original_name', String(150)),
+        Column('original_description', String(1000)),
+        Column('zvalue', Numeric),
+        Column('zvalue_units_id', Integer, ForeignKey('gstoredata.cv_units.id')),
+        Column('datatype_id', Integer, ForeignKey('gstoredata.cv_datatypes.id')),
+        Column('parametersource_id', Integer, ForeignKey('gstoredata.cv_parametersources.id')),
         Column('uuid', UUID, FetchedValue()),
         schema='gstoredata'
     )
@@ -51,7 +57,6 @@ class ParameterLUT(Base):
         schema='gstoredata'
     )
     
-    
     def __repr__(self):
         return '<ParameterLUT (%s, %s, %s)>' % (self.id, self.term, self.uuid)
 
@@ -70,7 +75,8 @@ class Units(Base):
         Column('uuid', UUID, FetchedValue()),
         schema='gstoredata'
     ) 
-    params = relationship('Parameter', backref='units')
+    params = relationship('Parameter', backref='units', primaryjoin='Parameter.unit_id==Units.id')
+    zunits = relationship('Parameter', backref='zunits', primaryjoin='Parameter.zvalue_units_id==Units.id')
 
 
 class TimeUnits(Base):
@@ -82,7 +88,7 @@ class TimeUnits(Base):
         Column('uuid', UUID, FetchedValue()),
         schema='gstoredata'
     )   
-    params = relationship('Parameter', backref='timeunits')
+    params = relationship('Parameter', backref='timeunits', primaryjoin='Parameter.timeunit_id==TimeUnits.id')
 
 
 
@@ -104,71 +110,97 @@ geolookups = Table('geolookups', Base.metadata,
 odm cvs
 '''
 
+class cvCensorCode(Base):
+    __table__ = Table('cv_censorcodes', Base.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('term', String(50)),
+        Column('description', String(200)),
+        Column('uuid', UUID, FetchedValue()),
+        schema='gstoredata'
+    )
 
+class cvDataType(Base):
+    __table__ = Table('cv_datatypes', Base.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('term', String(50)),
+        Column('description', String(200)),
+        Column('uuid', UUID, FetchedValue()),
+        schema='gstoredata'
+    )
+    param_datatypes = relationship('Parameter', backref='datatypes')
 
-cv_censorcodes = Table('cv_censorcodes', Base.metadata,
-    Column('id', Integer, primary_key=True),
-    Column('term', String(50)),
-    Column('description', String(200)),
-    Column('uuid', UUID, FetchedValue()),
-    schema='gstoredata'
-)
+class cvGeneralCategory(Base):
+    __table__ = Table('cv_generalcategories', Base.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('term', String(50)),
+        Column('description', String(200)),
+        Column('uuid', UUID, FetchedValue()),
+        schema='gstoredata'
+    )
 
-cv_datatypes = Table('cv_datatypes', Base.metadata,
-    Column('id', Integer, primary_key=True),
-    Column('term', String(50)),
-    Column('description', String(200)),
-    Column('uuid', UUID, FetchedValue()),
-    schema='gstoredata'
-)
+class cvSampleMedium(Base):
+    __table__ = Table('cv_samplemediums', Base.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('term', String(50)),
+        Column('description', String(200)),
+        Column('uuid', UUID, FetchedValue()),
+        schema='gstoredata'
+    )
 
-cv_generalcategories = Table('cv_generalcategories', Base.metadata,
-    Column('id', Integer, primary_key=True),
-    Column('term', String(50)),
-    Column('description', String(200)),
-    Column('uuid', UUID, FetchedValue()),
-    schema='gstoredata'
-)
+class cvSampleType(Base):
+    __table__ = Table('cv_sampletypes', Base.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('term', String(50)),
+        Column('description', String(200)),
+        Column('uuid', UUID, FetchedValue()),
+        schema='gstoredata'
+    )
 
-cv_samplemediums = Table('cv_samplemediums', Base.metadata,
-    Column('id', Integer, primary_key=True),
-    Column('term', String(50)),
-    Column('description', String(200)),
-    Column('uuid', UUID, FetchedValue()),
-    schema='gstoredata'
-)
+class cvVariableName(Base):
+    __table__ = Table('cv_variablenames', Base.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('term', String(50)),
+        Column('description', String(200)),
+        Column('uuid', UUID, FetchedValue()),
+        schema='gstoredata'
+    )
 
-cv_sampletypes = Table('cv_sampletypes', Base.metadata,
-    Column('id', Integer, primary_key=True),
-    Column('term', String(50)),
-    Column('description', String(200)),
-    Column('uuid', UUID, FetchedValue()),
-    schema='gstoredata'
-)
+class cvValueType(Base):
+    __table__ = Table('cv_valuetypes', Base.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('term', String(50)),
+        Column('description', String(200)),
+        Column('uuid', UUID, FetchedValue()),
+        schema='gstoredata'
+    )
 
-cv_variablenames = Table('cv_variablenames', Base.metadata,
-    Column('id', Integer, primary_key=True),
-    Column('term', String(50)),
-    Column('description', String(200)),
-    Column('uuid', UUID, FetchedValue()),
-    schema='gstoredata'
-)
+class cvSpeciation(Base):
+    __table__ = Table('cv_speciation', Base.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('term', String(50)),
+        Column('description', String(200)),
+        Column('uuid', UUID, FetchedValue()),
+        schema='gstoredata'
+    )
 
-cv_valuetypes = Table('cv_valuetypes', Base.metadata,
-    Column('id', Integer, primary_key=True),
-    Column('term', String(50)),
-    Column('description', String(200)),
-    Column('uuid', UUID, FetchedValue()),
-    schema='gstoredata'
-)
+class cvQualityControlLevel(Base):
+    __table__ = Table('cv_qualitycontrollevels', Base.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('code', String(50)),
+        Column('definition', String(250)),
+        Column('explanation', String(500)),
+        Column('uuid', UUID, FetchedValue()),
+        schema='gstoredata'
+    )
 
-cv_speciation = Table('cv_speciation', Base.metadata,
-    Column('id', Integer, primary_key=True),
-    Column('term', String(50)),
-    Column('description', String(200)),
-    Column('uuid', UUID, FetchedValue()),
-    schema='gstoredata'
-)
-
+class cvParameterSource(Base):
+    __table__ = Table('cv_parametersources', Base.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('name', String(100)),
+        Column('description', String(500)),
+        Column('uuid', UUID, FetchedValue()),
+        schema='gstoredata'
+    )
+    param_sources = relationship('Parameter', backref='sources')
 
 

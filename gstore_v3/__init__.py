@@ -96,6 +96,7 @@ def main(global_config, **settings):
 #to the features
     #config.add_route('features', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/features.{ext}')
     config.add_route('add_features', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/features', custom_predicates=(applist,)) #POST
+    config.add_route('add_feature_attributes', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/featureattributes', custom_predicates=(applist,)) #POST
     config.add_route('update_feature', '/apps/{app}/features/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,)) #PUT
     config.add_route('feature', '/apps/{app}/features/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
     config.add_route('features', '/apps/{app}/features.{ext}', custom_predicates=(applist,))
@@ -176,9 +177,10 @@ def main(global_config, **settings):
     config.add_route('update_collection', '/apps/{app}/collections/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
 
 #to controlled vocabs
-    config.add_route('vocabs', '/apps/{app}/vocab/{type}.{ext}', custom_predicates=(applist,))
-    config.add_route('vocab', '/apps/{app}/vocab/{type}/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
-    config.add_route('add_vocab', '/apps/{app}/vocab/{type}', custom_predicates=(applist,))
+    config.add_route('available_vocabs', '/apps/{app}/vocabs', custom_predicates=(applist,))
+    config.add_route('vocabs', '/apps/{app}/vocabs/{type}.{ext}', custom_predicates=(applist,))
+    config.add_route('vocab', '/apps/{app}/vocabs/{type}/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
+    config.add_route('add_vocab', '/apps/{app}/vocabs/{type}', custom_predicates=(applist,))
     
     config.scan('gstore_v3')
     #config.scan()

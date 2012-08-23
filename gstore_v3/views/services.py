@@ -406,7 +406,8 @@ http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a7
     except Exception as err:
         #TODO: REMOVE THE EXCEPTION IN PRODUCTION!
         #let's try this for what's probably a bad set of params by service+request type
-        return HTTPBadRequest(err)
+        #return HTTPBadRequest(err)
+        return HTTPBadRequest()
 
     
 '''
@@ -438,13 +439,13 @@ def datasets(request):
     d = get_dataset(dataset_id)   
 
     if not d:
-        return HTTPNotFound('No results')
+        return HTTPNotFound()
 
     if d.is_available == False:
         return HTTPNotFound('Temporarily unavailable')
 
     if service_type != 'ogc':
-        return HTTPNotFound('just plain ogc requests today')
+        return HTTPNotFound()
 
 
     #get some config stuff
@@ -476,7 +477,7 @@ def datasets(request):
 
     #need both for a raster, but just the file path for the vector (we made it!)
     if ((not mapsrc or not srcloc) and d.taxonomy == 'geoimage') or (d.taxonomy == 'vector' and not srcloc):
-        return HTTPNotFound('Invalid map source')
+        return HTTPNotFound()
 
 
     #NOTE: skipping tilecache and just running with wms services here
@@ -883,7 +884,7 @@ def mapper(request):
     d = get_dataset(dataset_id)   
 
     if not d:
-        return HTTPNotFound('No results')
+        return HTTPNotFound()
 
     if d.is_available == False:
         return HTTPNotFound('Temporarily unavailable')

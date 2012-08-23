@@ -2,7 +2,6 @@ from pyramid.view import view_config
 from pyramid.response import Response
 from pyramid.httpexceptions import HTTPNotFound, HTTPFound
 
-from pyramid.threadlocal import get_current_registry
 
 from sqlalchemy.exc import DBAPIError
 
@@ -37,12 +36,12 @@ def collections(request):
     c = DBSession.query(Collection).filter(Collection.uuid==collection_id).first()
 
     if not c:
-        return HTTPNotFound('No collection')
+        return HTTPNotFound()
 
     #do stuff and junk
     rsp = {'uuid': c.uuid, 'name': c.name, 'description': c.description, 'metadata': 'some url here'}
 
-    #TODO: add this back whent he image bits are added to postgres and the models
+    #TODO: add this back when the image bits are added to postgres and the models
 #    if c.imagepath is not None:
 #        rsp.update('img': {'full': 'some img path here', 'thmb': 'some other img path here'})
 

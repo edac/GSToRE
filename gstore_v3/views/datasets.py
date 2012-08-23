@@ -33,7 +33,7 @@ def show_html(request):
     d = get_dataset(dataset_id)
 
     if not d:
-        return HTTPNotFound('No results')
+        return HTTPNotFound()
 
     #http://129.24.63.66/gstore_v3/apps/rgis/datasets/8fc27d61-285d-45f6-8ef8-83785d62f529/soils83.html
     #http://{load_balancer}/apps/.....
@@ -67,7 +67,7 @@ def dataset(request):
     d = get_dataset(dataset_id)
 
     if not d:
-        return HTTPNotFound('No results')
+        return HTTPNotFound()
 
     #make sure it's available
     #TODO: replace this with the right status code
@@ -93,11 +93,11 @@ def dataset(request):
         
         if not src:
             #not valid source information for the dataset
-            return HTTPNotFound('No results')
+            return HTTPNotFound()
 
         loc = src.get_location()
         if not loc:
-            return HTTPNotFound('')
+            return HTTPNotFound()
             
         return HTTPFound(location=loc)
 
@@ -108,7 +108,7 @@ def dataset(request):
         src = d.get_source(datatype, format)
         if not src:
             #not valid source information for the dataset
-            return HTTPNotFound('No results')
+            return HTTPNotFound()
 
         if src.is_external:
             loc = src.get_location()
@@ -173,7 +173,7 @@ def dataset(request):
                 #to test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ccfc9523-4b9e-4c58-8cf5-7d727fc8a807/{basename}.original.tif
                 tmppath = request.registry.settings['TEMP_PATH']
                 if not tmppath:
-                    return HTTPNotFound('where is the temp!')
+                    return HTTPNotFound()
                 outname = '%s.%s.%s.zip' % (d.basename, datatype, format)
                 zippath = os.path.join(tmppath, str(dataset_id), outname)
                 #make the zipfile
@@ -219,7 +219,7 @@ def dataset(request):
         
         success = d.build_vector(format, cachepath, mongo_uri, srid)
         if success[0] != 0:
-            return HTTPServerError('failed to build vector')
+            return HTTPServerError()
 
         #return the file (already been zipped) and only has metadata if it's a shapefile
         fr = FileResponse(cachefile, content_type=mimetype)
@@ -241,7 +241,7 @@ def services(request):
     d = get_dataset(dataset_id)    
 
     if not d:
-        return HTTPNotFound('No results')
+        return HTTPNotFound()
 
 #can still show the basic info
 #    if d.is_available == False:
@@ -328,10 +328,7 @@ def add_dataset(request):
             'features':
             'records':
         }
-        'metadata': {
-            'standard':
-            'file':
-        }
+        'metadata': ''
         'apps': []
         'formats': []
         'services': []
@@ -429,13 +426,13 @@ def add_dataset(request):
         new_dataset.categories.append(c)
 
     #add the metadata
+    #TODO: fix this when we may have multiple metadata streams coming in. this just handles our current v2 situation
     if metadatas:
         o = OriginalMetadata()
         o.original_xml = metadatas
         new_dataset.original_metadata.append(o)
-        
 
-    #add the sources to the sources
+    #add the sources to sources
         #add the source_files to the source
     for src in sources:
         ext = src['extension']
@@ -453,7 +450,7 @@ def add_dataset(request):
 
         new_dataset.sources.append(s)        
 
-    #create the new dataset
+    #create the new dataset with all its pieces
     try:
         DBSession.add(new_dataset)
         DBSession.commit()
@@ -462,6 +459,7 @@ def add_dataset(request):
     except Exception as err:
         return HTTPServerError(err)
 
+    #and just for kicks, return the uuid
     return Response(str(new_dataset.uuid))
 
 @view_config(route_name='update_dataset', request_method='PUT')

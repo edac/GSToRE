@@ -149,7 +149,7 @@ def search_datasets(request):
     taxonomy = params.get('taxonomy', '')
     
     #check for geomtype
-    geomtype = params.get('geomtype', '')
+    geomtype = params.get('geomtype', '').replace('+', ' ')
 
     #TODO: add some explicit service field for this
     #check for avail services
@@ -160,7 +160,7 @@ def search_datasets(request):
     #if sort not in ['lastupdate', 'text', 'theme', 'subtheme', 'groupname']:
     #this includes geo-relevance even though it is not used (it is part of the request from rgis though)
     if sort not in ['lastupdate', 'text', 'geo_relevance']:
-        return HTTPNotFound('Bad sort parameter')
+        return HTTPNotFound()
     sort = 'dateadded' if sort == 'lastupdate' else sort
     sort = 'description' if sort == 'text' else sort
 
@@ -207,7 +207,7 @@ def search_datasets(request):
         #check that it's a supported format
         default_formats = request.registry.settings['DEFAULT_FORMATS'].split(',')
         if format not in default_formats:
-            return HTTPNotFound('Invalid request') 
+            return HTTPNotFound() 
         #add the filter
         dataset_clauses.append("not '%s' = ANY(excluded_formats)" % format)
 
@@ -442,7 +442,7 @@ def search_features(request):
     #TODO: sort params for features - by param or dataset or what?
     sort = params.get('sort') if 'sort' in params else 'observed'
     if sort not in ['observed']:
-        return HTTPNotFound('Bad sort parameter')
+        return HTTPNotFound()
 
     #geometry type so just points, polygons or lines or something
     geomtype = params.get('geomtype', '')
@@ -473,7 +473,7 @@ def search_features(request):
 
     #need to have all three right now?
     if param and not frequency and not units:
-        return HTTPNotFound('Bad parameter request')
+        return HTTPNotFound()
     
     #go for the dataset query first UNLESS there's a list of datasets
     #then ignore geomtype, theme/subtheme/groupname
@@ -602,7 +602,7 @@ def search(request):
     '''
     geolookup = request.matchdict['resource']
     if geolookup not in whats:
-        return HTTPNotFound('There is no such resource')
+        return HTTPNotFound()
 
     #pagination
     limit = int(request.params.get('limit')) if 'limit' in request.params else 25

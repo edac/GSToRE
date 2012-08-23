@@ -71,9 +71,9 @@ class gMongo:
         '''
         try:
             self.collection.insert(docs)
-        except:
-            return 1
-        return 0
+        except Exception as err:
+            return err
+        return ''
         
 
     #TODO: add some insert doc validation?

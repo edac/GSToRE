@@ -44,7 +44,7 @@ def metadata(request):
     format = request.matchdict['ext']
 
     if standard not in ['fgdc']:
-        return HTTPNotFound('Only running FGDC now')
+        return HTTPNotFound()
     if format not in ['html', 'xml']:
         #removing (, 'txt') from list - transform is busted and it provides little that's different from teh html representation (as per karl 8/21/2012)
         return HTTPNotFound() 
@@ -53,12 +53,12 @@ def metadata(request):
     d = get_dataset(dataset_id)    
 
     if not d:
-        return HTTPNotFound('No results')
+        return HTTPNotFound()
 
     #TODO: replace this when the schema is complete & populated
     #and make sure there's metadata
     if d.has_metadata_cache == False:
-        return HTTPNotFound('No metadata')
+        return HTTPNotFound()
 
     #this should only be valid xml (<?xml or <metadata)
     #get the xml metadata
