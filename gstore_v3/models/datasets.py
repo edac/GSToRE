@@ -26,8 +26,6 @@ from ..models.features import Feature
 import os, tempfile, shutil
 
 
-#__all__ = ['Dataset', 'categories_datasets', 'Category']
-
 '''
 gstoredata.datasets
 '''
@@ -58,7 +56,7 @@ class Dataset(Base):
         Column('excluded_formats', ARRAY(String)),
         Column('excluded_services', ARRAY(String)),
         Column('project_id', Integer, ForeignKey('gstoredata.projects.id')),
-        Column('uuid', UUID),
+        Column('uuid', UUID), # we aren't setting this in postgres anymore
         schema='gstoredata' #THIS IS KEY
     ) 
 
@@ -301,6 +299,8 @@ class Dataset(Base):
         #TODO: add related datasets
 
         #TODO: add link to collections it's in?
+
+        #TODO: add project
 
         return results
 
@@ -619,3 +619,4 @@ class Project(Base):
         Column('funder', String(200)),
         schema='gstoredata'
     )
+

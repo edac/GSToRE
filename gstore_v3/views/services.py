@@ -43,29 +43,6 @@ ogc
 ecw test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ef4c8cdc-bec4-43aa-8f2d-3046057e3335/services/ogc/wms?REQUEST=GetMap&SERVICE=WMS&VERSION=1.1.1&LAYERS=t20nr08e34&BBOX=-109.050173,31.332172,-103.001964,37.000293
 
 '''
-
-'''
-wcs multipart response parsing
-THIS IS NOT NECESSARY FOR WCS RESPONSES
-just returning the multipart content is the expected response from the server
-i am leaving it here for now for testing and just in case
-'''
-#based on eoxserver mapserver.py code and only works with geotiffs (obv.)
-def parse_tiff_response(content, content_type):
-    parser = Parser()
-    parts = parser.parsestr("Content-type:%s\n\n%s" % (content_type, content.rstrip("--wcs--\n\n"))).get_payload()
-    for p in parts:
-        if isGeotiff(p.get_content_type()):
-            #get the payload (the binary), the headers specific to the binary
-            return p.get_payload(), p.items()
-    return None, None
-#to check the multipart chunk mimetypes
-def isGeotiff(content_type):
-    return content_type.split(";")[0].lower() in 'image/tiff'
-def isAsciigrid(content_type):
-    return content_type.split(";")[0].lower() in 'image/x-aaigrid'
-#end wcs response parts  
-
 #so, neat trick, the order of the srs matters for wcs.describecoverage
 #this rebuilds the list so that the check_srs (the dataset srs, for example) is listed once and is listed first
 def build_supported_srs(check_srs, supported_srs):
@@ -231,14 +208,14 @@ def getLayer(d, src, dataloc, bbox):
 
 #set the default contact info for edac
 def set_contact_metadata(m):
-    m.web.metadata.set('ows_contactperson', 'Clearinghouse manager')
-    m.web.metadata.set('ows_contactposition', 'manager')
+    m.web.metadata.set('ows_contactperson', 'GStore Support')
+    m.web.metadata.set('ows_contactposition', 'technical support')
     m.web.metadata.set('ows_contactinstructions', 'phone or email')
     m.web.metadata.set('ows_contactorganization', 'Earth Data Analysis Center')
     m.web.metadata.set('ows_address', 'Earth Data Analysis Center, MSC01 1110, 1 University of New Mexico')
-    m.web.metadata.set('ows_contactvoicetelephone', '(505) 277-3622 ext. 230')
+    m.web.metadata.set('ows_contactvoicetelephone', '(505) 277-3622')
     m.web.metadata.set('ows_contactfacsimiletelephone', '(505) 277-3614')
-    m.web.metadata.set('ows_contactelectronicmailaddress', 'ADDRESS@edac.unm.edu')
+    m.web.metadata.set('ows_contactelectronicmailaddress', 'devteam@edac.unm.edu')
     m.web.metadata.set('ows_addresstype', 'Mailing address')
     m.web.metadata.set('ows_hoursofservice', '9-5 MST, M-F')
     m.web.metadata.set('ows_role', 'data provider')
@@ -307,15 +284,13 @@ def generateService(mapfile, params, mapname=''):
     req = mapscript.OWSRequest()
 
     '''
-http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a78001a/services/ogc/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=mod10a1_a2002210.fractional_snow_cover&FORMAT=PNG&SRS=EPSG:4326&BBOX=-107.93,34.96,-104.99,38.53&WIDTH=256&HEIGHT=256
+    http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a78001a/services/ogc/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=mod10a1_a2002210.fractional_snow_cover&FORMAT=PNG&SRS=EPSG:4326&BBOX=-107.93,34.96,-104.99,38.53&WIDTH=256&HEIGHT=256
 
     '''
 
     #set up the params
-    #TODO: possibly care about the params sent in and i don't know why we care about case
     keys = params.keys()
     for k in keys:
-        #if k.upper() not in ['SERVICE', 'VERSION', 'REQUEST']:
         req.setParameter(k.upper(), params[k])
 
     #TODO add the featureinfo, getcoverage, getfeature bits
@@ -325,35 +300,23 @@ http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a7
     #now check the service type: capabilities, map, mapfile (for internal use)
     try:
         if request_type in ['getcapabilities', 'describecoverage', 'describelayer', 'getstyles', 'describefeature', 'getfeature']:
+            #all of the xml/text responses
             mapscript.msIO_installStdoutToBuffer()
             mapfile.OWSDispatch(req)
             content_type = mapscript.msIO_stripStdoutBufferContentType()
             content = mapscript.msIO_getStdoutBufferBytes()
 
             if 'xml' in content_type:
-                content_type = 'application/xml'
-
-            #TODO: double check all of this
-            
+                content_type = 'application/xml'            
             return Response(content, content_type=content_type)
-
-        elif request_type in ['getmap']:        
-            mapfile.loadOWSParameters(req)
-            img = Image.open(StringIO(mapfile.draw().getBytes()))
-            buffer = StringIO()
+        elif request_type in ['getmap', 'getlegendgraphic']:     
+            #any image response  
+            if request_type == 'getmap':
+                mapfile.loadOWSParameters(req)
+                img = Image.open(StringIO(mapfile.draw().getBytes()))
+            else:
+                img = Image.open(StringIO(mapfile.drawLegend().getBytes())) 
             
-            image_type = get_image_mimetype(fmt)
-            if not image_type:
-                image_type = ('PNG', 'image/png')
-            img.save(buffer, image_type[0])
-            
-            buffer.seek(0)
-            content_type = image_type[1]
-            return Response(buffer.read(), content_type=content_type)
-        elif request_type == 'getlegendgraphic':
-            #do not let the similarity to getmap fool you.
-            #although really they could be combined
-            img = Image.open(StringIO(mapfile.drawLegend().getBytes()))
             buffer = StringIO()
             
             image_type = get_image_mimetype(fmt)
@@ -371,43 +334,13 @@ http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a7
             mapfile.save(mapname)
             #TODO: make this some meaningful response (even though it isn't for public consumption)
             return Response('map generated')
-        elif request_type == 'getcoverage':
-            #need to return the binary (geotiff or ascii results)
-            #THIS IS A MULTIPART RESPONSE
-
-            #THAT I AM BLATANTLY STEALING FROM EOXSERVER (sorry).
-            mapscript.msIO_installStdoutToBuffer()
-            mapfile.OWSDispatch(req)
-            content_type = mapscript.msIO_stripStdoutBufferContentType()
-            content = mapscript.msIO_getStdoutBufferBytes()
-
-            #the expected response from a wcs server is a multipart/mixed response so this isn't necessary 
-            #but i'm leaving it for testing or just in case
-#            #so rip apart the response
-#            #repack with the right boundaries
-#            if 'multipart/mixed' in content_type and fmt.lower() in ['geotiff', 'gtiff', 'tiff', 'tif', 'image/tiff']:
-#                coverage = str(params['coverage']) if 'coverage' in params else 'output'
-#                tiff, headers = parse_tiff_response(content, content_type)
-#                output_headers = {}
-#                headers = [] if not headers else headers
-#                for h in headers:
-#                    if h[0].lower() not in []:
-#                        output_headers[h[0]] = str(h[1])
-#                output_headers['Content-disposition'] = 'attachment; filename=%s.tif' % (coverage)
-#                return Response(tiff, headers=output_headers)
-
-            #TODO: check on why the ascii grid request also returns the geotiff binary (with the ascii grid)
-            #TODO: check on why the geotiff_16 format request is squirrelly
-            #just send everything we've got
-            #with this content-type: 'multipart/mixed; boundary=wcs'
-            return Response(content, content_type=content_type)
         else:
             return HTTPNotFound('Invalid OGC request')
     except Exception as err:
-        #TODO: REMOVE THE EXCEPTION IN PRODUCTION!
+        #TODO: catch just the mapserver errors?
         #let's try this for what's probably a bad set of params by service+request type
-        #return HTTPBadRequest(err)
-        return HTTPBadRequest()
+        return HTTPBadRequest(err)
+        #return HTTPBadRequest()
 
     
 '''
@@ -962,7 +895,7 @@ def mapper(request):
 
     metadatas = []
     metadatas.append({'title': 'HTML', 'text': '%s/metadata/fgdc.html' % (base_url)})
-    metadatas.append({'title': 'TXT', 'text': '%s/metadata/fgdc.txt' % (base_url)})
+    #metadatas.append({'title': 'TXT', 'text': '%s/metadata/fgdc.txt' % (base_url)})
     metadatas.append({'title': 'XML', 'text': '%s/metadata/fgdc.xml' % (base_url)})
     c.update({'metadata': metadatas})
 

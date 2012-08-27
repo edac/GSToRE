@@ -7,9 +7,7 @@ from sqlalchemy.exc import DBAPIError
 #from the models init script
 from ..models import DBSession
 #from the generic model loader (like meta from gstore v2)
-from ..models.datasets import (
-    Dataset, Category
-    )
+from ..models.datasets import *
 from ..models.sources import Source, SourceFile
 from ..models.metadata import OriginalMetadata
 
@@ -137,7 +135,10 @@ def dataset(request):
                 return HTTPNotFound()
             #get the name of the file from the url
             outname = '%s.%s.%s.zip' % (d.basename, datatype, format)
-            zippath = os.path.join(tmppath, str(dataset_id), outname)
+            zippath = os.path.join(tmppath, str(dataset_id))
+
+            if not os.path.isdir(zippath):
+                os.mkdir(zippath)
 
             #make the zipfile (which returns the path that we already know. whatever.)
             output = src.pack_source(zippath, outname, xslt_path)
@@ -367,7 +368,7 @@ def add_dataset(request):
     basename = post_data['basename']
     taxonomy = post_data['taxonomy']
     apps = post_data['apps'] if 'apps' in post_data else []
-    validdates = post_data['dates']
+    validdates = post_data['dates'] if 'dates' in post_data else {}
     spatials = post_data['spatial']
     formats = post_data['formats']
     services = post_data['services']
@@ -381,6 +382,8 @@ def add_dataset(request):
     geom = spatials['geom'] if 'geom' in spatials else ''
     features = spatials['features'] if 'features' in spatials else 0
     records = spatials['records'] if 'records' in spatials else 0
+
+    project = post_data['project'] if 'project' in post_data else ''
 
     #we may have instances where we have an external dataset (tri-state replices for example)
     #and we want to keep the uuid for that dataset so we can provide a uuid or make one here
@@ -425,6 +428,14 @@ def add_dataset(request):
 
         new_dataset.categories.append(c)
 
+    if validdates:
+        #TODO: add some date checking
+        validstart = validdates['start'] if 'start' in validdates else None
+        validend = validdates['end'] if 'end' in validdates else None
+        new_dataset.begin_datetime = validstart
+        new_dataset.end_datetime = validend
+
+
     #add the metadata
     #TODO: fix this when we may have multiple metadata streams coming in. this just handles our current v2 situation
     if metadatas:
@@ -438,10 +449,12 @@ def add_dataset(request):
         ext = src['extension']
         srcset = src['set']
         external = src['external']
+        external = True if external.upper() == 'TRUE' else False
         mimetype = src['mimetype']
         s = Source(srcset, ext)
         s.file_mimetype = mimetype
         s.is_external = external
+        s.active = True
 
         files = src['files']
         for f in files:
@@ -449,6 +462,12 @@ def add_dataset(request):
             s.src_files.append(sf)
 
         new_dataset.sources.append(s)        
+
+    if project:
+        #this should be the unique project name
+        p = DBSession.query(Project).filter(Project.name==project).first()
+        if p:
+            new_dataset.project_id = p[0].id
 
     #create the new dataset with all its pieces
     try:

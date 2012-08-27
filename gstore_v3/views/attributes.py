@@ -91,7 +91,7 @@ def attribute(request):
 '''
 attribute maintenance
 '''
-@view_config(route_name='add_attributes', request_method='POST')
+@view_config(route_name='add_attributes', request_method='POST', renderer='json')
 def attribute_new(request):
     '''
     add a new set of attributes
@@ -148,7 +148,7 @@ def attribute_new(request):
         field.description = desc
         field.orig_name = orig_name
 
-        if ogr_precision:
+        if ogr_precision or ogr_precision == 0:
             field.ogr_precision = ogr_precision
         if ogr_width:
             field.ogr_width = ogr_width
@@ -164,10 +164,12 @@ def attribute_new(request):
     try:
         DBSession.add_all(new_fields)
         DBSession.commit()
+        DBSession.flush()
+        
     except Exception as err:
         return HTTPServerError(err)
 
-    return Response()
+    return {'attributes': [{'name': n.name, 'uuid': n.uuid} for n in new_fields]}
 
 
 

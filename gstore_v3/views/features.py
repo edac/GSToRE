@@ -605,7 +605,7 @@ def add_feature(request):
     except Exception as err:
         return HTTPServerError(err)
 
-    return {'fid': feature.fid, 'uuid': feature.uuid}
+    return {'fid': feature.fid, 'uuid': feature.uuid, 'gid': gid}
 
 @view_config(route_name='add_feature_attributes', request_method='POST', renderer='json')
 def add_attributes(request):
@@ -662,6 +662,8 @@ def add_attributes(request):
     #get the attributes for the dataset so we can do at least some check against the inputs
     fields = [f.name for f in the_dataset.attributes]
 
+    #return {'d': dataset_id, 'g': geoms.all(), 'f': fids}
+
     bad_recs = []
     inserts = []
     for rec in records:
@@ -679,7 +681,7 @@ def add_attributes(request):
 
         #fix the date and it needs to be utc already
         #yyyyMMddTHH:MM:ss
-        fmt = '%Y%m%dT%H:%M:%s'
+        fmt = '%Y%m%dT%H:%M:%S'
         if obs:
             try:
                 obsd = datetime.strptime(obs, fmt)
@@ -692,13 +694,17 @@ def add_attributes(request):
             obsd = None
 
         #and get the geom
+        geom = ''
         if geoms:
+            #try the pre-fetched list first
             geom = [g[1] for g in geoms if g[0] == fid]
             geom = geom[0] if geom else ''
-        else:
+        if not geom:
+            #otherwise, try the shapes table
             geom = DBSession.query(Feature.geom).filter(Feature.fid==fid).first()
             geom = geom[0] if geom else '' #for the tuple action
         if not geom:
+            #we are really in trouble here
             r = rec
             r.update({"err": "bad geom"})
             bad_recs.append(r)
@@ -713,19 +719,21 @@ def add_attributes(request):
         inserts.append(obj)
 
     #insert everything to mongo
-    connstr = request.registry.settings['mongo_uri']
-    collection = request.registry.settings['mongo_collection']
-    mongo_uri = gMongoUri(connstr, collection)
-    gm = gMongo(mongo_uri)
-    fail = gm.insert(inserts)
-    gm.close()
+    if inserts:
+        connstr = request.registry.settings['mongo_uri']
+        collection = request.registry.settings['mongo_collection']
+        mongo_uri = gMongoUri(connstr, collection)
+        gm = gMongo(mongo_uri)
+        fail = gm.insert(inserts)
+        gm.close()
 
-    if fail:
-        return HTTPServerError(fail)
-        
+        if fail:
+            return HTTPServerError(fail)
+
+    output = {'features': len(inserts)}
     if bad_recs:
-        return {'errors': bad_recs}
-    return {'features': len(inserts)}
+        output.update({'errors': bad_recs})
+    return output
 
 @view_config(route_name='update_feature', request_method='PUT')
 def update_feature(request):

@@ -68,7 +68,7 @@ class Source(Base):
         files = [f.location for f in self.src_files]
 
         #now append the new metadata file to the list
-        md_output, md_contenttype = self.datasets.dataset_metadata[0].transform('fgdc', 'xml', xslt_path)
+        md_output, md_contenttype = self.datasets.original_metadata[0].transform('fgdc', 'xml', xslt_path)
         #add the metadata xml file unless there is one in the source list (good way to tell?)
         #except we don't have any .xml listed in the source_files table so tada!
         md_filename = os.path.join(outpath, '%s.xml' % (outname))
@@ -78,7 +78,7 @@ class Source(Base):
 
         files.append(md_filename)
         
-        output = createZip(outpath, files)
+        output = createZip(os.path.join(outpath, outname), files)
         return output
 
     #TODO: check if this will work with service loactions, i.e. links, that don't have a format

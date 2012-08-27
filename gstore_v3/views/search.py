@@ -76,12 +76,13 @@ def search_categories(request):
             #clicked on theme so get the distinct subthemes
             cats = DBSession.query(Category).filter("'%s'=ANY(apps)" % (app)).filter(Category.theme==parts[0]).distinct(Category.subtheme).order_by(Category.subtheme.asc()) 
 
-            resp = {"total": 0, "results": [{"text": c.subtheme, "leaf": False, "id": '%s__|__%s' % (c.theme, c.subtheme)} for c in cats]}
+            #and make sure that the category set isn't empty
+            resp = {"total": 0, "results": [{"text": c.subtheme, "leaf": False, "id": '%s__|__%s' % (c.theme, c.subtheme)} for c in cats if len(c.datasets) > 0]}
         elif len(parts) == 2:
             #clicked on the subtheme
             cats = DBSession.query(Category).filter("'%s'=ANY(apps)" % (app)).filter(Category.theme==parts[0]).filter(Category.subtheme==parts[1]).order_by(Category.groupname.asc()) 
 
-            resp = {"total": 0, "results": [{"text": c.groupname, "leaf": True, "id": '%s__|__%s__|__%s' % (c.theme, c.subtheme, c.groupname), "cls": "folder"} for c in cats]}
+            resp = {"total": 0, "results": [{"text": c.groupname, "leaf": True, "id": '%s__|__%s__|__%s' % (c.theme, c.subtheme, c.groupname), "cls": "folder"} for c in cats if len(c.datasets) > 0]}
         else:
             #clicked on the groupname or something
             #return nothing right now, it isn't meaningful
@@ -91,7 +92,7 @@ def search_categories(request):
     else:
         #just pull all of the categories for the app
         cats = DBSession.query(Category).filter("'%s'=ANY(apps)" % (app)).distinct(Category.theme).order_by(Category.theme.asc()).order_by(Category.subtheme.asc()).order_by(Category.groupname.asc()) 
-        resp = {"total": 0, "results": [{"text": c.theme, "leaf": False, "id": c.theme} for c in cats]}
+        resp = {"total": 0, "results": [{"text": c.theme, "leaf": False, "id": c.theme} for c in cats if len(c.datasets) > 0]}
 
     return resp
 
