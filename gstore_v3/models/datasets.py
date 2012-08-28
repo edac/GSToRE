@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from osgeo import ogr, osr
 import xlwt
 
-from ..lib.utils import getFormats, getServices, createZip
+from ..lib.utils import get_all_formats, get_all_services, create_zip
 from ..lib.spatial import *
 from ..lib.mongo import gMongo
 
@@ -104,7 +104,7 @@ class Dataset(Base):
     def get_formats(self, req):
         if not self.is_available:
             return []
-        lst = getFormats(req)
+        lst = get_all_formats(req)
         exc_lst = self.excluded_formats
 
         #get all from one not in the other
@@ -116,7 +116,7 @@ class Dataset(Base):
         if not self.is_available:
             return []
 
-        lst = getServices(req)
+        lst = get_all_services(req)
         exc_lst = self.excluded_services
 
         #get all from one not in the other
@@ -445,7 +445,7 @@ class Dataset(Base):
                     files.append(os.path.join(tmp_path, '%s.%s' % (self.basename, e)))
         else:
             files.append(os.path.join(tmp_path, '%s.%s' % (self.basename, format)))
-        output = createZip(filename, files)
+        output = create_zip(filename, files)
 
         #and copy everything in files to the formats cache
         for f in files:
@@ -513,7 +513,7 @@ class Dataset(Base):
 
         #just to be consistent with all of the other types
         #let's pack up a zip file
-        output = createZip(os.path.join(basepath, '%s.xls.zip' % (self.uuid)), [filename])
+        output = create_zip(os.path.join(basepath, '%s.xls.zip' % (self.uuid)), [filename])
         
         return (0, 'success')
     

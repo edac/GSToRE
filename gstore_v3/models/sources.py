@@ -78,7 +78,7 @@ class Source(Base):
 
         files.append(md_filename)
         
-        output = createZip(os.path.join(outpath, outname), files)
+        output = create_zip(os.path.join(outpath, outname), files)
         return output
 
     #TODO: check if this will work with service loactions, i.e. links, that don't have a format

@@ -29,7 +29,7 @@ def get_image_mimetype(s):
 file utils
 '''
 
-def createZip(fullname, files):
+def create_zip(fullname, files):
     zipf = zipfile.ZipFile(fullname, mode='w', compression=zipfile.ZIP_STORED)
     for f in files: 
         fname = f.split('/')[-1]
@@ -46,7 +46,7 @@ hashes
 '''
 
 #return the hash as sha1 or md5 for a file (so zip it somewhere first if it's a bunch of things)
-def getHash(zipfile, algo):
+def generate_hash(zipfile, algo):
     #TODO: change this if dataone rolls out other hash types or we want something else
     m = hashlib.md5() if algo.lower() == 'md5' else hashlib.sha1()
     zf = open(zipfile, 'rb')
@@ -71,7 +71,7 @@ regex
 '''
 
 #just do a check (for like the uuids in the urls)
-def matchPattern(pattern, test):
+def match_pattern(pattern, test):
     p = re.compile(pattern)
     results = p.match(test)
 
@@ -81,7 +81,7 @@ def matchPattern(pattern, test):
 get the default format lists - vector, raster, file
 update: all one list now
 '''
-def getFormats(req):
+def get_all_formats(req):
     fmts = req.registry.settings['DEFAULT_FORMATS']
     if not fmts:
         return []
@@ -90,7 +90,7 @@ def getFormats(req):
 '''
 get default services
 '''
-def getServices(req):
+def get_all_services(req):
     svcs =  req.registry.settings['DEFAULT_SERVICES']
     if not svcs:
         return []
@@ -115,7 +115,7 @@ mostly for the sqla queries
 dates as yyyyMMdd{THHMMss} (date with time optional)
 and UTC time - interfaces should do the conversion
 '''
-def convertTimestamp(in_timestamp):
+def convert_timestamp(in_timestamp):
     sfmt = '%Y%m%dT%H:%M:%S'
     if not in_timestamp:
         return None
@@ -127,9 +127,9 @@ def convertTimestamp(in_timestamp):
     except:
         return None
 #to compare a date (single column) with a search range
-def getSingleDateClause(column, start_range, end_range):
-    start_range = convertTimestamp(start_range)
-    end_range = convertTimestamp(end_range)
+def get_single_date_clause(column, start_range, end_range):
+    start_range = convert_timestamp(start_range)
+    end_range = convert_timestamp(end_range)
 
     if start_range and not end_range:
         clause = column >= start_range
@@ -141,9 +141,9 @@ def getSingleDateClause(column, start_range, end_range):
         clause = None
     return clause
 #to compare two sets of date ranges, one in table and one from search
-def getOverlapDateClause(start_column, end_column, start_range, end_range):
-    start_range = convertTimestamp(start_range)
-    end_range = convertTimestamp(end_range)
+def get_overlap_date_clause(start_column, end_column, start_range, end_range):
+    start_range = convert_timestamp(start_range)
+    end_range = convert_timestamp(end_range)
 
     if start_range and not end_range:
         clause = start_column >= start_range

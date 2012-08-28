@@ -1,6 +1,6 @@
 from pyramid.view import view_config
 from pyramid.response import Response, FileResponse
-from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError
+from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError, HTTPBadRequest
 
 from sqlalchemy.exc import DBAPIError
 
@@ -330,6 +330,7 @@ def add_dataset(request):
             'records':
         }
         'metadata': ''
+        'project': 
         'apps': []
         'formats': []
         'services': []
@@ -360,8 +361,8 @@ def add_dataset(request):
     post_data = request.json_body
 
     SRID = int(request.registry.settings['SRID'])
-    excluded_formats = getFormats(request)
-    excluded_services = getServices(request)
+    excluded_formats = get_all_formats(request)
+    excluded_services = get_all_services(request)
 
     #do stuff
     description = post_data['description']
@@ -424,7 +425,7 @@ def add_dataset(request):
         c = DBSession.query(Category).filter(and_(Category.theme==theme, Category.subtheme==subtheme, Category.groupname==groupname)).first()
         if not c:
             #we'll need to add a new category BEFORE running this (?)
-            continue
+            return HTTPBadRequest()
 
         new_dataset.categories.append(c)
 

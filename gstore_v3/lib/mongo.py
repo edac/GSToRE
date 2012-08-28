@@ -30,6 +30,9 @@ class gMongo:
     def __init__(self, mongo_uri):
         self.conn = pymongo.Connection(host=mongo_uri.hostname, port=mongo_uri.port)
         self.db = self.conn[mongo_uri.db]
+        if mongo_uri.user and mongo_uri.password:
+            #TODO: add some error handling here?
+            self.db.authenticate(mongo_uri.user, mongo_uri.password)
         self.collection = self.db[mongo_uri.collection_name]
 
     def set_collection(self, coll):
@@ -89,6 +92,7 @@ class gMongoUri:
         self.hostname = connection_uri.hostname
         self.port = connection_uri.port
         self.db = connection_uri.path[1:]
-        
-        
+        self.user = connection_uri.username if connection_uri.username else ''
+        self.password = connection_uri.password if connection_uri.password else ''
+
     

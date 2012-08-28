@@ -21,8 +21,8 @@ from ..models.features import Feature
 
 from ..models.vocabs import geolookups
 from ..lib.spatial import *
-from ..lib.mongo import gMongo
-from ..lib.utils import normalize_params, convertTimestamp, getSingleDateClause, getOverlapDateClause
+from ..lib.mongo import *
+from ..lib.utils import normalize_params, convert_timestamp, get_single_date_clause, get_overlap_date_clause
 
 '''
 search
@@ -74,15 +74,15 @@ def search_categories(request):
         
         if len(parts) == 1:
             #clicked on theme so get the distinct subthemes
-            cats = DBSession.query(Category).filter("'%s'=ANY(apps)" % (app)).filter(Category.theme==parts[0]).distinct(Category.subtheme).order_by(Category.subtheme.asc()) 
+            #and use the any() for datasets to make sure that we don't pull any empty category sets
+            cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any())).distinct(Category.subtheme).order_by(Category.subtheme.asc()) 
 
-            #and make sure that the category set isn't empty
-            resp = {"total": 0, "results": [{"text": c.subtheme, "leaf": False, "id": '%s__|__%s' % (c.theme, c.subtheme)} for c in cats if len(c.datasets) > 0]}
+            resp = {"total": 0, "results": [{"text": c.subtheme, "leaf": False, "id": '%s__|__%s' % (c.theme, c.subtheme)} for c in cats]}
         elif len(parts) == 2:
             #clicked on the subtheme
-            cats = DBSession.query(Category).filter("'%s'=ANY(apps)" % (app)).filter(Category.theme==parts[0]).filter(Category.subtheme==parts[1]).order_by(Category.groupname.asc()) 
+            cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any())).filter(Category.subtheme==parts[1]).order_by(Category.groupname.asc()) 
 
-            resp = {"total": 0, "results": [{"text": c.groupname, "leaf": True, "id": '%s__|__%s__|__%s' % (c.theme, c.subtheme, c.groupname), "cls": "folder"} for c in cats if len(c.datasets) > 0]}
+            resp = {"total": 0, "results": [{"text": c.groupname, "leaf": True, "id": '%s__|__%s__|__%s' % (c.theme, c.subtheme, c.groupname), "cls": "folder"} for c in cats]}
         else:
             #clicked on the groupname or something
             #return nothing right now, it isn't meaningful
@@ -91,8 +91,8 @@ def search_categories(request):
             
     else:
         #just pull all of the categories for the app
-        cats = DBSession.query(Category).filter("'%s'=ANY(apps)" % (app)).distinct(Category.theme).order_by(Category.theme.asc()).order_by(Category.subtheme.asc()).order_by(Category.groupname.asc()) 
-        resp = {"total": 0, "results": [{"text": c.theme, "leaf": False, "id": c.theme} for c in cats if len(c.datasets) > 0]}
+        cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.datasets.any())).distinct(Category.theme).order_by(Category.theme.asc()).order_by(Category.subtheme.asc()).order_by(Category.groupname.asc()) 
+        resp = {"total": 0, "results": [{"text": c.theme, "leaf": False, "id": c.theme} for c in cats]}
 
     return resp
 
@@ -223,13 +223,13 @@ def search_datasets(request):
   
     #add the dateadded
     if start_added or end_added:
-        c = getSingleDateClause(Dataset.dateadded, start_added, end_added)
+        c = get_single_date_clause(Dataset.dateadded, start_added, end_added)
         if c is not None:
             dataset_clauses.append(c)
 
     #and the valid data range
     if start_valid or end_valid:
-        c = getOverlapDateClause(Dataset.begin_datetime, Dataset.end_datetime, start_valid, end_valid)
+        c = get_overlap_date_clause(Dataset.begin_datetime, Dataset.end_datetime, start_valid, end_valid)
         if c is not None:
             dataset_clauses.append(c)
 
@@ -484,7 +484,7 @@ def search_features(request):
 
     #and the valid data range to limit the datasets
     if start_valid or end_valid:
-        c = getOverlapDateClause(Dataset.begin_datetime, Dataset.end_datetime, start_valid, end_valid)
+        c = get_overlap_date_clause(Dataset.begin_datetime, Dataset.end_datetime, start_valid, end_valid)
         if c is not None:
             dataset_clauses.append(c)
 

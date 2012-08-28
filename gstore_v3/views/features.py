@@ -246,13 +246,13 @@ def features(request):
 
     #add the dateadded
     if start_added or end_added:
-        c = getSingleDateClause(Dataset.dateadded, start_added, end_added)
+        c = get_single_date_clause(Dataset.dateadded, start_added, end_added)
         if c is not None:
             dataset_clauses.append(c)
 
     #and the valid data range
     if start_valid or end_valid:
-        c = getOverlapDateClause(Dataset.begin_datetime, Dataset.end_datetime, start_valid, end_valid)
+        c = get_overlap_date_clause(Dataset.begin_datetime, Dataset.end_datetime, start_valid, end_valid)
         if c is not None:
             dataset_clauses.append(c)
 
@@ -628,7 +628,7 @@ def add_attributes(request):
                 atts: [
                     {
                         name:
-                        u:
+                        u: 
                         val:
                         qual: #optional 
                     }
@@ -718,7 +718,7 @@ def add_attributes(request):
             obj.update({'obs': obsd, 'year': obsd.year, 'mon': obsd.month, 'day': obsd.day, 'hour': obsd.hour, 'mnt': obsd.minute})
         inserts.append(obj)
 
-    #insert everything to mongo
+    #insert everything to mongo if there's stuff to insert
     if inserts:
         connstr = request.registry.settings['mongo_uri']
         collection = request.registry.settings['mongo_collection']
@@ -729,6 +729,8 @@ def add_attributes(request):
 
         if fail:
             return HTTPServerError(fail)
+
+        #TODO: add the export to .json file (by dataset id/uuid) to clusterdata for backup, etc
 
     output = {'features': len(inserts)}
     if bad_recs:

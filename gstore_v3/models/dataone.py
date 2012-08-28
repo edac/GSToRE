@@ -21,7 +21,7 @@ import os
 from foresite import *
 from rdflib import URIRef, Namespace
 
-from ..lib.utils import getHash
+from ..lib.utils import generate_hash
 
 
 '''
@@ -124,7 +124,7 @@ class DataoneCore(Base):
             return ''
 
         #and then get the hash
-        return getHash(f, algo)
+        return generate_hash(f, algo)
 
     def get_size(self, path):
         f = self.get_object(path)
@@ -269,6 +269,15 @@ class DataonePackage(Base):
         
         return 'success'
 
+        '''
+        testing the package builder
+        >>> from gstore_v3.models import *
+        >>> outpath = '/clusterdata/gstore/dataone/packages'
+        >>> base_url = 'http://129.24.63.115/apps/dataone'
+        >>> pkg = DBSession.query(dataone.DataonePackage).filter(dataone.DataonePackage.package_uuid=='0130cb6f-d8ba-40e1-8954-3740bc20f0df').first()
+        >>> pkg.build_rdf(outpath, base_url)
+        '''
+
 class DataoneVector(Base):
     __table__ = Table('dataone_vectors', Base.metadata,
         Column('id', Integer, primary_key=True),
@@ -299,6 +308,21 @@ class DataoneVector(Base):
         for the dataset id and format requested (if format in supported list)
         where the file name is the new vector uuid 
         '''
+
+        #add a new vector record and get the uuid
+
+
+        #make the dataone zip
+        
+        pass
+    def build_vector_zip(self, format, path):
+        '''
+        go check the formats cache for the files (esp. the zip)
+        if it exists, copy it to dataone with the vector_uuid as the file name
+        carry on
+        if it doesn't, go build it for the dataset BUT not in the formats cache (we want to save space) and, if it's shp, chuck the bits that are not zip
+        '''
+
         pass
 
 class DataoneObsolete(Base):

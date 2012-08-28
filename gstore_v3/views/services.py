@@ -58,7 +58,7 @@ def build_supported_srs(check_srs, supported_srs):
 #default syle objs
 def getStyle(geomtype):
     s = mapscript.styleObj()
-    s.symbol = 0
+    #s.symbol = symbol
     if geomtype.upper() in ['POLYGON', 'MULTIPOLYGON', '3D POLYGON']:
         s.size = 1
         s.color.setRGB(180, 223, 238)
@@ -68,8 +68,10 @@ def getStyle(geomtype):
         s.width = 2
         s.color.setRGB(0, 0, 0)
     elif geomtype.upper() == 'POINT':
-        s.size = 20
-        s.color.setRGB(100, 100, 100)
+        s.size = 4
+        s.color.setRGB(0, 0, 0)
+        s.symbol = 1
+        #s.symbolname = 'circles'
     else:
         s.size = 3
         s.color.setRGB(100, 100, 100)
@@ -109,7 +111,7 @@ def getLayer(d, src, dataloc, bbox):
         style = getStyle(d.geomtype)
 
         #units always 4326 decimal degrees - data not reprojected
-        layer.units = mapscript.MS_DD
+        #layer.units = mapscript.MS_DD
 
         layer.setProjection('+init=epsg:4326')
         layer.opacity = 50
@@ -203,7 +205,7 @@ def getLayer(d, src, dataloc, bbox):
                 #add the styles as the available styles
                 
                 pass
-       
+    layer.close()   
     return layer
 
 #set the default contact info for edac
@@ -277,7 +279,7 @@ def generateService(mapfile, params, mapname=''):
     #create the request
     request_type = params['request'] if 'request' in params else ''
 
-    if not request_type:    
+    if not request_type and params:    
         return HTTPNotFound()
 
     request_type = request_type.lower()  
@@ -386,10 +388,6 @@ def datasets(request):
     tmppath = request.registry.settings['TEMP_PATH']
     srid = request.registry.settings['SRID']
     
-#    host = request.host_url
-#    g_app = request.script_name[1:]
-#    base_url = '%s/%s' % (host, g_app)
-
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = load_balancer
 
@@ -482,19 +480,9 @@ def datasets(request):
 
         #TODO: again, pick a decent name here
         m.web.metadata.set('ows_name', 'imagery_wms_%s' % (d.basename))
-        m.web.metadata.set('WMS_ONLINERESOURCE', '%s/apps/%s/datasets/%s/services/ogc/wms' % (base_url, app, d.uuid))
-        m.web.metadata.set('OWS_SERVICE_ONLINERESOURCE', '%s/apps/%s/datasets/%s/services/ogc/wms' % (base_url, app, d.uuid))
-        m.web.metadata.set('OWS_ABSTRACT', 'WMS Service for %s dataset %s' % (app, d.description))
-
-        if d.taxonomy == 'geoimage':
-            m.web.metadata.set('WCS_ONLINERESOURCE', '%s/apps/%s/datasets/%s/services/ogc/wcs' % (base_url, app, d.uuid))
-            m.web.metadata.set('wcs_label', 'imagery_wcs_%s' % (d.basename))
-            m.web.metadata.set('wcs_name', 'imagery_wcs_%s' % (d.basename))
-        if d.taxonomy == 'vector':
-            m.web.metadata.set('WFS_ONLINERESOURCE', '%s/apps/%s/datasets/%s/services/ogc/wfs' % (base_url, app, d.uuid))
-
-        #add the edac info
-        set_contact_metadata(m) 
+        m.web.metadata.set('wms_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wms' % (base_url, app, d.uuid))
+        #m.web.metadata.set('OWS_SERVICE_ONLINERESOURCE', '%s/apps/%s/datasets/%s/services/ogc/wms' % (base_url, app, d.uuid))
+        m.web.metadata.set('ows_abstract', 'WMS Service for %s dataset %s' % (app, d.description))
 
         m.web.metadata.set('wms_formatlist', 'image/png,image/gif,image/jpeg')
         m.web.metadata.set('wms_format', 'image/png')
@@ -503,13 +491,18 @@ def datasets(request):
         #TODO: check on this
         m.web.metadata.set('wms_server_version', '1.3.0')
 
-        m.web.metadata.set('ows_country', 'US')
-        m.web.metadata.set('ows_stateorprovince', 'NM')
-        m.web.metadata.set('ows_city', 'Albuquerque')  
-        m.web.metadata.set('ows_postcode', '87131')
-
         #TODO: still more better names  
         m.web.metadata.set('ows_title', '%s Dataset (%s)' % (app, d.uuid))
+
+        if d.taxonomy == 'geoimage':
+            m.web.metadata.set('wcs_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wcs' % (base_url, app, d.uuid))
+            m.web.metadata.set('wcs_label', 'imagery_wcs_%s' % (d.basename))
+            m.web.metadata.set('wcs_name', 'imagery_wcs_%s' % (d.basename))
+        if d.taxonomy == 'vector':
+            m.web.metadata.set('wfs_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wfs' % (base_url, app, d.uuid))
+
+        #add the edac info
+        set_contact_metadata(m) 
 
         #set the paths
         m.mappath = mappath
@@ -548,7 +541,21 @@ def datasets(request):
 #            of.setOption('FORM', 'multipart')
 #            m.appendOutputFormat(of)
 
-    
+        #add a point symbol (REQUIRED for POINT)
+        if d.taxonomy == 'vector' and d.geomtype == 'POINT':
+            symbol = mapscript.symbolObj('circles')
+            symbol.filled = mapscript.MS_TRUE
+            symbol.type = mapscript.MS_SYMBOL_ELLIPSE
+            line = mapscript.lineObj()
+            line.add(mapscript.pointObj(1, 1, 0, 0))
+            symbol.setPoints(line)
+            symbol.sizex = 1
+            symbol.sizey = 1
+            #required to write it to the mapfile
+            #if ogc_req == 'getmapfile':
+            symbol.inmapfile = mapscript.MS_TRUE
+            m.symbolset.appendSymbol(symbol)
+            
         #add the legend
         lgd = mapscript.legendObj()
         lgd.imagecolor.setRGB(255, 255, 255)
