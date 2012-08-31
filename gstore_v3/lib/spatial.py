@@ -165,6 +165,15 @@ bbox = [-107.930153271,34.9674233732,-104.994718803,38.5334870385]
 
 '''
 
+#wkt to geom 
+def wkt_to_geom(wkt, epsg):
+    #get the spatial reference
+    sr = epsg_to_sr(epsg)
+    #create geometry
+    geom = ogr.CreateGeometryFromWkt(wkt, sr)
+
+    return geom
+
 #box to wkb
 #bbox as float[] so transform first
 #and epsg of the input
@@ -198,6 +207,10 @@ def geom_to_bbox(geom):
     env = geom.GetEnvelope()
     #reorder the pieces to match our bbox and return
     return [env[0], env[2], env[1], env[3]]
+    
+#geom to wkb
+def geom_to_wkb(geom):
+    return geom.ExportToWkb().encode('hex')
 
 #wkb to box with epsg of the input geom
 def wkb_to_bbox(wkb, epsg):

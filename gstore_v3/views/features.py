@@ -1,6 +1,6 @@
 from pyramid.view import view_config
 from pyramid.response import Response
-from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError
+from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError, HTTPBadRequest
 
 from sqlalchemy import desc, asc, func
 from sqlalchemy.sql.expression import and_
@@ -578,6 +578,14 @@ def add_feature(request):
         epsg:
     }
     or we could have geom + epsg and reproject here?
+
+    or 
+    {
+        gid:
+        x:
+        y:
+    }
+    where x, y at lon, lat in wgs84 and we just make the geom here
     '''
     dataset_id = request.matchdict['id']
     the_dataset = get_dataset(dataset_id)
@@ -586,12 +594,18 @@ def add_feature(request):
 
     post_data = request.json_body
 
-    if not 'geom' in post_data or not 'gid' in post_data:
-        return HTTPNotFound()
+    if ('geom' not in post_data and 'x' not in post_data and 'y' not in post_data) or not 'gid' in post_data:
+        return HTTPBadRequest()
 
     
     gid = int(post_data['gid'])
-    geom = post_data['geom']
+    geom = post_data['geom'] if 'geom' in post_data else ''
+    x = post_data['x'] if 'x' in post_data else ''
+    y = post_data['y'] if 'y' in post_data else ''
+
+    if x and y:
+        geom = wkt_to_geom('POINT (%s %s)' % (x, y), 4326)
+        geom = geom_to_wkb(geom)
 
     #TODO: add something for the epsg reprojection, if we want that
 

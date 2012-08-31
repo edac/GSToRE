@@ -384,6 +384,10 @@ def add_dataset(request):
     features = spatials['features'] if 'features' in spatials else 0
     records = spatials['records'] if 'records' in spatials else 0
 
+    #add the inactive flag
+    active = post_data['active'] if 'active' in post_data else ''
+    inactive = False if active == 'True' else True
+
     project = post_data['project'] if 'project' in post_data else ''
 
     #we may have instances where we have an external dataset (tri-state replices for example)
@@ -482,11 +486,15 @@ def add_dataset(request):
     #and just for kicks, return the uuid
     return Response(str(new_dataset.uuid))
 
-@view_config(route_name='update_dataset', request_method='PUT')
+#TODO: change this back to PUT and figure out why pycurl hung up on it.
+@view_config(route_name='update_dataset', request_method='POST')
 def update_dataset(request):
     '''
     add version value
     activate/deactivate
+
+    update bbox + geom
+    update metadata xml (original_metadata)
 
     add dataset to tileindex | bundle | collection | some other thing
     '''
@@ -495,6 +503,66 @@ def update_dataset(request):
     if not d:
         return HTTPNotFound()
 
-    #get the dataset by the filter
+    post_data = request.json_body
+    option = post_data['option'].lower() if 'option' in post_data else ''
+    if not option:
+        return HTTPBadRequest()
 
-	return Response('put!')
+    #TODO: change this to accept multiple options at once
+
+    if option == 'metadata':
+        xml = post_data['xml'] if 'xml' in post_data else ''
+        if not 'xml':
+            return HTTPBadRequest()
+        #replace the original_metadata.xml with the metadata included here
+        if not d.original_metadata:
+            #we need to make one
+            o = OriginalMetadata()
+            o.original_xml = xml
+            d.original_metadata.append(o)
+        else:
+            #just update the xml field
+            d.original_metadata[0].original_xml = xml
+    elif option == 'activate':
+        active = post_data['active'] if 'active' in post_data else ''
+        if not active:
+            return HTTPBadRequest()
+        inactive = True if active == 'False' else False
+        d.inactive = inactive
+    elif option == 'available':
+        available = post_data['available'] if 'available' in post_data else ''
+        if not available:
+            return HTTPBadRequest()
+        available = True if available == 'True' else False
+        d.is_available = available
+    elif option == 'bbox':
+        if 'geom' not in post_data and 'box' not in post_data:
+            return HTTPBadRequest()
+
+        SRID = int(request.registry.settings['SRID'])
+        box = map(float, post_data['box'].split(','))
+        geom = post_data['geom'] if 'geom' in post_data else ''
+
+        if not geom and box:
+            geom = bbox_to_wkb(box, SRID)
+        else:
+            return HTTPBadRequest()
+
+        d.box = box
+        d.geom = geom
+        
+    try:
+        DBSession.commit()
+    except Exception as err:
+        return HTTPServerError(err)
+    
+    #TODO: add the other options
+    #      
+
+    return Response('updated')
+
+
+
+
+
+	

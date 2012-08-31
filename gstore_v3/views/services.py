@@ -43,6 +43,8 @@ ogc
 ecw test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ef4c8cdc-bec4-43aa-8f2d-3046057e3335/services/ogc/wms?REQUEST=GetMap&SERVICE=WMS&VERSION=1.1.1&LAYERS=t20nr08e34&BBOX=-109.050173,31.332172,-103.001964,37.000293
 
 '''
+#TODO: refactor the mapfile generation part (see the awkwardness of the point symbol)
+
 #so, neat trick, the order of the srs matters for wcs.describecoverage
 #this rebuilds the list so that the check_srs (the dataset srs, for example) is listed once and is listed first
 def build_supported_srs(check_srs, supported_srs):
@@ -70,6 +72,8 @@ def getStyle(geomtype):
     elif geomtype.upper() == 'POINT':
         s.size = 4
         s.color.setRGB(0, 0, 0)
+        #point to our ellipse symbol (mapscript starts at 1, not 0)
+        #and the symbol name pointer only seems to work from a file-based map
         s.symbol = 1
         #s.symbolname = 'circles'
     else:
@@ -167,6 +171,8 @@ def getLayer(d, src, dataloc, bbox):
             #check for the bands to use and their order
             if mapsettings.settings and 'BANDS' in mapsettings.settings:
                 layer.setProcessing('BANDS='+mapsettings.settings['BANDS'])
+            if mapsettings.settings and 'LUT' in mapsettings.settings:
+                layer.setProcessing('LUT=' + mapsettings.settings['LUT'])
 
             if mapsettings.classes:
                 #do something with classes
@@ -897,7 +903,7 @@ def mapper(request):
         
     services = []
     for s in svcs:
-        services.append({'title': s.upper(), 'text': '%s/services/ogc/%s' % (base_url, s)})
+        services.append({'title': s.upper(), 'text': '%s/services/ogc/%s?SERVICE=%s&REQUEST=GetCapabilities&VERSION=1.1.1' % (base_url, s, s)})
     c.update({'services': services})
 
     metadatas = []
