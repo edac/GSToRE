@@ -67,7 +67,7 @@ def getStyle(geomtype):
         s.width = 1
         s.outlinecolor.setRGB(0,0,0)
     elif geomtype.upper() in ['LINESTRING', 'LINE', '3D LINESTRING']:
-        s.width = 2
+        s.width = 1
         s.color.setRGB(0, 0, 0)
     elif geomtype.upper() == 'POINT':
         s.size = 4

@@ -132,7 +132,11 @@ class MapfileSetting(Base):
         #return the mapfile processing directives from the hstore
         #the keys list may need to be updated based on future needs. this list is for RASTER data
         keys = ['LUT', 'BANDS', 'COLOR_MATCH_THRESHOLD', 'DITHER', 'LOAD_FULL_RES_IMAGE', 'LOAD_WHOLE_IMAGE', 'OVERSAMPLE_RATIO', 'RESAMPLE', 'SCALE']
-        directives = []
+        
+        if not self.settings:
+            return []
+
+        directives = []    
         for key in keys:
             if key in self.settings:
                 directives.append('%s=%s' % (key, self.settings[key]))
