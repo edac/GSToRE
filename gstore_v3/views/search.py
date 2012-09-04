@@ -105,7 +105,7 @@ def search_datasets(request):
     limit
     offset
     dir (ASC | DESC)
-    start_time
+    start_time yyyyMMddThh:mm:ss
     end_time
     valid_start
     valid_end
@@ -232,6 +232,8 @@ def search_datasets(request):
         c = get_overlap_date_clause(Dataset.begin_datetime, Dataset.end_datetime, start_valid, end_valid)
         if c is not None:
             dataset_clauses.append(c)
+            #and add a check for non-null values or we get the world
+            
 
     '''
     all the spatial query bits

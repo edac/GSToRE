@@ -1,7 +1,7 @@
 from pyramid.view import view_config
 from pyramid.response import Response, FileResponse
 
-from pyramid.httpexceptions import HTTPNotFound, HTTPServerError
+from pyramid.httpexceptions import HTTPNotFound, HTTPServerError, HTTPBadRequest
 
 from sqlalchemy import desc, asc, func
 from sqlalchemy.sql.expression import and_
@@ -9,6 +9,8 @@ from sqlalchemy.sql import between
 
 from datetime import datetime
 import urllib2
+import json
+import os, shutil
 
 #from the models init script
 from ..models import DBSession
@@ -22,7 +24,7 @@ from ..lib.utils import *
 from ..lib.database import *
 from ..lib.mongo import gMongo, gMongoUri
 
-import os
+
 
 '''
 make sure that the general errors are being posted correctly (404, 500, etc)
@@ -46,7 +48,6 @@ DESCRIPTION = ''
 
 #convert to the d1 format
 def datetime_to_dataone(dt):
-    #TODO: deal with timezone-y issues
     fmt = '%Y-%m-%dT%H:%M:%S.0Z'
     return dt.strftime(fmt)
     
@@ -58,6 +59,10 @@ def datetime_to_http(dt):
 
 def dataone_to_datetime(dt):
     #TODO: deal with more datetime issues (could be gmt or utc, with or without milliseconds)
+    '''
+    YYYY-MM-DDTHH:MM:SS.mmm
+    YYYY-MM-DDTHH:MM:SS.mmm+00:00
+    '''
     fmt = '%Y-%m-%dT%H:%M:%S'
     dt = dt.replace('+00:00', '') if '+00:00' in dt else dt
     return datetime.strptime(dt, fmt)
@@ -80,10 +85,7 @@ dataone logging in mongodb
 '''
 def log_entry(identifier, ip, event, mongo_uri, useragent=None):
     gm = gMongo(mongo_uri)
-
-    #TODO: possible that identifier is just the pid?
-    gm.insert({"identifier": "" + identifier, "ip": ip, "useragent": useragent, "subject": SUBJECT, "date": datetime.utcnow(), "event": event, "node": NODE})
-
+    gm.insert({"identifier": identifier, "ip": ip, "useragent": useragent, "subject": SUBJECT, "date": datetime.utcnow(), "event": event, "node": NODE})
     gm.close()
 
 def query_log(mongo_uri, querydict, limit=0, offset=0):
@@ -289,11 +291,8 @@ def search(request):
 >>> from sqlalchemy.sql.expression import and_
 >>> from datetime import datetime
 >>> d = datetime(2012, 8, 14)
->>> search_clauses = [dataone.DataoneSearch.the_date>d, dataone.DataoneSearch.format=='FGDC-STD-001-1998']
-    
- query = DBSession.query(dataone.DataoneSearch, dataone.DataoneCore).join(dataone.DataoneCore, dataone.DataoneCore.dataone_uuid==dataone.DataoneSearch.the_uuid).filter(and_(*search_clauses)).all()
-
-
+>>> search_clauses = [dataone.DataoneSearch.the_date>d, dataone.DataoneSearch.format=='FGDC-STD-001-1998'] 
+>>> query = DBSession.query(dataone.DataoneSearch, dataone.DataoneCore).join(dataone.DataoneCore, dataone.DataoneCore.dataone_uuid==dataone.DataoneSearch.the_uuid).filter(and_(*search_clauses)).all()
     '''
 
     search_clauses = []
@@ -316,15 +315,14 @@ def search(request):
             search_clauses.append(between(DataoneSearch.the_date, fd, ed))
 
     if formatId:
-        #join the formats so we can query that
-        #TODO: deal with http escaping from the request
         formatId = urllib2.unquote(formatId)
         search_clauses.append(DataoneSearch.format==formatId)
         
-    #and add the limit/offset for fun
+    #join to the core so we don't have to query for those later
     query = DBSession.query(DataoneSearch, DataoneCore).join(DataoneCore, DataoneCore.dataone_uuid==DataoneSearch.the_uuid).filter(and_(*search_clauses))
     total = query.count()
 
+    #and add the limit/offset for fun but do it after we get a complete count for the total attribute
     objects = query.limit(limit).offset(offset).all()
 
     #now go do stuff with our tuple of search, core
@@ -340,15 +338,13 @@ def search(request):
         #get the core obj
         core = obj[1]
         algo = 'md5'
-        #f = core.get_object(dataone_path)
         h = core.get_hash(algo, dataone_path)
-        #h = 500
         size = core.get_size(dataone_path)
-        #size = 30
 
         #get the current id
         current = core.get_current()
-        
+
+        #this date comes from mongo so it should by utc already
         docs.append({'identifier': current, 'format': core.format.format, 'algo': algo, 'checksum': h, 'date': datetime_to_dataone(obj[0].the_date), 'size': size})
 
     return {'total': total, 'count': cnt, 'start': offset, 'docs': docs}
@@ -546,7 +542,7 @@ def metadata(request):
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/apps/dataone/' % (load_balancer)
 
-    #TODO: fix the date formats, i think
+    #dates should be from postgres, i.e. in utc
     rsp = {'pid': pid, 'dateadded': datetime_to_dataone(core_object.date_added), 'obj_format': obj_format, 'file_size': file_size, 
            'uid': 'GSTORE', 'o': 'EDAC', 'dc': 'everything', 'org': 'EDAC', 'hash_type': file_hashtype,
            'hash': file_hash, 'metadata_modified': datetime_to_dataone(obsolete.date_changed), 'mn': base_url, 'obsoletes': obsoletes, 'obsoletedby': obsoletedby}
@@ -584,7 +580,10 @@ def checksum(request):
 
 @view_config(route_name='dataone_error', request_method='POST', match_param='app=dataone')
 def error(request):
-    return Response('dataone error from controlling node')
+    #TODO: return notimplemented?
+
+    #TODO: parse a multipart post (without examples) and log to mongo as an error
+    return HTTPServerError('', status=501)
 
 @view_config(route_name='dataone_replica', match_param='app=dataone')
 def replica(request):
@@ -604,5 +603,282 @@ dataone management methods
 - create dataone package object
 - create dataone core object (after vector made if it's for a vector and after package made if it's a package widget)
 - add new obsolete record for a dataone core object
+
+adding vector, source, metadata and package objects does not register a dataone object. you must still add those objects
+as dataone core objects using the object uuid and type. and then push the core object uuid to obsoletes. so the process is:
+
+    1. create object (mostly adding the zip/xml/rdf to the dataone cache)
+    2. register the object in core
+    3. register the core object in obsolete
+
+that means three posts per object right now. the basic object posts always return the object uuid to register, the object type
+and the utc datetime it was posted.
 '''
-#TODO: add methods
+@view_config(route_name='dataone_addcore')
+def add_dataone_core(request):
+    '''
+    {
+        object_uuid
+        object_type: vector | source | package | metadata
+    }
+
+    NOTE: if you are posting metadata, the uuid is from the metadata (DatasetMetadata) table not datasets OR original_metadata
+    '''
+    post_data = request.json_body
+    if 'object_uuid' not in post_data and 'object_type' not in post_data and 'format' not in post_data:
+        return HTTPBadRequest()
+
+    format = post_data['format']
+    object_uuid = post_data['object_uuid']
+    object_type = post_data['object_type'].lower()
+    if object_type not in ['vector', 'source', 'metadata', 'package']:
+        return HTTPBadRequest()
+
+    format_id = DBSession.query(DataoneFormat).filter(DataoneFormat.format==format).first()
+    if not format_id:
+        return HTTPBadRequest()
+    format_id = format_id.id
+
+    core_obj = DBSession.query(DataoneCore).filter(and_(DataoneCore.object_uuid==object_uuid, DataoneCore.object_type==object_type)).first()
+    if core_obj:
+        return HTTPBadRequest('An object with this uuid already exists.')
+
+    core_obj = DataoneCore(object_uuid, object_type, format_id)
+    try:
+        DBSession.add(core_obj)
+        DBSession.commit()
+    except:
+        return HTTPServerError()
+    
+    return Response()
+    
+@view_config(route_name='dataone_addmetadata')
+def add_dataone_metadata(request):
+    '''
+    {
+        dataset_uuid
+        standard (once we have multiple standards)
+    }
+
+    this is a metadata reference to the metadata table (datasetmetadata model) that can be used to get the original metadata
+    or later, the iso metadata
+
+    but that table does not currently reference datasets so we go in a circle that is bad
+    '''
+    post_data = request.json_body
+
+    if 'dataset_uuid' not in post_data and 'standard' not in post_data:
+        return HTTPBadRequest()
+
+    dataset_uuid = post_data['dataset_uuid']
+    standard = post_data['standard'].lower()
+    if standard not in ['fgdc']:
+        return HTTPBadRequest()
+
+    d = get_dataset(dataset_uuid)
+    if not d:
+        return HTTPBadRequest()
+
+    if not d.has_metadata_cache or not d.original_metadata or not d.original_metadata[0].original_xml:
+        return HTTPBadRequest()
+
+    #TODO: UPDATE THIS FOR THE METADATA SCHEMA CHANGES SOMEDAY
+    xml = d.original_metadata[0].original_xml
+    meta_id = d.original_metadata[0].id
+
+    #get the metadata object that we want
+    meta_obj = DBSession.query(DatasetMetadata).filter(DatasetMetadata.original_id==meta_id).first()
+    if not meta_obj:
+        return HTTPBadRequest('Invalid metadata object')
+    meta_uuid = meta_obj.uuid
+
+    DATAONE_PATH = request.registry.settings['DATAONE_PATH']
+    dataone_path = os.path.join(DATAONE_PATH, 'metadata', '%s.xml' % (meta_uuid))
+
+    if os.path.isfile(dataone_path):
+        return HTTPBadRequest('Metadata xml already exists for this dataset')
+
+    with open(dataone_path, 'w') as f:
+        f.write(xml)
+
+    return Response({'object_uuid': meta_uuid, 'object_type': 'metadata', 'date_added': datetime.utcnow()})
+
+@view_config(route_name='dataone_addvector')
+def add_dataone_vector(request):
+    '''
+    {
+        dataset_uuid
+        format
+    }
+    '''
+    post_data = request.json_body
+    if 'dataset_uuid' not in post_data or 'format' not in post_data:
+        return HTTPBadRequest()
+
+    dataset_uuid = post_data['dataset_uuid']
+    format = post_data['format'].lower()
+
+    d = get_dataset(dataset_uuid)
+    if not d:
+        return HTTPBadRequest()
+
+    fmts = d.get_formats(request)
+    if format not in fmts:
+        return HTTPBadRequest()
+
+    #check for an existing vector with this uuid and format
+    vector = DBSession.query(DataoneVector).filter(and_(DataoneVector.dataset_uuid==dataset_uuid, DataoneVector.format==format)).first()
+    if vector:
+        return HTTPBadRequest('A vector object already exists for this dataset')
+    
+    #add a new dataone vector object
+    vector = DataoneVector(dataset_uuid, format)
+    try:
+        DBSession.add(vector)
+        DBSession.commit()
+        DBSession.flush()
+        DBSession.refresh(vector)
+    except:
+        return HTTPServerError()
+
+    vector_uuid = vector.vector_uuid
+
+    #see if the vector exists as a zip in formats
+    FORMATS_PATH = request.registry.settings['FORMATS_PATH']
+    DATAONE_PATH = request.registry.settings['DATAONE_PATH']
+    
+    dataone_path = os.path.join(DATAONE_PATH, 'datasets')
+
+    outpath = os.path.join(FORMATS_PATH, d.uuid, format, '%s.%s.zip' % (d.uuid, format))
+    datapath = os.path.join(dataone_path, '%s.zip' % (vector_uuid))
+    if os.path.isfile(outpath):
+        #copy the file to dataone and rename
+        shutil.copyfile(outpath, datapath)
+    else:   
+        #if not, go make it and copy the zip to dataone
+        #build_vector(self, format, basepath, mongo_uri, epsg)
+        #set up the mongo connection
+        mconn = request.registry.settings['mongo_uri']
+        mcoll = request.registry.settings['mongo_collection']
+        mongo_uri = gMongoUri(mconn, mcoll)
+
+        srid = int(request.registry.settings['SRID'])
+        success = d.build_vector(format, os.path.join(FORMATS_PATH, d.uuid, format), mongo_uri, srid)
+        if success[0] != 0:
+            return HTTPServerError()
+        #and copy to dataone
+        shutil.copyfile(outpath, datapath)
+
+    return Response({'object_uuid': vector_uuid, 'object_type': 'vector', 'date_added': datetime.utcnow()})
+
+@view_config(route_name='dataone_addsource')
+def add_dataone_source(request):
+    '''
+    {
+        dataset_uuid
+        format
+    }
+    '''
+    post_data = request.json_body
+    if 'dataset_uuid' not in post_data or 'format' not in post_data:
+        return HTTPBadRequest()
+
+    dataset_uuid = post_data['dataset_uuid']
+    format = post_data['format'].lower()
+
+    d = get_dataset(dataset_uuid)
+    if not d:
+        return HTTPBadRequest()
+
+    fmts = d.get_formats(request)
+    if format not in fmts:
+        return HTTPBadRequest()
+
+    #get the source object for the dataset + format
+    source = [s for s in d.sources if s.extension == format]
+    if not source:
+        return HTTPBadRequest()
+    source == source[0]
+
+    core_obj = DBSession.query(DataoneCore).filter(and_(DataoneCore.object_uuid==source.uuid, DataoneCore.object_type=='source')).first()
+    if core_obj:
+        return HTTPBadRequest()
+
+    #check for the zipped source file in the dataone cache
+    DATAONE_PATH = request.registry.settings['DATAONE_PATH']
+    
+    dataone_path = os.path.join(DATAONE_PATH, 'datasets')
+    outfile = os.path.join(dataone_path, '%s.zip' % (source.uuid))
+    if os.path.isfile(outfile):
+        return HTTPBadRequest()
+
+    #pack up the data
+    xslt_path = request.registry.settings['XSLT_PATH']
+    output = source.pack_source(dataone_path, '%s.zip' % (source.uuid), xslt_path)
+    
+    return Response({'object_uuid': source.uuid, 'object_type': 'source', 'date_added': datetime.utcnow()})
+
+@view_config(route_name='dataone_addpackage')
+def add_dataone_package(request):
+    '''
+    {
+        metadata_uuid (core_uuid for this metadata object)
+        dataobject_uuid (core_uuid for this metadata object)
+    }
+    '''
+
+    post_data = request.json_body
+    if 'metadata_uuid' not in post_data and 'dataobject_uuid' not in post_data:
+        return HTTPBadRequest()
+
+    #TODO: check for the two objects in the CORE table
+
+    #TODO: create new package
+
+    #TODO: build the rdf for the package
+    
+    return Response({'object_uuid': '', 'object_type': 'metadata', 'package': datetime.utcnow()})
+
+@view_config(route_name='dataone_addobsolete')
+def add_dataone_obsolete(request):
+    '''
+    {
+        core_uuid
+    }
+    '''
+
+    post_data = request.json_body
+    if 'core_uuid' not in post_data:
+        return HTTPBadRequest()
+
+    #let's make sure it's a valid dataone_core uuid
+    core_uuid = post_data['core_uuid']
+    core_obj = DBSession.query(DateoneCore).filter(DataoneCore.dataone_uuid==core_uuid).first()
+    if not core_obj:
+        return HTTPBadRequest()
+
+    obsolete = DataoneObsolete(core_obj.dataone_uuid)
+    try:
+        DBSession.add(obsolete)
+        DBSession.commit()
+        DBSession.flush()
+        DBSession.refresh(obsolete)
+    except:
+        DBSession.rollback()
+        return HTTPServerError()
+     
+    return Response({'obsolete_uuid': obsolete.obsolete_uuid, 'core_uuid': core_uuid, 'date_added': datetime.utcnow()})
+
+@view_config(route_name='dataone_updatepackage')
+def update_dataone_package(request):
+    '''
+    {
+        package_uuid
+        metadata_uuid (core_uuid for this metadata object IF MODIFIED)
+        dataobject_uuid (core_uuid for this metadata object IF MODIFIED)
+    }
+    '''
+    return Response()
+
+
+

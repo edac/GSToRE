@@ -146,9 +146,12 @@ def main(global_config, **settings):
 
     #maintenance routes
     config.add_route('dataone_addcore', '/apps/{app}/core/add', custom_predicates=(applist,))
+    config.add_route('dataone_addmetadata', '/apps/{app}/metadata/add', custom_predicates=(applist,))
     config.add_route('dataone_addvector', '/apps/{app}/vector/add', custom_predicates=(applist,))
+    config.add_route('dataone_addsource', '/apps/{app}/source/add', custom_predicates=(applist,))
     config.add_route('dataone_addpackage', '/apps/{app}/package/add', custom_predicates=(applist,))
     config.add_route('dataone_addobsolete', '/apps/{app}/obsolete/add', custom_predicates=(applist,))
+    config.add_route('dataone_updatepackage', '/apps/{app}/package/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/update', custom_predicates=(applist,))
 
 #to the dataset
     #use the integer dataset_id or the uuid

@@ -169,10 +169,14 @@ def getLayer(d, src, dataloc, bbox):
         mapsettings = src.map_settings[0] if src.map_settings else None
         if mapsettings:
             #check for the bands to use and their order
-            if mapsettings.settings and 'BANDS' in mapsettings.settings:
-                layer.setProcessing('BANDS='+mapsettings.settings['BANDS'])
-            if mapsettings.settings and 'LUT' in mapsettings.settings:
-                layer.setProcessing('LUT=' + mapsettings.settings['LUT'])
+#            if mapsettings.settings and 'BANDS' in mapsettings.settings:
+#                layer.setProcessing('BANDS='+mapsettings.settings['BANDS'])
+#            if mapsettings.settings and 'LUT' in mapsettings.settings:
+#                layer.setProcessing('LUT=' + mapsettings.settings['LUT'])
+            processing_directives = mapsettings.get_processing()
+            for directive in processing_directives:
+                layer.setProcessing(directive)
+                
 
             if mapsettings.classes:
                 #do something with classes

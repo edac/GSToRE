@@ -231,7 +231,7 @@ def wkb_to_bbox(wkb, epsg):
     
 #wkb to ogr.geometry
 def wkb_to_geom(wkb, epsg):
-   #get the spatial reference
+    #get the spatial reference
     sr = epsg_to_sr(epsg)
 
     #get the geometry
@@ -272,101 +272,6 @@ def wkb_to_output(wkb, epsg, output_type='kml'):
 '''
 any other bbox stuff
 '''
-
-
-'''
-tilecache stuff
-
-maybe move to its own file?
-'''
-##TODO: resolve import error (paste.request) and test again
-#def tilecache_service(baseurl, dataset, app, params, kargs, is_basemap = False):
-#    '''
-#    TILE_EPSG = 26913
-#    TILE_RESOLUTIONS = 2500,2000,1800,1600,1400,1200,1000,500,250,30,10,1,0.1524
-#    TILE_SIZE = 256,256
-#    TILE_EXTENT = -235635,3196994,1032202,4437481
-#    '''
-#    tilecache_path = get_current_registry().settings['TILECACHE_PATH']
-#    tilecache_epsg = get_current_registry().settings['TILE_EPSG']
-#    tilecache_resolutions = get_current_registry().settings['TILE_RESOLUTIONS']
-#    tilecache_size = get_current_registry().settings['TILE_SIZE']
-#    tilecache_extent = get_current_registry().settings['TILE_EXTENT']
-
-#    #basic_wms = 
-
-#    format = params['format'] if 'format' in params else ''
-#    format = params['FORMAT'] if 'FORMAT' in params else format
-
-#    extension = 'png'
-#    extension = 'jpeg' if 'jpeg' in format else extension
-#    extension = 'gif' if 'gif' in format else extension    
-
-#    if is_basemap:
-#        #do one thing
-#        basename = 'naturalearthsw,southwestutm,nmcounties,Highways'
-#        basic_wms = '%s/apps/%s/datasets/%s/services/ogc/wms' % (baseurl, app, 'base')
-
-#        layers = ['naturalearthsw', 'southwestutm','nmcounties','Highways' ]
-#        def make_wms_layer(layer):
-#            return WMS.WMS(
-#                layer,
-#                basic_wms,
-#                srs = 'EPSG:%s' % (epsg),
-#                extension = extension,
-#                resolutions = tilecache_resolutions,
-#                bbox = tilecache_extent,
-#                data_extent = tilecache_extent,
-#                size = tile_size,
-#                debug = False,
-#                extent_type = 'loose'
-#            )
-#        baselayers = {}
-#        for layer in layers:
-#            baselayers[layer] = make_wms_layer(layer)
-#        baselayers[','.join(layers)] = make_wms_layer(','.join(layers))
-
-#        tile_service = Service(
-#            Disk(tilecache_path),
-#            baselayers
-#        )
-#    else:
-#        #it's a dataset so do another thing
-#        basic_wms = '%s/apps/%s/datasets/%s/services/ogc/wms' % (baseurl, app, str(dataset.uuid))
-#        tile_service = Service(
-#            Disk(tilecache_path),
-#            {
-#                dataset.basename: WMS.WMS(
-#                    dataset.basename,
-#                    basic_wms,
-#                    srs = 'EPSG:%s' % (tilecache_epsg),
-#                    extension = extension,
-#                    bbox = tilecache_extent,
-#                    data_extent = tilecache_extent,
-#                    resolutions = tilecache_resolutions,
-#                    size = tilecache_size,
-#                    debug = False,
-#                    extent_type = 'loose'
-#                )
-#            }
-#        )
-
-#    #TODO: resolve the environ and start_response objects
-#    #return wsgiHandler(kargs['environ'], kargs['start_response'], tile_service)
-#    return wsgiHandler(None, ('200', []), tile_service)
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

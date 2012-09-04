@@ -504,60 +504,68 @@ def update_dataset(request):
         return HTTPNotFound()
 
     post_data = request.json_body
-    option = post_data['option'].lower() if 'option' in post_data else ''
-    if not option:
-        return HTTPBadRequest()
 
-    #TODO: change this to accept multiple options at once
-
-    if option == 'metadata':
-        xml = post_data['xml'] if 'xml' in post_data else ''
-        if not 'xml':
-            return HTTPBadRequest()
-        #replace the original_metadata.xml with the metadata included here
-        if not d.original_metadata:
-            #we need to make one
-            o = OriginalMetadata()
-            o.original_xml = xml
-            d.original_metadata.append(o)
-        else:
-            #just update the xml field
-            d.original_metadata[0].original_xml = xml
-    elif option == 'activate':
-        active = post_data['active'] if 'active' in post_data else ''
-        if not active:
-            return HTTPBadRequest()
-        inactive = True if active == 'False' else False
-        d.inactive = inactive
-    elif option == 'available':
-        available = post_data['available'] if 'available' in post_data else ''
-        if not available:
-            return HTTPBadRequest()
-        available = True if available == 'True' else False
-        d.is_available = available
-    elif option == 'bbox':
-        if 'geom' not in post_data and 'box' not in post_data:
-            return HTTPBadRequest()
-
-        SRID = int(request.registry.settings['SRID'])
-        box = map(float, post_data['box'].split(','))
-        geom = post_data['geom'] if 'geom' in post_data else ''
-
-        if not geom and box:
-            geom = bbox_to_wkb(box, SRID)
-        else:
-            return HTTPBadRequest()
-
-        d.box = box
-        d.geom = geom
+    keys = post_data.keys()
+    for key in keys:
+        #so we can update all the things
         
+        if key == 'metadata':
+            xml = post_data[key]
+            if not xml:
+                return HTTPBadRequest()
+            #replace the original_metadata.xml with the metadata included here
+            if not d.original_metadata:
+                #we need to make one
+                o = OriginalMetadata()
+                o.original_xml = xml
+                d.original_metadata.append(o)
+            else:
+                #just update the xml field
+                d.original_metadata[0].original_xml = xml
+        elif key == 'activate':
+            active = post_data[key]
+            if not active:
+                return HTTPBadRequest()
+            inactive = True if active == 'False' else False
+            d.inactive = inactive
+        elif key == 'available':
+            available = post_data[key]
+            if not available:
+                return HTTPBadRequest()
+            available = True if available == 'True' else False
+            d.is_available = available
+        elif key == 'bbox':
+            parts = post_data[key]
+            if 'geom' not in parts and 'box' not in parts:
+                return HTTPBadRequest()
+
+            SRID = int(request.registry.settings['SRID'])
+            box = parts['box'] if 'box' in parts else ''
+            geom = parts['geom'] if 'geom' in parts else ''
+
+            if not geom and box:
+                box = map(float, box.split(','))
+                geom = bbox_to_wkb(box, SRID)
+            else:
+                return HTTPBadRequest()
+
+            d.box = box
+            d.geom = geom
+        elif key == 'sources':
+            new_sources = post_data[key]
+            #TODO: add the code to add a new source for a dataset
+
+        elif key == 'mapfile':
+            map_settings = post_data[key]
+
+        elif key == 'project':
+            project = post_data[key]
+       
     try:
         DBSession.commit()
     except Exception as err:
         return HTTPServerError(err)
-    
-    #TODO: add the other options
-    #      
+       
 
     return Response('updated')
 
