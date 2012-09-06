@@ -3,6 +3,7 @@ import sys
 import transaction
 
 from sqlalchemy import engine_from_config
+#import sqlahelper
 
 from pyramid.paster import (
     get_appsettings,
@@ -12,6 +13,8 @@ from pyramid.paster import (
 from ..models import (
     DBSession,
     Base,
+    DataoneSession,
+    DataoneBase
     )
     
 from ..models.datasets import (
@@ -31,9 +34,15 @@ def main(argv=sys.argv):
     config_uri = argv[1]
     setup_logging(config_uri)
     settings = get_appsettings(config_uri)
+    
     engine = engine_from_config(settings, 'sqlalchemy.')
     DBSession.configure(bind=engine)
     Base.metadata.create_all(engine)
+
+    d_engine = engine_from_config(settings, 'dataone.')
+    DataoneSession.configure(bind=d_engine)
+    DataoneBase.metadata.create_all(d_engine)
+    
     with transaction.manager:
         #model = MyModel(name='one')
         #DBSession.add(model)

@@ -75,7 +75,11 @@ def main(global_config, **settings):
     config = Configurator(settings=settings)    
     config.scan('.models')
     engine = engine_from_config(settings, 'sqlalchemy.')
-    models.initialize_sql(engine)
+
+    dataone_engine = engine_from_config(settings, 'dataone.')
+
+    models.initialize_sql([engine, dataone_engine])
+    #models.initialize_sql(engine)
 
     config.add_static_view('static', 'static', cache_max_age=3600)
     config.add_route('home', '/')    

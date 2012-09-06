@@ -1,7 +1,7 @@
 from pyramid.view import view_config
 from pyramid.response import Response, FileResponse
 
-from pyramid.httpexceptions import HTTPNotFound, HTTPServerError, HTTPBadRequest
+from pyramid.httpexceptions import HTTPNotFound, HTTPServerError, HTTPBadRequest, HTTPNotImplemented
 
 from sqlalchemy import desc, asc, func
 from sqlalchemy.sql.expression import and_
@@ -12,13 +12,14 @@ import urllib2
 import json
 import os, shutil
 
-#from the models init script
-from ..models import DBSession
+#from the models init script (BOTH connections)
+from ..models import DBSession, DataoneSession
 #from the generic model loader (like meta from gstore v2)
 from ..models.datasets import (
     Dataset,
     )
 from ..models.dataone import *
+from ..models.dataone_logs import DataoneLog
 
 from ..lib.utils import *
 from ..lib.database import *
@@ -41,9 +42,10 @@ NODE = 'urn:node:GSTORE'
 SUBJECT = 'CN=GStore,DC=dataone,DC=org'
 RIGHTSHOLDER = 'CN=GStore,DC=dataone,DC=org'
 CONTACTSUBJECT = 'CN=GStore,DC=dataone,DC=org'
-IDENTIFIER = ''
 NAME = ''
 DESCRIPTION = ''
+
+#TODO: what else needs to be logged other than object/pid (read)?
 
 
 #convert to the d1 format
@@ -83,19 +85,19 @@ def return_error(error_type, detail_code, error_code, error_message='', pid=''):
 '''
 dataone logging in mongodb
 '''
-def log_entry(identifier, ip, event, mongo_uri, useragent=None):
-    gm = gMongo(mongo_uri)
-    gm.insert({"identifier": identifier, "ip": ip, "useragent": useragent, "subject": SUBJECT, "date": datetime.utcnow(), "event": event, "node": NODE})
-    gm.close()
+def log_entry(identifier, ip, event, useragent='public'):
+#    gm = gMongo(mongo_uri)
+#    gm.insert({"identifier": identifier, "ip": ip, "useragent": useragent, "subject": SUBJECT, "date": datetime.utcnow(), "event": event, "node": NODE})
+#    gm.close()
+    
+    dlog = DataoneLog(identifier, ip, SUBJECT, event, NODE, useragent)
+    try:
+        DataoneSession.add(dlog)
+        DataoneSession.commit()
+    except:
+        DataoneSession.rollback()
+        raise
 
-def query_log(mongo_uri, querydict, limit=0, offset=0):
-    gm = gMongo(mongo_uri)
-    if limit:
-        logs = gm.query(querydict, {}, {}, limit, offset)
-    else:
-        logs = gm.query(querydict)
-    gm.close()
-    return logs
 
 #TODO: modify the cache settings
 @view_config(route_name='dataone_ping', match_param='app=dataone', http_cache=3600)
@@ -116,6 +118,7 @@ def ping(request):
 
     #TODO: add check for insufficient resources (except we don't seem to know that)
     #      (413)
+
 
     return Response()
 	
@@ -163,7 +166,8 @@ def dataone(request):
     request.response.content_type='text/xml'
     return rsp
 
-@view_config(route_name='dataone_log', match_param='app=dataone', renderer='dataone_logs.mako')
+#, renderer='dataone_logs.mako'
+@view_config(route_name='dataone_log', match_param='app=dataone')
 def log(request):
     '''
     <?xml version="1.0" encoding="UTF-8"?>
@@ -197,46 +201,55 @@ def log(request):
     offset = int(request.params.get('start')) if 'start' in request.params else 0
     limit = int(request.params.get('count')) if 'count' in request.params else 1000
 
-    fromDate = request.params.get('fromDate') if 'fromDate' in request.params else ''
-    toDate = request.params.get('toDate') if 'toDate' in request.params else ''
+    fromDate = request.params.get('fromdate') if 'fromdate' in request.params else ''
+    toDate = request.params.get('todate') if 'todate' in request.params else ''
 
     #return objects with pid that start with this string
-    pid_init = request.params.get('pidFilter') if 'pidFilter' in request.params else ''
+    pid_init = request.params.get('pidfilter') if 'pidfilter' in request.params else ''
 
     event = request.params.get('event') if 'event' in request.params else ''
 
-    querydict = {}
+    #TODO: add the session request
 
-    connstr = request.registry.settings['dataone_mongo_uri']
-    collection = request.registry.settings['dataone_mongo_collection']
-    mongo_uri = gMongoUri(connstr, collection)
-    logs = query_log(mongo_uri, querydict, limit, offset)
+    clauses = []
+    if pid_init:
+        clauses.append(DataoneLog.identifier.like(pid_init + '%'))
 
-    results = logs.count()
-    #TODO: what is total? the number of all log entries? or what?
-    total = 0
+    if event:
+        clauses.append(DataoneLog.event.like(event))
 
-    '''
-    #2012-02-29T23:26:38.828+00:00
+    if fromDate and not toDate:
+        from_date = dataone_to_datetime(fromDate)
+        clauses.append(DataoneLog.logged>=from_date)
+    elif not fromDate and toDate:
+        to_date = dataone_to_datetime(toDate)
+        clauses.append(DataoneLog.logged<=to_date)
+    elif fromDate and toDate:
+        from_date = dataone_to_datetime(fromDate)
+        to_date = dataone_to_datetime(toDate)
+        clauses.append(between(DataoneLog.logged, fromDate, toDate))
+           
+
+    query = DataoneSession.query(DataoneLog).filter(and_(*clauses))
+    total = query.count()
+    query = query.limit(limit).offset(offset).all()
+
     fmt = '%Y-%m-%dT%H:%M:%S+00:00'
-    post = {'total': 45, 'results': 3, 'offset': 0}
-    docs = [
-            {'id': 1, 'identifier': dataset_id, 'ip': '129.24.63.165', 'useragent': 'null', 'subject': 'CN=GStore,dc=informatics,dc=org', 'event':'read', 'dateLogged':datetime.utcnow().strftime(fmt), 'node': 'GSTORE'},
-            {'id': 2, 'identifier': dataset_id, 'ip': '129.24.63.55', 'useragent': 'null', 'subject': 'CN=GStore,dc=informatics,dc=org', 'event':'read', 'dateLogged':datetime.utcnow().strftime(fmt), 'node': 'GSTORE'},
-            {'id': 3, 'identifier': dataset_id, 'ip': '129.24.63.235', 'useragent': 'null', 'subject': 'CN=GStore,dc=informatics,dc=org', 'event':'read', 'dateLogged':datetime.utcnow().strftime(fmt), 'node': 'GSTORE'}
-        ]
-    post.update({'docs': docs})
-    '''
+    
+#    rsp = {'total': total, 'results': query.count(), 'offset': offset}
+#    docs = []
+    
+#    for q in query:
+#        docs.append({'id': q.id, 'identifier': q.identifier, 'ip': q.ip_address, 'useragent': q.useragent, 'subject': q.subject, 'event': q.event, 'dateLogged': q.logged.strftime(fmt), 'node': q.node})
 
-    rsp = {'total': total, 'results': results, 'offset': offset}
-    docs = []
-    for g in logs:
-        logged = g['date']
-        
-        docs.append({'id': str(g['_id']), 'identifier': g['identifier'], 'ip': g['ip'], 'useragent': 'null', 'subject': g['subject'], 'event': g['event'], 'dateLogged': '', 'node': g['node']})
+    entries = []
+    for q in query:
+        entries.append(q.get_log_entry())
+    rsp = '<?xml version="1.0" encoding="UTF-8"?><d1:log xmlns:d1="http://ns.dataone.org/service/types/v1" count="%s" start="%s" total="%s">%s</d1:log>' % (len(query), offset, total, ''.join(entries))
 
-    rsp.update({'docs': docs})
-    return rsp
+    return Response(rsp, content_type='application/xml')    
+#    rsp.update({'docs': docs})
+#    return rsp
 	
 @view_config(route_name='dataone_search', match_param='app=dataone', renderer='dataone_search.mako')
 def search(request):
@@ -378,10 +391,12 @@ def show(request):
         return_error('object', 1800, 404)
 
     #should be xml or zip only
-    #TODO: check on the RDF mimetype if it's not xml
     mimetype = 'application/xml'
     if core_object.object_type in ['source', 'vector']:
         mimetype = 'application/x-zip-compressed'
+
+    #TODO: add the session info or something    
+    log_entry(pid, request.client_addr, 'read')
 
     fr = FileResponse(obj_path, content_type=mimetype)
     #make the download filename be the obsolete_uuid that was requested just to be consistent
@@ -555,7 +570,6 @@ def checksum(request):
     '''
     <checksum algorithm="SHA-1">2e01e17467891f7c933dbaa00e1459d23db3fe4f</checksum>
     '''
-
     pid = request.matchdict['pid']
 
     algo = request.params.get('checksumAlgorithm', '')
@@ -580,10 +594,10 @@ def checksum(request):
 
 @view_config(route_name='dataone_error', request_method='POST', match_param='app=dataone')
 def error(request):
-    #TODO: return notimplemented?
 
     #TODO: parse a multipart post (without examples) and log to mongo as an error
-    return HTTPServerError('', status=501)
+    #return HTTPServerError('', status=501)
+    return HTTPNotImplemented()
 
 @view_config(route_name='dataone_replica', match_param='app=dataone')
 def replica(request):
@@ -592,6 +606,8 @@ def replica(request):
 
     return file
     '''
+    return HTTPNotImplemented()
+    
     pid = request.matchdict['pid']
     return Response('dataone replica')
 
@@ -614,7 +630,7 @@ as dataone core objects using the object uuid and type. and then push the core o
 that means three posts per object right now. the basic object posts always return the object uuid to register, the object type
 and the utc datetime it was posted.
 '''
-@view_config(route_name='dataone_addcore')
+@view_config(route_name='dataone_addcore', request_method='POST')
 def add_dataone_core(request):
     '''
     {
@@ -647,12 +663,14 @@ def add_dataone_core(request):
     try:
         DBSession.add(core_obj)
         DBSession.commit()
+        DBSession.flush()
+        DBSession.refresh(core_obj)
     except:
         return HTTPServerError()
     
-    return Response()
+    return Response(json.dumps({"core_uuid": core_obj.dataone_uuid, "date_added": core_obj.date_added.strftime('%Y-%m-%dT%H:%M:%S'), "object_uuid": core_obj.object_uuid, "object_type": core_obj.object_type}))
     
-@view_config(route_name='dataone_addmetadata')
+@view_config(route_name='dataone_addmetadata', request_method='POST')
 def add_dataone_metadata(request):
     '''
     {
@@ -701,9 +719,9 @@ def add_dataone_metadata(request):
     with open(dataone_path, 'w') as f:
         f.write(xml)
 
-    return Response({'object_uuid': meta_uuid, 'object_type': 'metadata', 'date_added': datetime.utcnow()})
+    return Response(json.dumps({'object_uuid': meta_uuid, 'object_type': 'metadata', 'date_added': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}))
 
-@view_config(route_name='dataone_addvector')
+@view_config(route_name='dataone_addvector', request_method='POST')
 def add_dataone_vector(request):
     '''
     {
@@ -741,6 +759,7 @@ def add_dataone_vector(request):
     except:
         return HTTPServerError()
 
+
     vector_uuid = vector.vector_uuid
 
     #see if the vector exists as a zip in formats
@@ -748,30 +767,46 @@ def add_dataone_vector(request):
     DATAONE_PATH = request.registry.settings['DATAONE_PATH']
     
     dataone_path = os.path.join(DATAONE_PATH, 'datasets')
-
-    outpath = os.path.join(FORMATS_PATH, d.uuid, format, '%s.%s.zip' % (d.uuid, format))
     datapath = os.path.join(dataone_path, '%s.zip' % (vector_uuid))
-    if os.path.isfile(outpath):
-        #copy the file to dataone and rename
-        shutil.copyfile(outpath, datapath)
-    else:   
-        #if not, go make it and copy the zip to dataone
-        #build_vector(self, format, basepath, mongo_uri, epsg)
-        #set up the mongo connection
-        mconn = request.registry.settings['mongo_uri']
-        mcoll = request.registry.settings['mongo_collection']
-        mongo_uri = gMongoUri(mconn, mcoll)
 
-        srid = int(request.registry.settings['SRID'])
-        success = d.build_vector(format, os.path.join(FORMATS_PATH, d.uuid, format), mongo_uri, srid)
-        if success[0] != 0:
-            return HTTPServerError()
-        #and copy to dataone
-        shutil.copyfile(outpath, datapath)
 
-    return Response({'object_uuid': vector_uuid, 'object_type': 'vector', 'date_added': datetime.utcnow()})
+#    #TODO: may need to update this and the _source method for the original v derived + format setup (in case there's original+shp and derived+shp or something)
+    try:
+        source = [s for s in d.sources if s.extension == format and s.active and not s.is_external] if d.sources else None
+        if source:
+            #make a copy 
+            source = source[0]
+#            xslt_path = request.registry.settings['XSLT_PATH']
+#            output = source.pack_source(dataone_path, '%s.zip' % (vector_uuid), xslt_path)
+        else:   
 
-@view_config(route_name='dataone_addsource')
+            outpath = os.path.join(FORMATS_PATH, d.uuid, format, '%s.%s.zip' % (d.uuid, format))
+            if os.path.isfile(outpath):
+                #copy the file to dataone and rename
+                shutil.copyfile(outpath, datapath)
+            else:   
+                #if not, go make it and copy the zip to dataone
+                cachepath = os.path.join(FORMATS_PATH, d.uuid, format)
+                if not os.path.isdir(cachepath):
+                    #make a new one and this is stupid
+                    if not os.path.isdir(os.path.join(FORMATS_PATH, str(d.uuid))):
+                        os.mkdir(os.path.join(FORMATS_PATH, str(d.uuid)))
+                    os.mkdir(os.path.join(FORMATS_PATH, str(d.uuid), format))
+                
+                mconn = request.registry.settings['mongo_uri']
+                mcoll = request.registry.settings['mongo_collection']
+                mongo_uri = gMongoUri(mconn, mcoll)
+                srid = int(request.registry.settings['SRID'])
+                success = d.build_vector(format, cachepath, mongo_uri, srid)
+                if success[0] != 0:
+                    return HTTPServerError(success[1])
+                #and copy to dataone
+                shutil.copyfile(outpath, datapath)
+    except Exception as err:
+        return HTTPServerError(err)
+    return Response(json.dumps({'object_uuid': vector.vector_uuid, 'object_type': 'vector', 'date_added': vector.date_added.strftime('%Y-%m-%dT%H:%M:%S')}))
+
+@view_config(route_name='dataone_addsource', request_method='POST')
 def add_dataone_source(request):
     '''
     {
@@ -795,7 +830,7 @@ def add_dataone_source(request):
         return HTTPBadRequest()
 
     #get the source object for the dataset + format
-    source = [s for s in d.sources if s.extension == format]
+    source = [s for s in d.sources if s.extension == format and s.active and not s.is_external]
     if not source:
         return HTTPBadRequest()
     source == source[0]
@@ -816,30 +851,62 @@ def add_dataone_source(request):
     xslt_path = request.registry.settings['XSLT_PATH']
     output = source.pack_source(dataone_path, '%s.zip' % (source.uuid), xslt_path)
     
-    return Response({'object_uuid': source.uuid, 'object_type': 'source', 'date_added': datetime.utcnow()})
+    return Response(json.dumps({'object_uuid': source.uuid, 'object_type': 'source', 'date_added': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}))
 
-@view_config(route_name='dataone_addpackage')
+@view_config(route_name='dataone_addpackage', request_method='POST')
 def add_dataone_package(request):
     '''
     {
         metadata_uuid (core_uuid for this metadata object)
         dataobject_uuid (core_uuid for this metadata object)
+        dataobject_type 
     }
     '''
 
     post_data = request.json_body
-    if 'metadata_uuid' not in post_data and 'dataobject_uuid' not in post_data:
+    if 'metadata_uuid' not in post_data and 'dataobject_uuid' not in post_data and 'dataobject_type' not in post_data:
         return HTTPBadRequest()
 
-    #TODO: check for the two objects in the CORE table
+    dataobject_uuid = post_data['dataobject_uuid']
+    dataobject_type = post_data['dataobject_type']
+    metadata_uuid = post_data['metadata_uuid']
 
-    #TODO: create new package
+    #the object type is not 100% necessary but we like specificity here. and if not
+    #TODO: just do an or (or in) for the two uuids and count the result set
+    data_obj = DBSession.query(DataoneCore).filter(and_(DataoneCore.object_uuid==dataobject_uuid, DataoneCore.object_type==dataobject_type)).first()
+    meta_obj = DBSession.query(DataoneCore).filter(and_(DataoneCore.object_uuid==metadata_uuid, DataoneCore.object_type=='metadata')).first()
 
-    #TODO: build the rdf for the package
+    if not data_obj or not meta_obj:
+        return HTTPBadRequest()
+
+    #check for a package with these objects as well
+    package_obj = DBSession.query(DataonePackage).filter(and_(DataonePackage.dataset_uuid==dataobject_uuid, DataonePackage.metadata_uuid==metadata_uuid)).first()
+    if package_obj:
+        return HTTPBadRequest()
+
+    #add the new package
+    package_obj = DataonePackage(dataobject_uuid, metadata_uuid)
+    try:
+        DBSession.add(package_obj)
+        DBSession.commit()
+        DBSession.flush()
+        DBSession.refresh(package_obj)
+    except:
+        DBSession.rollback()
+        return HTTPServerError()
+
+    #build the rdf
+    LOAD_BALANCER = request.registry.settings['BALANCER_URL']
+    DATAONE_PATH = request.registry.settings['DATAONE_PATH']
+    base_url = '%s/apps/dataone'
+    rdfpath = os.path.join(DATAONE_PATH, 'packages')
+    success = package_obj.build_rdf(rdfpath, base_url)
+    if not success:
+        return HTTPServerError()
     
-    return Response({'object_uuid': '', 'object_type': 'metadata', 'package': datetime.utcnow()})
+    return Response(json.dumps({'object_uuid': package_obj.package_uuid, 'object_type': 'package', 'date_added': package_obj.date_added.strftime('%Y-%m-%dT%H:%M:%S')}))
 
-@view_config(route_name='dataone_addobsolete')
+@view_config(route_name='dataone_addobsolete', request_method='POST')
 def add_dataone_obsolete(request):
     '''
     {
@@ -853,7 +920,7 @@ def add_dataone_obsolete(request):
 
     #let's make sure it's a valid dataone_core uuid
     core_uuid = post_data['core_uuid']
-    core_obj = DBSession.query(DateoneCore).filter(DataoneCore.dataone_uuid==core_uuid).first()
+    core_obj = DBSession.query(DataoneCore).filter(DataoneCore.dataone_uuid==core_uuid).first()
     if not core_obj:
         return HTTPBadRequest()
 
@@ -867,9 +934,9 @@ def add_dataone_obsolete(request):
         DBSession.rollback()
         return HTTPServerError()
      
-    return Response({'obsolete_uuid': obsolete.obsolete_uuid, 'core_uuid': core_uuid, 'date_added': datetime.utcnow()})
+    return Response(json.dumps({'obsolete_uuid': obsolete.obsolete_uuid, 'core_uuid': core_uuid, 'date_added': obsolete.date_changed.strftime('%Y-%m-%dT%H:%M:%S')}))
 
-@view_config(route_name='dataone_updatepackage')
+@view_config(route_name='dataone_updatepackage', request_method='POST')
 def update_dataone_package(request):
     '''
     {

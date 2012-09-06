@@ -34,7 +34,7 @@ class DataoneCore(Base):
         Column('dataone_uuid', UUID, FetchedValue()),
         Column('object_uuid', UUID),
         Column('object_type', String(25)),
-        Column('date_added', TIMESTAMP, default="now()"),
+        Column('date_added', TIMESTAMP, FetchedValue()),
         Column('format_id', Integer, ForeignKey('gstoredata.dataone_formatids.id')),
         schema='gstoredata'
     )
@@ -51,7 +51,7 @@ class DataoneCore(Base):
 
     format = relationship('DataoneFormat')
 
-    def __init(self, object_uuid, object_type, format_id):
+    def __init__(self, object_uuid, object_type, format_id):
         self.object_uuid = object_uuid
         self.object_type = object_type
         self.format_id = format_id
@@ -140,6 +140,7 @@ class DataonePackage(Base):
         Column('package_uuid', UUID, FetchedValue()),
         Column('dataset_object', UUID),
         Column('metadata_object', UUID),
+        Column('date_added', TIMESTAMP, FetchedValue()),
         schema='gstoredata'
     )
     '''
@@ -284,7 +285,7 @@ class DataoneVector(Base):
         Column('vector_uuid', UUID, FetchedValue()),
         Column('dataset_uuid', UUID),
         Column('format', String(20)),
-        Column('date_added', TIMESTAMP, default="now()"),
+        Column('date_added', TIMESTAMP, FetchedValue()),
         schema='gstoredata'
     )
     '''
@@ -330,7 +331,7 @@ class DataoneObsolete(Base):
         Column('id', Integer, primary_key=True),
         Column('dataone_uuid', UUID, ForeignKey('gstoredata.dataone_core.dataone_uuid')),
         Column('obsolete_uuid', UUID, FetchedValue()),
-        Column('date_changed', TIMESTAMP, default="now()"),
+        Column('date_changed', TIMESTAMP, FetchedValue()),
         schema='gstoredata'
     )    
     '''
