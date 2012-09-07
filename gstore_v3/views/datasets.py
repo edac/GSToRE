@@ -135,7 +135,7 @@ def dataset(request):
                 return HTTPNotFound()
             #get the name of the file from the url
             outname = '%s.%s.%s.zip' % (d.basename, datatype, format)
-            zippath = os.path.join(tmppath, str(dataset_id))
+            zippath = os.path.join(tmppath, str(d.uuid))
 
             if not os.path.isdir(zippath):
                 os.mkdir(zippath)
@@ -176,13 +176,15 @@ def dataset(request):
                 if not tmppath:
                     return HTTPNotFound()
                 outname = '%s.%s.%s.zip' % (d.basename, datatype, format)
-                zippath = os.path.join(tmppath, str(dataset_id), outname)
+                zippath = os.path.join(tmppath, str(d.uuid), outname)
                 #make the zipfile
                 output = src.pack_source(zippath, outname, xslt_path)
             else:
                 #it should already be a zip
-                output = files[0].location
-                outname = files[0].location.split('/')[-1]
+                #output = src.src_files[0].location
+                #outname = src.src_files[0].location.split('/')[-1]
+                output = src.get_location(format)
+                outname = output.split('/')[-1]
 
             fr = FileResponse(output, content_type=mimetype)
             fr.content_disposition = 'attachment; filename=%s' % (outname)
@@ -472,7 +474,7 @@ def add_dataset(request):
         #this should be the unique project name
         p = DBSession.query(Project).filter(Project.name==project).first()
         if p:
-            new_dataset.project_id = p[0].id
+            new_dataset.project_id = p.id
 
     #create the new dataset with all its pieces
     try:

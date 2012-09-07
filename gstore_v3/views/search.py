@@ -381,8 +381,7 @@ def search_datasets(request):
                 to_yield += rst + ','
 
                 if cnt == limit - 1:
-                    to_yield = to_yield[:-1]
-                    to_yield += tail
+                    to_yield = to_yield[:-1] + tail
                 
                 cnt += 1
 
@@ -410,9 +409,7 @@ def search_datasets(request):
                 to_yield += rst + ','
 
                 if cnt == limit - 1:
-                    to_yield = to_yield[:-1]
-                    to_yield += tail
-
+                    to_yield = to_yield[:-1] + tail
 
                 cnt += 1
                 yield to_yield                    

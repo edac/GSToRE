@@ -196,6 +196,9 @@ def log(request):
 
     '''
 
+    #TODO: check opn filters again (pidFilter not working??)
+
+
     params = normalize_params(request.params)
 
     offset = int(request.params.get('start')) if 'start' in request.params else 0
@@ -636,6 +639,7 @@ def add_dataone_core(request):
     {
         object_uuid
         object_type: vector | source | package | metadata
+        format 
     }
 
     NOTE: if you are posting metadata, the uuid is from the metadata (DatasetMetadata) table not datasets OR original_metadata
@@ -833,7 +837,7 @@ def add_dataone_source(request):
     source = [s for s in d.sources if s.extension == format and s.active and not s.is_external]
     if not source:
         return HTTPBadRequest()
-    source == source[0]
+    source = source[0]
 
     core_obj = DBSession.query(DataoneCore).filter(and_(DataoneCore.object_uuid==source.uuid, DataoneCore.object_type=='source')).first()
     if core_obj:
@@ -853,6 +857,9 @@ def add_dataone_source(request):
     
     return Response(json.dumps({'object_uuid': source.uuid, 'object_type': 'source', 'date_added': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}))
 
+#TODO: modify this to create packages for 1+ datasets and 1 metadata (all versions of vector (shp, kml, csv, etc) use same metadata). 
+#      should just be a matter of magically finding all vector objects for a dataset uuid and doing that. but the build_package
+#      method will also have to be updated. and what to do about source objects? 
 @view_config(route_name='dataone_addpackage', request_method='POST')
 def add_dataone_package(request):
     '''

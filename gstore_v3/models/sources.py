@@ -78,6 +78,10 @@ class Source(Base):
         files.append(md_filename)
         
         output = create_zip(os.path.join(outpath, outname), files)
+
+        #and delete the new xml
+        os.remove(md_filename)
+        
         return output
 
     #TODO: check if this will work with service loactions, i.e. links, that don't have a format
