@@ -373,15 +373,20 @@ def search_datasets(request):
                                 (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
                                 "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
                                 "box": [float(b) for b in d.box], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id, "gr": gr})
+
+                to_yield = ''
                 if cnt == 0:
-                    rst = head + rst + ','
-                elif cnt == limit - 1:
-                    rst += tail
-                else:
-                    rst += ','
+                    to_yield = head
+
+                to_yield += rst + ','
+
+                if cnt == limit - 1:
+                    to_yield = to_yield[:-1]
+                    to_yield += tail
+                
                 cnt += 1
 
-                yield rst
+                yield to_yield
         elif version == 3:
             '''
             new format
@@ -396,21 +401,21 @@ def search_datasets(request):
                     gr = 0.0
                 rst = d.get_full_service_dict(base_url, request)
                 rst.update({'gr': gr})
-                #results.append(rst)
-                #rsp = d.get_full_service_dict(base_url)
-
                 rst = json.dumps(rst)
+                
+                to_yield = ''
                 if cnt == 0:
-                    rst = head + rst + ','
-                elif cnt == limit - 1:
-                    rst += tail
-                else:
-                    rst += ','
+                    to_yield = head
+
+                to_yield += rst + ','
+
+                if cnt == limit - 1:
+                    to_yield = to_yield[:-1]
+                    to_yield += tail
+
 
                 cnt += 1
-                yield rst
-                    
-            #yield "]}"
+                yield to_yield                    
 
     response = Response()
     response.content_type = 'application/json'

@@ -25,17 +25,134 @@
     <h3>Downloads</h3>
     <p>To get a list of available download formats for a dataset, please use the Service Description request (see below).</p>
     <p>URL structure: /apps/rgis/datasets/{uuid}/{basename}.{set}.{format}</p>
-    <p>where basename is the dataset file name, set is original or derived, and format is the desired format (so long as it is a supported format for the dataset).</p>
+    <p>where basename is the dataset file name, set is original or derived, and format is the desired format (so long as it is a supported format for the dataset). Note: 
+    Excel file downloads are truncated if a dataset exceeds 65,534 records. 
+    </p>
     <p>There are no query parameters for this request.</p>
     <h4>Examples</h4>
     <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/coalminepermitbounds.derived.shp</p>
     
     <h3>Service Description</h3>
-    <p>The service description provides a listing of all available downloads, web services, metadata files, and other basic dataset information.</p>
+    <p>The service description provides a listing of all available downloads, web services, metadata files, and other basic dataset information. The structure of the JSON response is identical to the individual dataset objects in the dataset search results (see below).</p>
     <p>URL structure: /apps/rgis/datasets/{uuid}/services.json</p>
     <p>There are no query parameters for this request.</p>
     <h4>Examples</h4>
     <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/services.json</p>
+
+    <h4>Example Output</h4>
+    <dl>
+        <dt>description</dt>
+        <dd>The dataset title</dd>
+        <dt>lastupdate</dt>
+        <dd>The date the dataset was added to RGIS as yyyyMMdd.</dd>
+        <dt>uuid</dt>
+        <dd>The dataset UUID</dd>
+        <dt>id</dt>
+        <dd>Unique integer ID</dd>
+        <dt>taxonomy</dt>
+        <dd>Dataset type (file, geoimage or vector)</dd>
+        <dt>name</dt>
+        <dd>Dataset file name</dd>
+        <dt>categories</dt>
+        <dd>List of elements defining the category sets this dataset belongs to. Each element has a theme, subtheme and groupname element.</dd>
+        <dt>gr</dt>
+        <dd>Dataset georelevance score (0+ if performaing a spatial search; 0.0 if not). Datasets are considered more relevant a the score approaches zero.</dd>
+        <dt>availability</dt>
+        <dd>Optional boolean element (if the result set for a dataset does not include "availablility", assume availability is TRUE. Note, however, that the dataset may still have empty downloads, metadata or services lists (see below) even if a dataset is available. </dd>
+        <dt>downloads</dt>
+        <dd>List of elements describing the formats available (keys) and the downloads links associated with each format.</dd>
+        <dt>services</dt>
+        <dd>List of elements describing the services available (keys) and the links associated with service.</dd>
+        <dt>metadata</dt>
+        <dd>List of elements describing the metadata standards (keys) and formats (nested element) available for a dataset. Each standard has a nested element with the metadata formats (keys) and links defined.</dd>
+        <dt>preview</dt>
+        <dd>URL for the GSTORE map previewer for the dataset</dd>
+        <dt>spatial</dt>
+        <dd>Defines the spatial reference (as integer EPSG code) and the bounding box (in WGS84) for the dataset.</dd>
+    </dl>
+    <p>Note that the downloads, services, metadata, and preview elements may be empty based on availability or dataset limitations.</p>
+    
+     <p>Example JSON response for a raster dataset</p>
+     <pre>
+        {
+            "lastupdate": "20120827", 
+            "uuid": "53e46145-2171-4f33-b1d6-6c0a3e6b6904", 
+            "taxonomy": "geoimage", 
+            "downloads": [
+                            {
+                                "img": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/mora_tm2011.original.img"
+                            }
+                         ], 
+            "description": "Mora County Landsat Mosaic, 2011", 
+            "metadata": [
+                            {
+                                "fgdc": 
+                                    {
+                                        "xml": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/metadata/fgdc.xml", 
+                                        "html": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/metadata/fgdc.html"
+                                    }
+                            }
+                        ], 
+            "spatial": {
+                            "epsg": 4326, 
+                            "bbox": [-105.724276, 35.751735, -104.324307, 36.262927]
+                       }, 
+            "services": [
+                            {
+                                "wms": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/services/ogc/wms", 
+                                "wcs": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/services/ogc/wcs"
+                            }
+                        ], 
+            "preview": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/mapper", 
+            "gr": 0.0, 
+            "id": 163367, 
+            "categories": [
+                            {
+                                "subtheme": "Landsat", 
+                                "theme": "Satellite Imagery", 
+                                "groupname": "New Mexico"
+                            }
+                          ], 
+            "name": "mora_tm2011"
+        }
+    </pre>
+    <p>Example JSON response for an unavailable dataset</p>
+    <pre>
+        {
+            "downloads": [], 
+            "lastupdate": "20120827", 
+            "uuid": "5bb2eb39-643b-4ca5-bec5-cff2c2c2d33a", 
+            "taxonomy": "geoimage", 
+            "description": "Valencia County Landsat Mosaic, 2011", 
+            "metadata": [
+                            {
+                                "fgdc": 
+                                    {
+                                        "xml": "${base_url}/apps/rgis/datasets/5bb2eb39-643b-4ca5-bec5-cff2c2c2d33a/metadata/fgdc.xml", 
+                                        "html": "${base_url}/apps/rgis/datasets/5bb2eb39-643b-4ca5-bec5-cff2c2c2d33a/metadata/fgdc.html"
+                                    }
+                                }
+                        ], 
+            "availability": false, 
+            "spatial": 
+                {
+                    "epsg": 4326, 
+                    "bbox": [-107.214776, 34.425583, -106.403015, 34.970134]
+                }, 
+            "services": [], 
+            "preview": "", 
+            "gr": 0.0, 
+            "id": 163381, 
+            "categories": [
+                            {
+                                "subtheme": "Landsat", 
+                                "theme": "Satellite Imagery", 
+                                "groupname": "New Mexico"
+                            }
+                            ], 
+            "name": "valencia_tm2011"
+        }
+     </pre>
 
     <h3>Web Services</h3>
     <p>Available web services by dataset are currently limited to OGC services: WMS, WCS or WFS.</p>
