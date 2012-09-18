@@ -56,6 +56,7 @@ def dataset(request):
     #use the original dataset_id structure 
     #or the new dataset uuid structure
 
+    app = request.matchdict['app']
     dataset_id = request.matchdict['id']
     format = request.matchdict['ext']
     datatype = request.matchdict['type'] #original vs. derived
@@ -220,7 +221,10 @@ def dataset(request):
 
         srid = int(request.registry.settings['SRID'])
         
-        success = d.build_vector(format, cachepath, mongo_uri, srid)
+#        success = d.build_vector(format, cachepath, mongo_uri, srid)
+        load_balancer = request.registry.settings['BALANCER_URL']
+        base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
+        success = d.stream_vector(format, cachepath, mongo_uri, srid, base_url)
         if success[0] != 0:
             return HTTPServerError()
 
@@ -387,8 +391,8 @@ def add_dataset(request):
     records = spatials['records'] if 'records' in spatials else 0
 
     #add the inactive flag
-    active = post_data['active'] if 'active' in post_data else ''
-    inactive = False if active == 'True' else True
+    active = post_data['active'].lower() if 'active' in post_data else ''
+    inactive = False if active == 'true' else True
 
     project = post_data['project'] if 'project' in post_data else ''
 
@@ -558,7 +562,7 @@ def update_dataset(request):
             #TODO: add the code to add a new source for a dataset
 
         elif key == 'mapfile':
-            map_settings = post_data[key]
+            new_settings = post_data[key]
 
         elif key == 'project':
             project = post_data[key]

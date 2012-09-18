@@ -70,7 +70,7 @@ class Source(Base):
         md_output, md_contenttype = self.datasets.original_metadata[0].transform('fgdc', 'xml', xslt_path)
         #add the metadata xml file unless there is one in the source list (good way to tell?)
         #except we don't have any .xml listed in the source_files table so tada!
-        md_filename = os.path.join(outpath, '%s.xml' % (outname))
+        md_filename = os.path.join(outpath, outname.replace('.zip', '.xml'))
         md_file = open(md_filename, 'w')
         md_file.write(md_output)
         md_file.close()

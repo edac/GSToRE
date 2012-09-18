@@ -165,22 +165,19 @@ def getLayer(d, src, dataloc, bbox):
 
     #check for any mapfile settings
     #TODO: refactor this to make it nicer (woof)
+    #TODO: how does this handle vector classes? whoops, it doesn't.
     if src:
         mapsettings = src.map_settings[0] if src.map_settings else None
         if mapsettings:
-            #check for the bands to use and their order
-#            if mapsettings.settings and 'BANDS' in mapsettings.settings:
-#                layer.setProcessing('BANDS='+mapsettings.settings['BANDS'])
-#            if mapsettings.settings and 'LUT' in mapsettings.settings:
-#                layer.setProcessing('LUT=' + mapsettings.settings['LUT'])
             processing_directives = mapsettings.get_processing()
             for directive in processing_directives:
                 layer.setProcessing(directive)
-                
 
-            if mapsettings.classes:
+            mapclasses = mapsettings.classes if mapsettings.classes else None    
+
+            if mapclasses:
                 #do something with classes
-                for c in mapsettings.classes:
+                for c in mapclasses:
                     cls = mapscript.classObj()
                     cls.name = c.name
                     #check for a style ref
@@ -211,10 +208,10 @@ def getLayer(d, src, dataloc, bbox):
             #TODO: add styles and make sure that they're available through the getstyles or whatever
             #       probably add styles first and then the class points to it instead of baking the style into the class
             #       like above
-            if mapsettings.styles:
-                #add the styles as the available styles
-                
-                pass
+#            if mapsettings.styles:
+#                #add the styles as the available styles
+#                
+#                pass
     layer.close()   
     return layer
 

@@ -439,7 +439,7 @@ def features(request):
                     'sfields': '\n'.join(["""<SimpleField type="%s" name="%s"><displayName>%s</displayName></SimpleField>""" % (k['type'], k['name'], k['name']) for k in kml_flds])
                 }
 
-                field_set = ''
+#                field_set = ''
                 schema_url = schema_base % (the_dataset.uuid)
             elif format == 'csv':
                 #and add the dataset id, the fid and the observed datetime fields
@@ -461,6 +461,8 @@ def features(request):
                 
             #so we'll yield each vector instead (eek, that's a lot of stuff)
             cnt = 0
+
+            #TODO: CHECK THIS FOR ONE FEATURE ONLY (WHEN WOULD THAT HAPPEN?)
             for vector in vectors:
                 vector_result = convert_vector(vector, fields, format, the_dataset.basename, schema_url, epsg)
 
@@ -491,7 +493,7 @@ def features(request):
         obs = vector['obs'] if 'obs' in vector else ''
 
         #get the geometry
-        if not format in ['csv', 'json']:
+        if not fmt in ['csv', 'json']:
             wkb = vector['geom']['g'] if 'geom' in vector else ''
             if not wkb:
                 #need to get it from shapes
@@ -510,8 +512,9 @@ def features(request):
         #there's some wackiness with a unicode char and mongo (and also a bad char in the data, see fid 6284858)
         #convert atts to name, value tuples so we only have to deal with the wackiness once
         atts = [(a['name'], unicode(a['val']).encode('ascii', 'xmlcharrefreplace')) for a in atts]
-        
-        if format == 'kml': 
+
+        #TODO: add observed to kml/gml and field list (also double check attribute schema for kml for observed)
+        if fmt == 'kml': 
             #make sure we've encoded the value string correctly for kml
             feature = "\n".join(["""<SimpleData name="%s">%s</SimpleData>""" % (v[0], re.sub(r'[^\x20-\x7E]', '', escape(str(v[1])))) for v in atts])
 
@@ -522,20 +525,20 @@ def features(request):
                         <ExtendedData><SchemaData schemaUrl="%s">%s</SchemaData></ExtendedData>
                         <Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
                         </Placemark>""" % (fid, fid, geom_repr, '', schema_url, feature)
-        elif format == 'gml':
+        elif fmt == 'gml':
             #going to match the gml from the dataset downloader
             #need a list of values as <ogr:{att name}>VAL</ogr:{att name}>
             vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0], re.sub(r'[^\x20-\x7E]', '', escape(str(a[1]))), a[0]) for a in atts])
             feature = """<gml:featureMember><ogr:g_%(basename)s><ogr:geometryProperty>%(geom)s</ogr:geometryProperty>%(values)s</ogr:g_%(basename)s></gml:featureMember>""" % {
                     'basename': basename, 'geom': geom_repr, 'values': vals} 
-        elif format == 'geojson':
+        elif fmt == 'geojson':
             #TODO: qgis won't read a geojson from multiple datasets
             #so we don't care about the fact that the fields change?
             #or we do and we will deal with the consequences shortly
             vals = dict([(a[0], a[1]) for a in atts])
             vals.update({'fid':fid, 'dataset_id': did, 'observed': obs})
             feature = json.dumps({"type": "Feature", "properties": vals, "geometry": json.loads(geom_repr)})
-        elif format == 'csv':
+        elif fmt == 'csv':
             vals = []
             for f in fields:
                 att = [a for a in atts if a[0] == f.name]
@@ -544,7 +547,7 @@ def features(request):
                 vals.append(att[0][1])
             vals += [str(fid), str(did), obs]
             feature = ','.join(vals)
-        elif format == 'json':
+        elif fmt == 'json':
             #no geometry, just attributes (good for timeseries requests)
             vals = dict([(a[0], a[1]) for a in atts])
             feature = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals, 'observed': obs})
@@ -733,18 +736,30 @@ def add_attributes(request):
         inserts.append(obj)
 
     #insert everything to mongo if there's stuff to insert
+#    if len(inserts) != the_dataset.record_count:
+#        return HTTPBadRequest('')
+        
     if inserts:
         connstr = request.registry.settings['mongo_uri']
         collection = request.registry.settings['mongo_collection']
         mongo_uri = gMongoUri(connstr, collection)
         gm = gMongo(mongo_uri)
-        fail = gm.insert(inserts)
-        gm.close()
-
-        if fail:
-            return HTTPServerError(fail)
+        try:
+            fail = gm.insert(inserts)
+            if fail:
+                #TODO: run a delete for the dataset id just in case it failed midstream
+                return HTTPServerError(fail)
+        except:
+            #remove anything that got entered
+            pass
+        finally:
+            gm.close()    
 
         #TODO: add the export to .json file (by dataset id/uuid) to clusterdata for backup, etc
+        VECTOR_PATH = request.registry.settings['VECTOR_IMPORT_PATH']
+        vector_file = os.path.join(VECTOR_PATH, '%s.json' % (dataset_uuid))
+        with open(vector_file, 'w') as g:
+            g.write('\n'.join([json.dumps(i) for i in inserts]))
 
     output = {'features': len(inserts)}
     if bad_recs:

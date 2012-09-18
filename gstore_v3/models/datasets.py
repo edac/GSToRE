@@ -24,6 +24,8 @@ from ..lib.mongo import gMongo
 from ..models.features import Feature
 
 import os, tempfile, shutil
+import subprocess, re
+from xml.sax.saxutils import escape
 
 
 '''
@@ -200,6 +202,7 @@ class Dataset(Base):
                 return None, fmtfile
 
             #nope, go build the vector
+            #TODO: why is this showing up in the logs as an error? even though the vectors are generated and diplayed correctly?
             if not os.path.isdir(os.path.join(fmtpath, str(self.uuid), 'shp')):
                 #make the directory
                 if not os.path.isdir(os.path.join(fmtpath, str(self.uuid))):
@@ -219,6 +222,11 @@ class Dataset(Base):
     def get_full_service_dict(self, base_url, req):
         #update the url
         base_url += str(self.uuid)
+
+
+        ##TODO: need to escape the description text - this:
+        #1935 15' Quad #217 Aerial Photo Mosaic Index - AZ
+        #returns a result but doesn't parse
     
         results = {'id': self.id, 'uuid': self.uuid, 'description': self.description, 
                 'spatial': {'bbox': string_to_bbox(self.box), 'epsg': 4326}, 'lastupdate': self.dateadded.strftime('%Y%m%d'), 'name': self.basename, 'taxonomy': self.taxonomy,
@@ -304,6 +312,9 @@ class Dataset(Base):
 
         return results
 
+    #TODO: add a vector cache directory check + mkdir method
+
+
     #build any vector format that comes from OGR (shp, kml, csv, gml, geojson)
     def build_vector(self, format, basepath, mongo_uri, epsg):
         '''
@@ -359,7 +370,8 @@ class Dataset(Base):
         for fld in flds:
             layer.CreateField(fld.att_to_fielddefn(format))
 
-        #TODO: add the observed field
+        #TODO: change to a datetime field and fix the format is necessary
+        layer.CreateField(ogr.FieldDefn('Observed', ogr.OFTString))
 
         lyrdef = layer.GetLayerDefn()
 
@@ -399,8 +411,10 @@ class Dataset(Base):
                     value = convert_by_ogrtype(value, fld.ogr_type)
                     feature.SetField(str(fld.name), value)
 
-            #TODO: add the observed value   
-                
+            #TODO: check on the format (it's utc, but maybe we want a specific structure)   
+            obs = str(v['obs']) if 'obs' in v else ''
+            if obs:
+                feature.SetField('Observed', obs)
 
             #add the feature to the layer
             layer.CreateFeature(feature)
@@ -417,19 +431,17 @@ class Dataset(Base):
         #just for shapes? or add metadata to all in the zip
         if format == 'shp':
             #write out the .prj file
-            #TODO: add the basepath
             prjfile = open('%s.prj' % (os.path.join(tmp_path, self.basename)), 'w')
             sr.MorphToESRI()
             prjfile.write(sr.ExportToWkt())
             prjfile.close()
 
-            #and the metadata
-            #TODO: NEED SOME METADATA BUILDER THAT IS NOT RESPONSE TEMPLATE FOR THIS
-            if self.has_metadata_cache:
-                mt = str(self.original_metadata[0].original_xml.encode('utf8'))
-                mtfile = open('%s.shp.xml' % (os.path.join(tmp_path, self.basename)), 'w')
-                mtfile.write(mt)
-                mtfile.close()
+        #and the metadata
+        if self.has_metadata_cache:
+            mt = str(self.original_metadata[0].original_xml.encode('utf8'))
+            mtfile = open('%s/%s.%s.xml' % (tmp_path, self.basename, format), 'w')
+            mtfile.write(mt)
+            mtfile.close()
                 
         #set up the formats directory WITHOUT BASENAMES
         #NO - move this to the view so that we can build vector formats wherever we want
@@ -445,6 +457,7 @@ class Dataset(Base):
                     files.append(os.path.join(tmp_path, '%s.%s' % (self.basename, e)))
         else:
             files.append(os.path.join(tmp_path, '%s.%s' % (self.basename, format)))
+        files.append('%s/%s.%s.xml' % (tmp_path, self.basename, format))
         output = create_zip(filename, files)
 
         #and copy everything in files to the formats cache
@@ -452,8 +465,6 @@ class Dataset(Base):
             outfile = f.replace(tmp_path, basepath)
             shutil.copyfile(f, outfile)
             
-
-        #TODO: tidy up tmp (or figure out where it is and cron job?)
         
         return (0, 'success')
 
@@ -479,7 +490,8 @@ class Dataset(Base):
             worksheet.write(y, x, att.name, style=style)
             x += 1
             
-       #TODO: add observed timestamp column
+        #the observed timestamp tacked on to the end
+        worksheet.write(y, x, 'observed', style=style)
 
         #add the data
         y = 1
@@ -499,13 +511,12 @@ class Dataset(Base):
                 worksheet.write(y, x, value)
                 x += 1
                 
-            #TODO: add the observed timestamp data
+            #TODO: deal with the utc format and make sure it's what we want
+            obs = v['obs'] if 'obs' in v else ''
+            if obs:
+                worksheet.write(y, x, obs)
             
             y += 1
-
-#            #TODO: do something else for this, instead of just stopping partway through
-#            if y > 65535:
-#                break
 
         #write the file
         filename = os.path.join(basepath, '%s.xls' % (self.basename))
@@ -513,10 +524,219 @@ class Dataset(Base):
 
         #just to be consistent with all of the other types
         #let's pack up a zip file
-        output = create_zip(os.path.join(basepath, '%s.xls.zip' % (self.uuid)), [filename])
+        if self.has_metadata_cache:
+            mt = str(self.original_metadata[0].original_xml.encode('utf8'))
+            mtfile = open('%s.xls.xml' % (os.path.join(tmp_path, self.basename)), 'w')
+            mtfile.write(mt)
+            mtfile.close()
+            
+        output = create_zip(os.path.join(basepath, '%s.xls.zip' % (self.uuid)), [filename, '%s.xls.xml' % (os.path.join(tmp_path, self.basename))])
         
         return (0, 'success')
-    
+
+
+    def stream_vector(self, format, basepath, mongo_uri, epsg, baseurl=''):
+        '''
+        optimization to speed up the file generation, especially for large vector datasets
+        processing time goes from 15 minutes to 1 and change for a 100,000 feature dataset   
+
+        if the request is for gml, json, csv, or kml -> stream those
+        if the request is for xls -> run the original excel builder (nothing we can do about that one)
+        if the request is for a shapefile -> stream as gml and convert with ogr2ogr 
+
+        then grab the metadata and pack everything as a zip for delivery
+        and copy all of the files to the formats cache for mapserver, etc
+        '''
+
+        #check the base location
+        if os.path.abspath(basepath) != basepath or not os.path.isdir(basepath):
+            return (1, 'invalid base path')
+
+        #send the excel off for processing
+        if format == 'xls':
+            return self.build_excel(basepath, mongo_uri)    
+
+        fields = self.attributes
+        encode_as = 'utf-8'
+
+        fmt = 'gml' if format == 'shp' else format
+
+        #gml generator
+        def generate_stream():
+            #set up the head, tail, folder info, etc
+            folder_head = ''
+            field_set = ''
+            folder_tail = ''
+            delimiter = '\n'
+            schema_url = ''
+            if fmt == 'geojson':
+                head = """{"type": "FeatureCollection", "features": ["""
+                tail = "\n]}"
+                delimiter = ',\n'
+            elif fmt == 'kml':
+                head = """<?xml version="1.0" encoding="UTF-8"?>
+                                <kml xmlns="http://earth.google.com/kml/2.2">
+                                <Document>"""
+                tail = """\n</Document>\n</kml>"""
+                folder_head = "<Folder><name>%s</name>" % (self.description)
+                folder_tail = "</Folder>"
+
+                schema_url = baseurl + '%s/attributes.kml' % (self.uuid)
+
+                kml_flds = [{'type': ogr_to_kml_fieldtype(f.ogr_type), 'name': f.name} for f in fields]
+                kml_flds.append({'type': 'string', 'name': 'observed'})
+                field_set = """<Schema name="%(name)s" id="%(id)s">%(sfields)s</Schema>""" % {'name': str(self.uuid), 'id': str(self.uuid), 
+                    'sfields': '\n'.join(["""<SimpleField type="%s" name="%s"><displayName>%s</displayName></SimpleField>""" % (k['type'], k['name'], k['name']) for k in kml_flds])
+                }     
+            elif fmt == 'csv':
+                head = '' 
+                tail = ''
+                delimiter = '\n'
+
+                field_set = ','.join([f.name for f in fields]) + ',fid,dataset,observed\n'
+            elif fmt == 'gml':
+                head = """<?xml version="1.0" encoding="UTF-8"?>
+                                        <gml:FeatureCollection 
+                                            xmlns:gml="http://www.opengis.net/gml" 
+                                            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+                                            xmlns:xlink="http://www.w3.org/1999/xlink"
+                                            xmlns:ogr="http://ogr.maptools.org/">
+                                        <gml:description>GSTORE API 3.0 Vector Stream</gml:description>\n""" 
+                tail = """\n</gml:FeatureCollection>"""
+            elif fmt == 'json':
+                head = """{"features": ["""
+                tail = "]}"
+                delimiter = ',\n'
+        
+            #get the vectors
+            gm = gMongo(mongo_uri)
+            vectors = gm.query({'d.id': self.id})
+            total = vectors.count()
+
+            yield head + folder_head + field_set
+            cnt = 0
+            for vector in vectors:
+                result = convert(vector, schema_url, epsg)
+                if cnt < total - 1 and total > 1:
+                    result += delimiter
+
+                cnt += 1
+                yield result.encode(encode_as)
+
+            yield folder_tail + tail
+
+        #convert the mongo doc to a feature
+        def convert(vector, schema_url, epsg):
+            #convert the mongo to a chunk of something based on the format
+            fid = int(vector['f']['id'])
+            did = int(vector['d']['id'])
+            obs = vector['obs'] if 'obs' in vector else ''
+
+            #get the geometry
+            if not fmt in ['csv', 'json']:
+                wkb = vector['geom']['g'] if 'geom' in vector else ''
+                if not wkb:
+                    #need to get it from shapes
+                    feat = DBSession.query(Feature).filter(Feature.fid==fid).first()
+                    wkb = feat.geom
+                    
+                #and convert to geojson, kml, or gml
+                geom_repr = wkb_to_output(wkb, epsg, fmt)
+                if not geom_repr:
+                    return ''
+
+            atts = vector['atts']
+            #there's some wackiness with a unicode char and mongo (and also a bad char in the data, see fid 6284858)
+            #convert atts to name, value tuples so we only have to deal with the wackiness once
+            atts = [(a['name'], unicode(a['val']).encode('ascii', 'xmlcharrefreplace')) for a in atts]
+
+            #TODO: add observed to kml/gml and field list (also double check attribute schema for kml for observed)
+            if fmt == 'kml': 
+                #make sure we've encoded the value string correctly for kml
+                feature = "\n".join(["""<SimpleData name="%s">%s</SimpleData>""" % (v[0], re.sub(r'[^\x20-\x7E]', '', escape(str(v[1])))) for v in atts])
+
+                #and no need for a schema url since it can be an internal schema linked by uuid here
+                feature = """<Placemark id="%s">
+                            <name>%s</name>
+                            %s\n%s
+                            <ExtendedData><SchemaData schemaUrl="%s">%s</SchemaData></ExtendedData>
+                            <Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+                            </Placemark>""" % (fid, fid, geom_repr, '', schema_url, feature)
+            elif fmt == 'gml':
+                #going to match the gml from the dataset downloader
+                #need a list of values as <ogr:{att name}>VAL</ogr:{att name}>
+                vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0], re.sub(r'[^\x20-\x7E]', '', escape(str(a[1]))), a[0]) for a in atts])
+                feature = """<gml:featureMember><ogr:g_%(basename)s><ogr:geometryProperty>%(geom)s</ogr:geometryProperty>%(values)s</ogr:g_%(basename)s></gml:featureMember>""" % {
+                        'basename': self.basename, 'geom': geom_repr, 'values': vals} 
+            elif fmt == 'geojson':
+                vals = dict([(a[0], a[1]) for a in atts])
+                vals.update({'fid':fid, 'dataset_id': did, 'observed': obs})
+                feature = json.dumps({"type": "Feature", "properties": vals, "geometry": json.loads(geom_repr)})
+            elif fmt == 'csv':
+                vals = []
+                for f in fields:
+                    att = [a for a in atts if a[0] == f.name]
+                    if not att:
+                        continue
+                    vals.append(att[0][1])
+                vals += [str(fid), str(did), obs]
+                feature = ','.join(vals)
+            elif fmt == 'json':
+                #no geometry, just attributes (good for timeseries requests)
+                vals = dict([(a[0], a[1]) for a in atts])
+                feature = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals, 'observed': obs})
+            else:
+                feature = ''
+                    
+            return feature
+
+        #run the generator for the streaming
+        #set up the temporary location
+        tmp_path = tempfile.mkdtemp()
+        tmp_file = os.path.join(tmp_path, '%s.%s' % (self.basename, fmt))
+        for g in generate_stream():
+            #append a tmp file
+            with open(tmp_file, 'a') as f:
+                f.write(g)  
+                      
+
+        #pack up the results, with metadata, as a zip
+        filename = os.path.join(basepath, '%s.%s.zip' % (self.uuid, format))
+        files = []
+        if format == 'shp':
+            #convert it first
+            s = subprocess.Popen(['ogr2ogr', '-f', 'ESRI Shapefile', os.path.join(basepath, '%s.shp' % (self.basename)), tmp_file], shell=False)    
+            status = s.wait()
+            #note: the prj file should be generated already
+            #TODO: add a spatial index
+        
+            exts = ['shp', 'shx', 'dbf', 'prj', 'shp.xml', 'sbn', 'sbx']
+            for e in exts:
+                if os.path.isfile(os.path.join(basepath, '%s.%s' % (self.basename, e))):
+                    files.append(os.path.join(basepath, '%s.%s' % (self.basename, e)))
+        else:
+            files.append(os.path.join(tmp_path, '%s.%s' % (self.basename, format)))
+
+        #return (1, ','.join(files))
+            
+        #add a metadata file if there's any metadata to add
+        if self.original_metadata:
+            xml = self.original_metadata[0].original_xml.encode(encode_as)
+            mtfile = open('%s.%s.xml' % (os.path.join(tmp_path, self.basename), format), 'w')
+            mtfile.write(xml)
+            mtfile.close()
+            files.append('%s.%s.xml' % (os.path.join(tmp_path, self.basename), format))
+
+        #create the zip file
+        output = create_zip(filename, files)
+
+        #copy to the formats cache
+        if format != 'shp':
+            for f in files:
+                outfile = f.replace(tmp_path, basepath)
+                shutil.copyfile(f, outfile)        
+
+        return (0, 'success')
 
 '''
 gstoredata.categories and the join table
@@ -538,6 +758,12 @@ class Category(Base):
         schema='gstoredata'
     )
     #relate to datasets handled in the datasets backref
+
+    def __init__(self, theme, subtheme, groupname, apps):
+        self.theme = theme
+        self.subtheme = subtheme
+        self.groupname = groupname
+        self.apps = apps
 
     def __repr__(self):
         return '<Category (%s, %s, %s, %s)>' % (self.id, self.theme, self.subtheme, self.groupname)
@@ -619,4 +845,12 @@ class Project(Base):
         Column('funder', String(200)),
         schema='gstoredata'
     )
+
+    def __init__(self, name, description, funder):
+        self.name = name
+        self.description = description
+        self.funder = funder
+
+    def __repr__(self):
+        return '<Project (%s, %s, %s)>' % (self.id, self.name, self.funder)
 
