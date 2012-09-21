@@ -446,7 +446,7 @@ class Dataset(Base):
         #set up the formats directory WITHOUT BASENAMES
         #NO - move this to the view so that we can build vector formats wherever we want
 
-        filename = os.path.join(basepath, '%s.%s.zip' % (self.uuid, format))
+        filename = os.path.join(basepath, '%s_%s.zip' % (self.basename, format))
         #get the files for the zip
         #and move them to the formats cache
         files = []
@@ -530,7 +530,7 @@ class Dataset(Base):
             mtfile.write(mt)
             mtfile.close()
             
-        output = create_zip(os.path.join(basepath, '%s.xls.zip' % (self.uuid)), [filename, '%s.xls.xml' % (os.path.join(basepath, self.basename))])
+        output = create_zip(os.path.join(basepath, '%s_xls.zip' % (self.uuid)), [filename, '%s.xls.xml' % (os.path.join(basepath, self.basename))])
         
         return (0, 'success')
 
@@ -702,7 +702,7 @@ class Dataset(Base):
                       
 
         #pack up the results, with metadata, as a zip
-        filename = os.path.join(basepath, '%s.%s.zip' % (self.uuid, format))
+        filename = os.path.join(basepath, '%s_%s.zip' % (self.basename, format))
         files = []
         if format == 'shp':
             #TODO: if we use this, change it back to the tmp folder and copy? 

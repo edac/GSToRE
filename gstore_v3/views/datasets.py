@@ -17,10 +17,20 @@ from ..lib.spatial import *
 from ..lib.database import *
 from ..lib.mongo import gMongoUri
 
+
 '''
 datasets
 '''
 #TODO: add dataset statistics view - min/max per attribute, histogram info, etc
+
+def return_fileresponse(output, mimetype, filename):
+    fr = FileResponse(output, content_type=mimetype)
+    fr.content_disposition = 'attachment; filename=%s' % filename
+    
+    #TODO: may want to reconsider the cookie age
+    #for the jquery file download progress widget
+    fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/')
+    return fr
 
 ##TODO: add the html renderer to this
 @view_config(route_name='html_dataset', renderer='dataset_card.mako')
@@ -87,7 +97,8 @@ def dataset(request):
     if not sources && vector - check the cache
     if not sources && vector && no cache - generate cache file
     '''  
-    if d.taxonomy in ['services']:
+    taxonomy = str(d.taxonomy)
+    if taxonomy in ['services']:
         src = d.get_source(datatype, format)
         
         if not src:
@@ -100,123 +111,55 @@ def dataset(request):
             
         return HTTPFound(location=loc)
 
-    #TODO: refactor the heck out of this  
+    #check for a source for everyone
+    src = d.get_source(datatype, format)
+    if not src and d.taxonomy in ['geoimage', 'file']:
+        return HTTPNotFound()
 
+    #outside link so redirect
+    if src and src.is_external:
+        loc = src.get_location()
+        return HTTPFound(location=loc)
+
+    mimetype = str(src.file_mimetype) if src else 'application/x-zip-compressed'
     xslt_path = request.registry.settings['XSLT_PATH']
-    if d.taxonomy in ['geoimage', 'file']:
-        src = d.get_source(datatype, format)
-        if not src:
-            #not valid source information for the dataset
-            return HTTPNotFound()
+    fmtpath = request.registry.settings['FORMATS_PATH']
+    tmppath = request.registry.settings['TEMP_PATH']
 
-        if src.is_external:
-            loc = src.get_location()
-            #redirect and bail
-            return HTTPFound(location=loc)
+    #return things that shouldn't be zipped (pdfs, etc)
+    if format != 'zip' and mimetype != 'application/x-zip-compressed':
+        output = src.get_location(format)
+        return return_fileresponse(output, mimetype, output.split('/')[-1])
 
-        #get the mimetype (not as unicode)
-        mimetype = str(src.file_mimetype)
+    #return the already packed zip (this assumes that everything set to zip is already a zip)
+    if format == 'zip':
+        output = src.get_location(format)
+        return return_fileresponse(output, mimetype, output.split('/')[-1])
+    
+    #check the cache for a zip
+    output = os.path.join(fmtpath, str(d.uuid), format, '%s_%s.zip' % (str(d.basename), format))
+    if os.path.isfile(output):
+        return return_fileresponse(output, mimetype, output.split('/')[-1])
 
+    #first check for the uuid + format subdirectories in the formats dir
+    cached_path = os.path.join(fmtpath, str(d.uuid), format)
+    if not os.path.isdir(cached_path):
+        if not os.path.isdir(os.path.join(fmtpath, str(d.uuid))):
+            os.mkdir(os.path.join(fmtpath, str(d.uuid)))
+        os.mkdir(cached_path)
 
-        #for things that we don't actually want to emit as zips (pdf, etc)
-        if format != 'zip' and mimetype != 'application/x-zip-compressed':
-            #it's not a file we want to deliver as a zip anyway
-            f = src.get_location(format)
+    outname = '%s_%s.zip' % (d.basename, format)
+    cached_file = os.path.join(cached_path, '%s_%s.zip' % (str(d.basename), format))
 
-            fr = FileResponse(f, content_type=mimetype)
-            fr.content_disposition = 'attachment; filename=%s' % (f.split('/')[-1])
-            fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/')
-            return fr
-            
-        #zip'em up unless it's already a zip
-        if format != 'zip':
-
-            #to test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ccfc9523-4b9e-4c58-8cf5-7d727fc8a807.original.tif
-            tmppath = request.registry.settings['TEMP_PATH']
-            if not tmppath:
-                return HTTPNotFound()
-            #get the name of the file from the url
-            outname = '%s.%s.%s.zip' % (d.basename, datatype, format)
-            zippath = os.path.join(tmppath, str(d.uuid))
-
-            if not os.path.isdir(zippath):
-                os.mkdir(zippath)
-
-            #make the zipfile (which returns the path that we already know. whatever.)
-            output = src.pack_source(zippath, outname, xslt_path)
-        else:
-            #it should already be a zip
-            output = src.get_location(format)
-            outname = output.split('/')[-1]
-
-        fr = FileResponse(output, content_type=mimetype)
-        fr.content_disposition = 'attachment; filename=%s' % (outname)
-        fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/')
-        return fr
-
-    else:
-        # get file
-        # zip file (or if kml, kmz it)
-        #deliver
+    #no zip. need to pack it up (raster/file) or generate it (vector)
+    if taxonomy in ['geoimage', 'file']:
+        #pack up the zip to the formats cache
+        output = src.pack_source(cached_path, outname, xslt_path)
         
-        #check for the existing file in sources
-        src = d.get_source(datatype, format)
-        if src:
-            #zip or not
-            if src.is_external:
-                loc = src.get_location(format)
-                #redirect and bail
-                return HTTPFound(location=loc)
-
-            #get the mimetype (not as unicode)
-            mimetype = str(src.file_mimetype)
-
-            #zip'em up unless it's already a zip
-            if format != 'zip':
-
-                #to test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ccfc9523-4b9e-4c58-8cf5-7d727fc8a807/{basename}.original.tif
-                tmppath = request.registry.settings['TEMP_PATH']
-                if not tmppath:
-                    return HTTPNotFound()
-                outname = '%s.%s.%s.zip' % (d.basename, datatype, format)
-                zippath = os.path.join(tmppath, str(d.uuid), outname)
-                #make the zipfile
-                output = src.pack_source(zippath, outname, xslt_path)
-            else:
-                #it should already be a zip
-                #output = src.src_files[0].location
-                #outname = src.src_files[0].location.split('/')[-1]
-                output = src.get_location(format)
-                outname = output.split('/')[-1]
-
-            fr = FileResponse(output, content_type=mimetype)
-            fr.content_disposition = 'attachment; filename=%s' % (outname)
-            fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/')
-            return fr
-
-        #at this point it's going to be an existing cached zip or a new zip
-        mimetype = 'application/x-zip-compressed'
-
-        #TODO: probably something about the KML -> KMZ situation (UNLESS we're packing some metadata in the zip)
-        #check for the existing file in formats
-        fmtpath = request.registry.settings['FORMATS_PATH']
-        cachepath = os.path.join(fmtpath, str(d.uuid), format)
-        #don't forget the actual packed zip
-        cachefile = os.path.join(cachepath, str(d.uuid) + '.' + format + '.zip')
-        if os.path.isfile(cachefile):
-            fr = FileResponse(cachefile, content_type=mimetype)
-            fr.content_disposition = 'attachment; filename=%s' % (str(d.basename) + '.' + format + '.zip')
-            fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/')
-            return fr
-
-        #build the file
-        #at the cache path
-        if not os.path.isdir(cachepath):
-            #make a new one and this is stupid
-            if not os.path.isdir(os.path.join(fmtpath, str(d.uuid))):
-                os.mkdir(os.path.join(fmtpath, str(d.uuid)))
-            os.mkdir(os.path.join(fmtpath, str(d.uuid), format))
-
+        return return_fileresponse(output, mimetype, outname)
+    elif taxonomy in ['vector']:
+        #generate the file and pack the zip
+        #note that the kml isn't being packed as kmz - we include metadata with every download here
 
         #set up the mongo connection
         mconn = request.registry.settings['mongo_uri']
@@ -224,22 +167,25 @@ def dataset(request):
         mongo_uri = gMongoUri(mconn, mcoll)
 
         srid = int(request.registry.settings['SRID'])
-        
-#        success = d.build_vector(format, cachepath, mongo_uri, srid)
+
+        #for the original write to ogr directly build option
+#        success = d.build_vector(format, cached_path, mongo_uri, srid)
+
+        #for the new stream to ogr2ogr option (or just stream if not shapefile)
         load_balancer = request.registry.settings['BALANCER_URL']
         base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
-        success = d.stream_vector(format, cachepath, mongo_uri, srid, base_url)
+        success = d.stream_vector(format, cached_path, mongo_uri, srid, base_url)
+
+        #check the response for failure
         if success[0] != 0:
-            return HTTPServerError()
+            return HTTPServerError()    
 
-        #return the file (already been zipped) and only has metadata if it's a shapefile
-        fr = FileResponse(cachefile, content_type=mimetype)
-        fr.content_disposition = 'attachment; filename=%s' % (str(d.basename) + '.' + format + '.zip')
+        #TODO: the vectors are returning as uuid.format.zip instead of basename.format.zip
+        return return_fileresponse(cached_file, mimetype, outname)    
 
-        #for the file download progress widget in the interfaces
-        fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/') 
-        return fr
-        
+    #if we're here something really bad is happening
+    return HTTPNotFound()
+ 
 
 @view_config(route_name='dataset_services', renderer='json')
 def services(request):

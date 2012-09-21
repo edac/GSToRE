@@ -273,7 +273,31 @@ def wkb_to_output(wkb, epsg, output_type='kml'):
 any other bbox stuff
 '''
 
+'''
+extent methods
+'''
 
+def check_for_valid_extent(bbox):
+    '''
+    check the dataset bounding box to see if the extent
+    has no area, i.e. it is the extent of a single point
+    where minx, miny == maxx, maxy
 
+    this is not considered a valid extent in mapscript/mapserver
+    '''
+    return 0.0 < ((bbox[2] - bbox[0]) * (bbox[3] - bbox[1]))
+
+def buffer_point_extent(bbox, radius):
+    '''
+    build a buffer for the point extent situation
+    where the point is the same for minx, miny or maxx, maxy
+    and return in the same order as a standard gstore bbox (minx, miny, maxx, maxy)
+
+    bbox should be in wgs84 (gstore default)
+    '''
+    point = ogr.CreateGeometryFromWkt('POINT (%s %s)' % (bbox[0], bbox[1]))
+    buf = point.Buffer(radius, 30)
+    env = buf.GetEnvelope()
+    return env[0], env[2], env[1], env[3]
 
 

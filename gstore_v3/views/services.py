@@ -462,6 +462,10 @@ def datasets(request):
             bbox = geom_to_bbox(bbox_geom)
 
             init_proj = 'init=epsg:%s' % (d.orig_epsg)
+
+        if not check_for_valid_extent(bbox):
+            #the extent area == 0, it is invalid for mapserver/mapscript
+            bbox = buffer_point_extent(bbox, 0.00001)
    
         m.setExtent(bbox[0], bbox[1], bbox[2], bbox[3])
         m.imagecolor.setRGB(255, 255, 255)
