@@ -125,6 +125,7 @@ def dataset(request):
 
             fr = FileResponse(f, content_type=mimetype)
             fr.content_disposition = 'attachment; filename=%s' % (f.split('/')[-1])
+            fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/')
             return fr
             
         #zip'em up unless it's already a zip
@@ -150,6 +151,7 @@ def dataset(request):
 
         fr = FileResponse(output, content_type=mimetype)
         fr.content_disposition = 'attachment; filename=%s' % (outname)
+        fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/')
         return fr
 
     else:
@@ -189,6 +191,7 @@ def dataset(request):
 
             fr = FileResponse(output, content_type=mimetype)
             fr.content_disposition = 'attachment; filename=%s' % (outname)
+            fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/')
             return fr
 
         #at this point it's going to be an existing cached zip or a new zip
@@ -203,6 +206,7 @@ def dataset(request):
         if os.path.isfile(cachefile):
             fr = FileResponse(cachefile, content_type=mimetype)
             fr.content_disposition = 'attachment; filename=%s' % (str(d.basename) + '.' + format + '.zip')
+            fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/')
             return fr
 
         #build the file
@@ -231,6 +235,9 @@ def dataset(request):
         #return the file (already been zipped) and only has metadata if it's a shapefile
         fr = FileResponse(cachefile, content_type=mimetype)
         fr.content_disposition = 'attachment; filename=%s' % (str(d.basename) + '.' + format + '.zip')
+
+        #for the file download progress widget in the interfaces
+        fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/') 
         return fr
         
 
@@ -478,7 +485,8 @@ def add_dataset(request):
         #this should be the unique project name
         p = DBSession.query(Project).filter(Project.name==project).first()
         if p:
-            new_dataset.project_id = p.id
+            #new_dataset.project_id = p.id
+            new_dataset.projects.append(p)
 
     #create the new dataset with all its pieces
     try:

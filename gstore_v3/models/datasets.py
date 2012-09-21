@@ -16,6 +16,7 @@ from sqlalchemy.dialects.postgresql import UUID, ARRAY
 
 from osgeo import ogr, osr
 import xlwt
+import json
 
 from ..lib.utils import get_all_formats, get_all_services, create_zip
 from ..lib.spatial import *
@@ -57,7 +58,6 @@ class Dataset(Base):
         Column('has_metadata_cache', Boolean, default=True), 
         Column('excluded_formats', ARRAY(String)),
         Column('excluded_services', ARRAY(String)),
-        Column('project_id', Integer, ForeignKey('gstoredata.projects.id')),
         Column('uuid', UUID), # we aren't setting this in postgres anymore
         schema='gstoredata' #THIS IS KEY
     ) 
@@ -90,7 +90,7 @@ class Dataset(Base):
     original_metadata = relationship('OriginalMetadata')
 
     #relate to projects
-    projects = relationship('Project', backref='datasets')
+    projects = relationship('Project', secondary='gstoredata.projects_datasets', backref='datasets')
       
     def __init__(self, description):
         self.description = description
@@ -482,7 +482,7 @@ class Dataset(Base):
         gm = gMongo(mongo_uri)
 
         #only request as many as excel can handle
-        vectors = gm.query({'d.id': self.id}, {}, 65534, 0)
+        vectors = gm.query({'d.id': self.id}, {}, {}, 65534, 0)
 
         #build the header
         atts = self.attributes
@@ -514,7 +514,7 @@ class Dataset(Base):
             #TODO: deal with the utc format and make sure it's what we want
             obs = v['obs'] if 'obs' in v else ''
             if obs:
-                worksheet.write(y, x, obs)
+                worksheet.write(y, x, obs.strftime('%Y-%m-%dT%H:%M:%S+00'))
             
             y += 1
 
@@ -526,11 +526,11 @@ class Dataset(Base):
         #let's pack up a zip file
         if self.has_metadata_cache:
             mt = str(self.original_metadata[0].original_xml.encode('utf8'))
-            mtfile = open('%s.xls.xml' % (os.path.join(tmp_path, self.basename)), 'w')
+            mtfile = open('%s.xls.xml' % (os.path.join(basepath, self.basename)), 'w')
             mtfile.write(mt)
             mtfile.close()
             
-        output = create_zip(os.path.join(basepath, '%s.xls.zip' % (self.uuid)), [filename, '%s.xls.xml' % (os.path.join(tmp_path, self.basename))])
+        output = create_zip(os.path.join(basepath, '%s.xls.zip' % (self.uuid)), [filename, '%s.xls.xml' % (os.path.join(basepath, self.basename))])
         
         return (0, 'success')
 
@@ -631,6 +631,7 @@ class Dataset(Base):
             fid = int(vector['f']['id'])
             did = int(vector['d']['id'])
             obs = vector['obs'] if 'obs' in vector else ''
+            obs = obs.strftime('%Y-%m-%dT%H:%M:%S+00')
 
             #get the geometry
             if not fmt in ['csv', 'json']:
@@ -678,12 +679,12 @@ class Dataset(Base):
                     att = [a for a in atts if a[0] == f.name]
                     if not att:
                         continue
-                    vals.append(att[0][1])
+                    vals.append(str(att[0][1]))
                 vals += [str(fid), str(did), obs]
                 feature = ','.join(vals)
             elif fmt == 'json':
                 #no geometry, just attributes (good for timeseries requests)
-                vals = dict([(a[0], a[1]) for a in atts])
+                vals = dict([(a[0], str(a[1])) for a in atts])
                 feature = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals, 'observed': obs})
             else:
                 feature = ''
@@ -704,6 +705,7 @@ class Dataset(Base):
         filename = os.path.join(basepath, '%s.%s.zip' % (self.uuid, format))
         files = []
         if format == 'shp':
+            #TODO: if we use this, change it back to the tmp folder and copy? 
             #convert it first
             s = subprocess.Popen(['ogr2ogr', '-f', 'ESRI Shapefile', os.path.join(basepath, '%s.shp' % (self.basename)), tmp_file], shell=False)    
             status = s.wait()
@@ -836,6 +838,12 @@ class DatasetRelationship(Base):
 '''
 gstoredata.projects
 '''
+projects_datasets = Table('projects_datasets', Base.metadata,
+    Column('dataset_id', Integer, ForeignKey('gstoredata.datasets.id')),
+    Column('project_id', Integer, ForeignKey('gstoredata.projects.id')),
+    schema='gstoredata'    
+)
+
 class Project(Base):
     __table__ = Table('projects', Base.metadata,
         Column('id', Integer, primary_key=True),
