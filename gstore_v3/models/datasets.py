@@ -47,7 +47,7 @@ class Dataset(Base):
         Column('basename', String(100)),
         Column('geom', String),
         Column('geomtype', String),
-        Column('formats_cache', String),
+        #Column('formats_cache', String), #TODO: drop this once we've decided to do something about the TOOLS (although the insert doesn't pay attention)
         Column('orig_epsg', Integer),
         Column('inactive', Boolean, default=False), #shuts it off completely
         Column('box', ARRAY(Numeric)),
@@ -58,6 +58,7 @@ class Dataset(Base):
         Column('has_metadata_cache', Boolean, default=True), 
         Column('excluded_formats', ARRAY(String)),
         Column('excluded_services', ARRAY(String)),
+        Column('date_acquired', TIMESTAMP),
         Column('uuid', UUID), # we aren't setting this in postgres anymore
         schema='gstoredata' #THIS IS KEY
     ) 
@@ -337,6 +338,10 @@ class Dataset(Base):
             #do something else
             return self.build_excel(basepath, mongo_uri)
 
+        if format == 'json':
+            #this is just plain jane json with no geometry at all
+            return self.build_json(basepath, mongo_uri)
+
         #get the data
         gm = gMongo(mongo_uri)
         vectors = gm.query({'d.id': self.id})
@@ -534,11 +539,74 @@ class Dataset(Base):
         
         return (0, 'success')
 
+    #build the plain json (ogr generates geojson) without the geometry
+    #it is effectively streaming the results
+    def build_json(self, basepath, mongo_uri):
+        #get the data
+        gm = gMongo(mongo_uri)
+
+        #only request as many as excel can handle
+        vectors = gm.query({'d.id': self.id})
+        total = vectors.count()
+
+        fields = self.attributes
+        encode_as = 'utf-8'
+
+        def generate_stream():
+            head = """{"features": ["""
+            tail = "]}"
+            delimiter = ',\n'
+
+            yield head
+
+            cnt = 0
+            for vector in vectors:
+                fid = int(vector['f']['id'])
+                obs = vector['obs'] if 'obs' in vector else ''
+                obs = obs.strftime('%Y-%m-%dT%H:%M:%S+00') if obs else ''
+                #just dump atts out
+                vals = dict([(a[0], str(a[1])) for a in atts])
+                result = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals, 'observed': obs})
+                
+                if cnt < total - 1 and total > 0:
+                    result += delimiter
+
+                cnt +=1
+                yield result.encode(encode_as)
+                
+            yield tail
+
+        #stream to a file    
+        tmp_path = tempfile.mkdtemp()
+        tmp_file = os.path.join(tmp_path, '%s.json' % (self.basename))
+        for g in generate_stream():
+            #append a tmp file
+            with open(tmp_file, 'a') as f:
+                f.write(g)  
+                
+        filename = os.path.join(basepath, '%s_json.zip' % (self.basename))
+        files = [tmp_file]
+        
+        #add a metadata file if there's any metadata to add
+        if self.original_metadata:
+            xml = self.original_metadata[0].original_xml.encode(encode_as)
+            mtfile = open('%s.json.xml' % (os.path.join(tmp_path, self.basename)), 'w')
+            mtfile.write(xml)
+            mtfile.close()
+            files.append('%s.json.xml' % (os.path.join(tmp_path, self.basename)))
+
+        #create the zip file
+        output = create_zip(filename, files)
+
+        for f in files:
+            outfile = f.replace(tmp_path, basepath)
+            shutil.copyfile(f, outfile) 
+
+        return (0, 'success')
 
     def stream_vector(self, format, basepath, mongo_uri, epsg, baseurl=''):
         '''
-        optimization to speed up the file generation, especially for large vector datasets
-        processing time goes from 15 minutes to 1 and change for a 100,000 feature dataset   
+        optimization to speed up the file generation, especially for large vector datasets  
 
         if the request is for gml, json, csv, or kml -> stream those
         if the request is for xls -> run the original excel builder (nothing we can do about that one)
@@ -562,6 +630,7 @@ class Dataset(Base):
         fmt = 'gml' if format == 'shp' else format
 
         #gml generator
+        #TODO: update kml/gml (+shp) to include observed field + values
         def generate_stream():
             #set up the head, tail, folder info, etc
             folder_head = ''
@@ -631,7 +700,7 @@ class Dataset(Base):
             fid = int(vector['f']['id'])
             did = int(vector['d']['id'])
             obs = vector['obs'] if 'obs' in vector else ''
-            obs = obs.strftime('%Y-%m-%dT%H:%M:%S+00')
+            obs = obs.strftime('%Y-%m-%dT%H:%M:%S+00') if obs else ''
 
             #get the geometry
             if not fmt in ['csv', 'json']:
@@ -650,6 +719,9 @@ class Dataset(Base):
             #there's some wackiness with a unicode char and mongo (and also a bad char in the data, see fid 6284858)
             #convert atts to name, value tuples so we only have to deal with the wackiness once
             atts = [(a['name'], unicode(a['val']).encode('ascii', 'xmlcharrefreplace')) for a in atts]
+
+            #add the observed datetime for everything
+            atts.append(('observed', obs))
 
             #TODO: add observed to kml/gml and field list (also double check attribute schema for kml for observed)
             if fmt == 'kml': 
@@ -671,7 +743,7 @@ class Dataset(Base):
                         'basename': self.basename, 'geom': geom_repr, 'values': vals} 
             elif fmt == 'geojson':
                 vals = dict([(a[0], a[1]) for a in atts])
-                vals.update({'fid':fid, 'dataset_id': did, 'observed': obs})
+                vals.update({'fid':fid, 'dataset_id': did})
                 feature = json.dumps({"type": "Feature", "properties": vals, "geometry": json.loads(geom_repr)})
             elif fmt == 'csv':
                 vals = []
@@ -685,7 +757,7 @@ class Dataset(Base):
             elif fmt == 'json':
                 #no geometry, just attributes (good for timeseries requests)
                 vals = dict([(a[0], str(a[1])) for a in atts])
-                feature = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals, 'observed': obs})
+                feature = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals})
             else:
                 feature = ''
                     

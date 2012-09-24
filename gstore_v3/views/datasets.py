@@ -335,6 +335,7 @@ def add_dataset(request):
     categories = post_data['categories']
     sources = post_data['sources']
     metadatas = post_data['metadata']
+    acquired = post_data['acquired'] if 'acquired' in post_data else ''
 
     box = map(float, spatials['bbox'].split(','))
     epsg = spatials['epsg']
@@ -345,7 +346,6 @@ def add_dataset(request):
 
     #add the inactive flag
     active = post_data['active'].lower() if 'active' in post_data else ''
-    inactive = False if active == 'true' else True
 
     project = post_data['project'] if 'project' in post_data else ''
 
@@ -362,6 +362,7 @@ def add_dataset(request):
         new_dataset.feature_count = features
         new_dataset.record_count = records
     new_dataset.orig_epsg = epsg
+    new_dataset.inactive = False if active == 'true' else True
 
     if not geom:
         #go make one
@@ -373,7 +374,7 @@ def add_dataset(request):
     new_dataset.apps_cache = [app] + apps
 
     #TODO: get rid of formats_cache (once v2 tools issue is resolved in search datasets)
-    new_dataset.formats_cache = ','.join(formats)
+    #new_dataset.formats_cache = ','.join(formats)
     new_dataset.excluded_formats = [f for f in excluded_formats if f not in formats]
     new_dataset.excluded_services = [s for s in excluded_services if s not in services]
 
@@ -399,6 +400,8 @@ def add_dataset(request):
         new_dataset.begin_datetime = validstart
         new_dataset.end_datetime = validend
 
+    if acquired:
+        new_dataset.date_acquired = acquired
 
     #add the metadata
     #TODO: fix this when we may have multiple metadata streams coming in. this just handles our current v2 situation

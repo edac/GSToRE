@@ -336,10 +336,7 @@ def search_datasets(request):
     
     def yield_results():
     
-#    rsp = {"total": total}
-#    results = []
-
-    #note: georelevance is added not as an extra field but as the second element in a tuple. the first element is the dataset object. hence the wonkiness.
+        #note: georelevance is added not as an extra field but as the second element in a tuple. the first element is the dataset object. hence the wonkiness.
         if version == 2:
             '''
             {"box": [-109.114059, 31.309483, -102.98925, 37.044096000000003], "lastupdate": "02/29/12", "gr": 0.0, "text": "NM Property Tax Rates - September 2011", "config": {"what": "dataset", "taxonomy": "vector", "formats": ["zip", "shp", "gml", "kml", "json", "csv", "xls"], "services": ["wms", "wfs"], "tools": [1, 1, 1, 1, 0, 0], "id": 130043}, "id": 130043, "categories": "Boundaries__|__General__|__New Mexico"}
@@ -353,10 +350,13 @@ def search_datasets(request):
                 else:
                     d = ds
                     gr = 0.0
+
+                services = d.get_services(request)
+                fmts = d.get_formats(request)
             
                 #TODO: not this REVISE 
                 tools = [0 for i in range(6)]
-                if d.formats_cache:
+                if fmts:
                     tools[0] = 1
                 if d.taxonomy in ['vector', 'geoimage']:
                     tools[1] = 1
@@ -365,8 +365,6 @@ def search_datasets(request):
                 if d.has_metadata_cache:
                     tools[2] = 1
 
-                services = d.get_services(request)
-                fmts = d.get_formats(request)
                     
                 #let's build some json
                 rst = json.dumps({"text": d.description, "categories": '%s__|__%s__|__%s' % 
@@ -418,9 +416,6 @@ def search_datasets(request):
     response.content_type = 'application/json'
     response.app_iter = yield_results()
     return response
-
-#    rsp.update({"results": results})
-#    return rsp
 
 
 #TODO: finish this
