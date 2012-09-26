@@ -75,12 +75,12 @@ def search_categories(request):
         if len(parts) == 1:
             #clicked on theme so get the distinct subthemes
             #and use the any() for datasets to make sure that we don't pull any empty category sets
-            cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any())).distinct(Category.subtheme).order_by(Category.subtheme.asc()) 
+            cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any(Dataset.inactive==False))).distinct(Category.subtheme).order_by(Category.subtheme.asc()) 
 
             resp = {"total": 0, "results": [{"text": c.subtheme, "leaf": False, "id": '%s__|__%s' % (c.theme, c.subtheme)} for c in cats]}
         elif len(parts) == 2:
             #clicked on the subtheme
-            cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any())).filter(Category.subtheme==parts[1]).order_by(Category.groupname.asc()) 
+            cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any(Dataset.inactive==False))).filter(Category.subtheme==parts[1]).order_by(Category.groupname.asc()) 
 
             resp = {"total": 0, "results": [{"text": c.groupname, "leaf": True, "id": '%s__|__%s__|__%s' % (c.theme, c.subtheme, c.groupname), "cls": "folder"} for c in cats]}
         else:
@@ -91,7 +91,7 @@ def search_categories(request):
             
     else:
         #just pull all of the categories for the app
-        cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.datasets.any())).distinct(Category.theme).order_by(Category.theme.asc()).order_by(Category.subtheme.asc()).order_by(Category.groupname.asc()) 
+        cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.datasets.any(Dataset.inactive==False))).distinct(Category.theme).order_by(Category.theme.asc()).order_by(Category.subtheme.asc()).order_by(Category.groupname.asc()) 
         resp = {"total": 0, "results": [{"text": c.theme, "leaf": False, "id": c.theme} for c in cats]}
 
     return resp

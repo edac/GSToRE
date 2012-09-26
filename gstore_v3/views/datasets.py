@@ -169,12 +169,12 @@ def dataset(request):
         srid = int(request.registry.settings['SRID'])
 
         #for the original write to ogr directly build option
-#        success = d.build_vector(format, cached_path, mongo_uri, srid)
+        success = d.build_vector(format, cached_path, mongo_uri, srid)
 
         #for the new stream to ogr2ogr option (or just stream if not shapefile)
-        load_balancer = request.registry.settings['BALANCER_URL']
-        base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
-        success = d.stream_vector(format, cached_path, mongo_uri, srid, base_url)
+#        load_balancer = request.registry.settings['BALANCER_URL']
+#        base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
+#        success = d.stream_vector(format, cached_path, mongo_uri, srid, base_url)
 
         #check the response for failure
         if success[0] != 0:

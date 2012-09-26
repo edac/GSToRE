@@ -48,7 +48,7 @@ _FILE_TYPES = [
     ('csv', 'CSV', 'Comma Separated Value'),
     ('gml', 'GML', 'Geographic Markup Language'),
     ('shp', 'ESRI Shapefile', 'ESRI Shapefile'),
-    ('json', 'GeoJSON', 'Geographic Javascript Object Notation'),
+    ('geojson', 'GeoJSON', 'Geographic Javascript Object Notation'),
     ('sqlite', 'SQLite', 'SQLite/SpatiaLite'),
     ('georss', 'GeoRSS', 'GeoRSS')
 ]

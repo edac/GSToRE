@@ -6,7 +6,7 @@ from sqlalchemy import desc, asc, func
 from sqlalchemy.sql.expression import and_
 from sqlalchemy.sql import between
 
-import json, re
+import os, json, re
 from xml.sax.saxutils import escape
 
 from ..models import DBSession
@@ -491,6 +491,7 @@ def features(request):
         fid = int(vector['f']['id'])
         did = int(vector['d']['id'])
         obs = vector['obs'] if 'obs' in vector else ''
+        obs = obs.strftime('%Y-%m-%dT%H:%M:%S+00') if obs else ''
 
         #get the geometry
         if not fmt in ['csv', 'json']:
@@ -512,6 +513,9 @@ def features(request):
         #there's some wackiness with a unicode char and mongo (and also a bad char in the data, see fid 6284858)
         #convert atts to name, value tuples so we only have to deal with the wackiness once
         atts = [(a['name'], unicode(a['val']).encode('ascii', 'xmlcharrefreplace')) for a in atts]
+
+        #add the observed datetime for everything
+        atts.append(('observed', obs))
 
         #TODO: add observed to kml/gml and field list (also double check attribute schema for kml for observed)
         if fmt == 'kml': 
@@ -536,9 +540,10 @@ def features(request):
             #so we don't care about the fact that the fields change?
             #or we do and we will deal with the consequences shortly
             vals = dict([(a[0], a[1]) for a in atts])
-            vals.update({'fid':fid, 'dataset_id': did, 'observed': obs})
+            vals.update({'fid':fid, 'dataset_id': did})
             feature = json.dumps({"type": "Feature", "properties": vals, "geometry": json.loads(geom_repr)})
         elif fmt == 'csv':
+            #NOTE: still appending observed here - field order matters and observed is not a recognized feature_attribute for a dataset
             vals = []
             for f in fields:
                 att = [a for a in atts if a[0] == f.name]
@@ -550,7 +555,7 @@ def features(request):
         elif fmt == 'json':
             #no geometry, just attributes (good for timeseries requests)
             vals = dict([(a[0], a[1]) for a in atts])
-            feature = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals, 'observed': obs})
+            feature = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals})
         else:
             feature = ''
             
@@ -727,10 +732,13 @@ def add_attributes(request):
             bad_recs.append(r)
             continue
 
+        #build the shard key from the dataset uuid and the feature uuid
+        shardkey = dataset_uuid.split('-')[0] + uid.split('-')[0]
+
         #build the mongo object
         #we are including the year, month, day, hour, minute as separate items in case we want to 
         #do aggregation later (easier now than trying to update a gajillion docs)
-        obj = {'f': {'id': fid, 'u': uid}, 'd': {'id': dataset_id, 'u': dataset_uuid}, 'atts': atts, 'geom': {'g': geom}}
+        obj = {'key': shardkey, 'f': {'id': fid, 'u': uid}, 'd': {'id': dataset_id, 'u': dataset_uuid}, 'atts': atts, 'geom': {'g': geom}}
         if obsd:
             obj.update({'obs': obsd, 'year': obsd.year, 'mon': obsd.month, 'day': obsd.day, 'hour': obsd.hour, 'mnt': obsd.minute})
         inserts.append(obj)
@@ -755,6 +763,7 @@ def add_attributes(request):
         finally:
             gm.close()    
 
+        #MISSING PATH!!!
         #TODO: add the export to .json file (by dataset id/uuid) to clusterdata for backup, etc
         VECTOR_PATH = request.registry.settings['VECTOR_IMPORT_PATH']
         vector_file = os.path.join(VECTOR_PATH, '%s.json' % (dataset_uuid))

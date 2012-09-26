@@ -44,7 +44,8 @@ class OriginalMetadata(Base):
     def transform(self, standard, format, xslt_path):
         #TODO: update this for iso, fgdc, dc, etc
         #TODO: xml-to-text transform iffy? or esri metadata in database so not valid fgdc
-        xslt = 'fgdc_classic_rgis.xsl' if format == 'html' else 'xml-to-text.xsl'
+        #original xslt - 'fgdc_classic_rgis.xsl'
+        xslt = 'fgdc-details_update.xslt' if format == 'html' else 'xml-to-text.xsl'
 
         xml = self.original_xml
 
@@ -70,6 +71,13 @@ class OriginalMetadata(Base):
             return output, content_type
         except:
             return xml.encode('utf8'), 'text/xml; charset=UTF-8'
+
+    #export the xml to a file
+    def write_xml_to_disk(self, filename):
+        xml = self.original_xml.encode('utf-8')
+        with open(filename, 'w') as f:
+            f.write(xml)
+        
 
 
 #TODO: implement the full metadata schema

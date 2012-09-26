@@ -564,6 +564,11 @@ class Dataset(Base):
                 fid = int(vector['f']['id'])
                 obs = vector['obs'] if 'obs' in vector else ''
                 obs = obs.strftime('%Y-%m-%dT%H:%M:%S+00') if obs else ''
+
+                #there's some wackiness with a unicode char and mongo (and also a bad char in the data, see fid 6284858)
+                #convert atts to name, value tuples so we only have to deal with the wackiness once
+                atts = [(a['name'], unicode(a['val']).encode('ascii', 'xmlcharrefreplace')) for a in vector['atts']]
+                
                 #just dump atts out
                 vals = dict([(a[0], str(a[1])) for a in atts])
                 result = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals, 'observed': obs})
@@ -589,11 +594,10 @@ class Dataset(Base):
         
         #add a metadata file if there's any metadata to add
         if self.original_metadata:
-            xml = self.original_metadata[0].original_xml.encode(encode_as)
-            mtfile = open('%s.json.xml' % (os.path.join(tmp_path, self.basename)), 'w')
-            mtfile.write(xml)
-            mtfile.close()
-            files.append('%s.json.xml' % (os.path.join(tmp_path, self.basename)))
+            orig_metadata = self.original_metadata[0]
+            metadata_file = '%s.json.xml' % (os.path.join(tmp_path, self.basename))
+            orig_metadata.write_xml_to_disk(metadata_file)
+            files.append(metadata_file)
 
         #create the zip file
         output = create_zip(filename, files)

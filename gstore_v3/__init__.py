@@ -76,8 +76,8 @@ def main(global_config, **settings):
     config.scan('.models')
     engine = engine_from_config(settings, 'sqlalchemy.')
 
+    #add the dataone logging engine (in its own postgres connection)
     dataone_engine = engine_from_config(settings, 'dataone.')
-
     models.initialize_sql([engine, dataone_engine])
     #models.initialize_sql(engine)
 
@@ -91,6 +91,7 @@ def main(global_config, **settings):
     config.add_route('test_fmt', '/test/services/{fmt}')
     config.add_route('test_fidsearch', '/test/mongo')
     config.add_route('test_insert', '/test/insert')
+    config.add_route('test_bulkinsert', '/test/chunk/{id}/{amount}')
     
     #to the attributes
     config.add_route('attributes', '/apps/{app}/attributes/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
