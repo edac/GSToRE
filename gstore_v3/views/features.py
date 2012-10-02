@@ -684,7 +684,7 @@ def add_attributes(request):
     #get the attributes for the dataset so we can do at least some check against the inputs
     fields = [f.name for f in the_dataset.attributes]
 
-    #return {'d': dataset_id, 'g': geoms.all(), 'f': fids}
+    #TODO: split up the inserts into sets for larger datasets
 
     bad_recs = []
     inserts = []
@@ -765,10 +765,15 @@ def add_attributes(request):
 
         #MISSING PATH!!!
         #TODO: add the export to .json file (by dataset id/uuid) to clusterdata for backup, etc
+        archives = []
+        for i in inserts:
+            del i['_id']
+            i['obs'] = i['obs'].strftime('%Y%m%dT%H:%M:%S')
+            archives.append(i)
         VECTOR_PATH = request.registry.settings['VECTOR_IMPORT_PATH']
         vector_file = os.path.join(VECTOR_PATH, '%s.json' % (dataset_uuid))
         with open(vector_file, 'w') as g:
-            g.write('\n'.join([json.dumps(i) for i in inserts]))
+            g.write('\n'.join([json.dumps(i) for i in archives]))
 
     output = {'features': len(inserts)}
     if bad_recs:

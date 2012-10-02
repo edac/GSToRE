@@ -2,275 +2,291 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" xmlns:tal="http://xml.zope.org/namespaces/tal">
 <head>
     <title>GStore V3 API</title>
+    <link rel="stylesheet" href="/css/style.css"></link>
     <style>
-        dl {margin-bottom: 50px;}
-        dl dt {background: #5f9be3; color: #fff; float: left; font-weight:bold; margin-right: 10px; padding: 5px; width:100px;}
+        dl {margin-bottom: 50px; display:block; position:relative;}
+        dl dt, dl dd {display: block; position:relative; z-index:2;}
+        dl dt {background: #bcdfbb; color: #285327; clear:both; float: left; font-weight:bold; margin-right: 10px; padding: 5px; width:100px;}
         dl dd {margin: 2px 0; padding: 5px 0;}
+        dt:before, dd:before {content:" "; display:block; position:absolute; z-index:-1;}
+        pre {white-space:pre-wrap;}
     </style>
 </head>
 <body>
-    <h1>GSTORE: Geographic Storage, Transformation and Retrieval Engine!</h1>
-    <p>Documentation for Version 3.</p>
-    <h2>Basic Usage</h2>
-    <p>Definition of terms, basic route structures</p>
-    <dl>
-        <dt>UUID</dt>
-        <dd>The dataset or object identifier, for example 7b5a3ba0-d806-11e1-9b23-0800200c9a66.</dd>
-        <dt>app</dt>
-        <dd>The GStore name of the application (rgis, epscor, etc). All API calls are limited to the APP data objects. The examples below refer to data objects in the RGIS application.</dd>
-    </dl>
-    <h2>Datasets</h2>
-    <p>This includes dataset downloads, OGC services, the map preview service, and a dataset service description.</p>
+    <div id="page">
+        <div id="header">
+        <h1>GSTORE </h1>
+        <h2>Geographic Storage, Transformation and Retrieval Engine Version 3</h2>
+        </div>
 
-    <h3>Downloads</h3>
-    <p>To get a list of available download formats for a dataset, please use the Service Description request (see below).</p>
-    <p>URL structure: /apps/rgis/datasets/{uuid}/{basename}.{set}.{format}</p>
-    <p>where basename is the dataset file name, set is original or derived, and format is the desired format (so long as it is a supported format for the dataset). Note: 
-    Excel file downloads are truncated if a dataset exceeds 65,534 records. 
-    </p>
-    <p>There are no query parameters for this request.</p>
-    <h4>Examples</h4>
-    <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/coalminepermitbounds.derived.shp</p>
-    
-    <h3>Service Description</h3>
-    <p>The service description provides a listing of all available downloads, web services, metadata files, and other basic dataset information. The structure of the JSON response is identical to the individual dataset objects in the dataset search results (see below).</p>
-    <p>URL structure: /apps/rgis/datasets/{uuid}/services.json</p>
-    <p>There are no query parameters for this request.</p>
-    <h4>Examples</h4>
-    <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/services.json</p>
+        <div id="main">
+            <h2>Basic Usage</h2>
+            <p>Definition of terms, basic route structures</p>
+            <dl>
+                <dt>UUID</dt>
+                <dd>The dataset or object identifier, for example 7b5a3ba0-d806-11e1-9b23-0800200c9a66.</dd>
+                <dt>app</dt>
+                <dd>The GStore name of the application (rgis, epscor, etc). All API calls are limited to the APP data objects. The examples below refer to data objects in the RGIS application.</dd>
+            </dl>
+            <h2>Datasets</h2>
+            <p>This includes dataset downloads, OGC services, the map preview service, and a dataset service description.</p>
 
-    <h4>Example Output</h4>
-    <dl>
-        <dt>description</dt>
-        <dd>The dataset title</dd>
-        <dt>lastupdate</dt>
-        <dd>The date the dataset was added to RGIS as yyyyMMdd.</dd>
-        <dt>uuid</dt>
-        <dd>The dataset UUID</dd>
-        <dt>id</dt>
-        <dd>Unique integer ID</dd>
-        <dt>taxonomy</dt>
-        <dd>Dataset type (file, geoimage or vector)</dd>
-        <dt>name</dt>
-        <dd>Dataset file name</dd>
-        <dt>categories</dt>
-        <dd>List of elements defining the category sets this dataset belongs to. Each element has a theme, subtheme and groupname element.</dd>
-        <dt>gr</dt>
-        <dd>Dataset georelevance score (0+ if performaing a spatial search; 0.0 if not). Datasets are considered more relevant a the score approaches zero.</dd>
-        <dt>availability</dt>
-        <dd>Optional boolean element (if the result set for a dataset does not include "availablility", assume availability is TRUE. Note, however, that the dataset may still have empty downloads, metadata or services lists (see below) even if a dataset is available. </dd>
-        <dt>downloads</dt>
-        <dd>List of elements describing the formats available (keys) and the downloads links associated with each format.</dd>
-        <dt>services</dt>
-        <dd>List of elements describing the services available (keys) and the links associated with service.</dd>
-        <dt>metadata</dt>
-        <dd>List of elements describing the metadata standards (keys) and formats (nested element) available for a dataset. Each standard has a nested element with the metadata formats (keys) and links defined.</dd>
-        <dt>preview</dt>
-        <dd>URL for the GSTORE map previewer for the dataset</dd>
-        <dt>spatial</dt>
-        <dd>Defines the spatial reference (as integer EPSG code) and the bounding box (in WGS84) for the dataset.</dd>
-    </dl>
-    <p>Note that the downloads, services, metadata, and preview elements may be empty based on availability or dataset limitations.</p>
-    
-     <p>Example JSON response for a raster dataset</p>
-     <pre>
-        {
-            "lastupdate": "20120827", 
-            "uuid": "53e46145-2171-4f33-b1d6-6c0a3e6b6904", 
-            "taxonomy": "geoimage", 
-            "downloads": [
+            <h3>Downloads</h3>
+            <p>To get a list of available download formats for a dataset, please use the Service Description request (see below).</p>
+            <p>URL structure: /apps/rgis/datasets/{uuid}/{basename}.{set}.{format}</p>
+            <p>where basename is the dataset file name, set is original or derived, and format is the desired format (so long as it is a supported format for the dataset). Note: 
+            Excel file downloads are truncated if a dataset exceeds 65,534 records. 
+            </p>
+            <p>There are no query parameters for this request.</p>
+            <h4>Examples</h4>
+            <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/coalminepermitbounds.derived.shp</p>
+            
+            <h3>Service Description</h3>
+            <p>The service description provides a listing of all available downloads, web services, metadata files, and other basic dataset information. The structure of the JSON response is identical to the individual dataset objects in the dataset search results (see below).</p>
+            <p>URL structure: /apps/rgis/datasets/{uuid}/services.json</p>
+            <p>There are no query parameters for this request.</p>
+            <h4>Examples</h4>
+            <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/services.json</p>
+
+            <h4>Example Output</h4>
+            <dl>
+                <dt>description</dt>
+                <dd>The dataset title</dd>
+                <dt>lastupdate</dt>
+                <dd>The date the dataset was added to RGIS as yyyyMMdd.</dd>
+                <dt>uuid</dt>
+                <dd>The dataset UUID</dd>
+                <dt>id</dt>
+                <dd>Unique integer ID</dd>
+                <dt>taxonomy</dt>
+                <dd>Dataset type (file, geoimage or vector)</dd>
+                <dt>name</dt>
+                <dd>Dataset file name</dd>
+                <dt>categories</dt>
+                <dd>List of elements defining the category sets this dataset belongs to. Each element has a theme, subtheme and groupname element.</dd>
+                <dt>gr</dt>
+                <dd>Dataset georelevance score (0+ if performaing a spatial search; 0.0 if not). Datasets are considered more relevant a the score approaches zero.</dd>
+                <dt>availability</dt>
+                <dd>Optional boolean element (if the result set for a dataset does not include "availablility", assume availability is TRUE. Note, however, that the dataset may still have empty downloads, metadata or services lists (see below) even if a dataset is available. </dd>
+                <dt>downloads</dt>
+                <dd>List of elements describing the formats available (keys) and the downloads links associated with each format.</dd>
+                <dt>services</dt>
+                <dd>List of elements describing the services available (keys) and the links associated with service.</dd>
+                <dt>metadata</dt>
+                <dd>List of elements describing the metadata standards (keys) and formats (nested element) available for a dataset. Each standard has a nested element with the metadata formats (keys) and links defined.</dd>
+                <dt>preview</dt>
+                <dd>URL for the GSTORE map previewer for the dataset</dd>
+                <dt>spatial</dt>
+                <dd>Defines the spatial reference (as integer EPSG code) and the bounding box (in WGS84) for the dataset.</dd>
+            </dl>
+            <p>Note that the downloads, services, metadata, and preview elements may be empty based on availability or dataset limitations.</p>
+            
+             <p>Example JSON response for a raster dataset</p>
+<pre>
+{
+    "lastupdate": "20120827", 
+    "uuid": "53e46145-2171-4f33-b1d6-6c0a3e6b6904", 
+    "taxonomy": "geoimage", 
+    "downloads": [
+                    {
+                        "img": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/mora_tm2011.original.img"
+                    }
+                    ], 
+    "description": "Mora County Landsat Mosaic, 2011", 
+    "metadata": [
+                    {
+                        "fgdc": 
                             {
-                                "img": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/mora_tm2011.original.img"
+                                "xml": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/metadata/fgdc.xml", 
+                                "html": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/metadata/fgdc.html"
                             }
-                         ], 
-            "description": "Mora County Landsat Mosaic, 2011", 
-            "metadata": [
-                            {
-                                "fgdc": 
-                                    {
-                                        "xml": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/metadata/fgdc.xml", 
-                                        "html": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/metadata/fgdc.html"
-                                    }
-                            }
-                        ], 
-            "spatial": {
-                            "epsg": 4326, 
-                            "bbox": [-105.724276, 35.751735, -104.324307, 36.262927]
-                       }, 
-            "services": [
-                            {
-                                "wms": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/services/ogc/wms", 
-                                "wcs": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/services/ogc/wcs"
-                            }
-                        ], 
-            "preview": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/mapper", 
-            "gr": 0.0, 
-            "id": 163367, 
-            "categories": [
-                            {
-                                "subtheme": "Landsat", 
-                                "theme": "Satellite Imagery", 
-                                "groupname": "New Mexico"
-                            }
-                          ], 
-            "name": "mora_tm2011"
-        }
-    </pre>
-    <p>Example JSON response for an unavailable dataset</p>
-    <pre>
-        {
-            "downloads": [], 
-            "lastupdate": "20120827", 
-            "uuid": "5bb2eb39-643b-4ca5-bec5-cff2c2c2d33a", 
-            "taxonomy": "geoimage", 
-            "description": "Valencia County Landsat Mosaic, 2011", 
-            "metadata": [
-                            {
-                                "fgdc": 
-                                    {
-                                        "xml": "${base_url}/apps/rgis/datasets/5bb2eb39-643b-4ca5-bec5-cff2c2c2d33a/metadata/fgdc.xml", 
-                                        "html": "${base_url}/apps/rgis/datasets/5bb2eb39-643b-4ca5-bec5-cff2c2c2d33a/metadata/fgdc.html"
-                                    }
-                                }
-                        ], 
-            "availability": false, 
-            "spatial": 
-                {
+                    }
+                ], 
+    "spatial": {
                     "epsg": 4326, 
-                    "bbox": [-107.214776, 34.425583, -106.403015, 34.970134]
+                    "bbox": [-105.724276, 35.751735, -104.324307, 36.262927]
                 }, 
-            "services": [], 
-            "preview": "", 
-            "gr": 0.0, 
-            "id": 163381, 
-            "categories": [
+    "services": [
+                    {
+                        "wms": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/services/ogc/wms", 
+                        "wcs": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/services/ogc/wcs"
+                    }
+                ], 
+    "preview": "${base_url}/apps/rgis/datasets/53e46145-2171-4f33-b1d6-6c0a3e6b6904/mapper", 
+    "gr": 0.0, 
+    "id": 163367, 
+    "categories": [
+                    {
+                        "subtheme": "Landsat", 
+                        "theme": "Satellite Imagery", 
+                        "groupname": "New Mexico"
+                    }
+                    ], 
+    "name": "mora_tm2011"
+}
+</pre>
+            <p>Example JSON response for an unavailable dataset</p>
+<pre>
+{
+    "downloads": [], 
+    "lastupdate": "20120827", 
+    "uuid": "5bb2eb39-643b-4ca5-bec5-cff2c2c2d33a", 
+    "taxonomy": "geoimage", 
+    "description": "Valencia County Landsat Mosaic, 2011", 
+    "metadata": [
+                    {
+                        "fgdc": 
                             {
-                                "subtheme": "Landsat", 
-                                "theme": "Satellite Imagery", 
-                                "groupname": "New Mexico"
+                                "xml": "${base_url}/apps/rgis/datasets/5bb2eb39-643b-4ca5-bec5-cff2c2c2d33a/metadata/fgdc.xml", 
+                                "html": "${base_url}/apps/rgis/datasets/5bb2eb39-643b-4ca5-bec5-cff2c2c2d33a/metadata/fgdc.html"
                             }
-                            ], 
-            "name": "valencia_tm2011"
-        }
-     </pre>
+                        }
+                ], 
+    "availability": false, 
+    "spatial": 
+        {
+            "epsg": 4326, 
+            "bbox": [-107.214776, 34.425583, -106.403015, 34.970134]
+        }, 
+    "services": [], 
+    "preview": "", 
+    "gr": 0.0, 
+    "id": 163381, 
+    "categories": [
+                    {
+                        "subtheme": "Landsat", 
+                        "theme": "Satellite Imagery", 
+                        "groupname": "New Mexico"
+                    }
+                    ], 
+    "name": "valencia_tm2011"
+}
+</pre>
 
-    <h3>Web Services</h3>
-    <p>Available web services by dataset are currently limited to OGC services: WMS, WCS or WFS.</p>
-    <dl>
-        <dt>REQUEST</dt>
-        <dd>Method</dd>
-        <dt>SERVICE</dt>
-        <dd>WMS or WFS or WCS</dd> 
-        <dt>VERSION</dt>
-        <dd>which version of the service to use (see GetCapabilities for supported versions)</dd>
-    </dl>
-    <p>This list does not include all of the parameters required or supported by the OGC services. Refer to the Mapserver OGC documentation for parameters by service and method.</p>
+            <h3>Web Services</h3>
+            <p>Available web services by dataset are currently limited to OGC services: WMS, WCS or WFS.</p>
+            <dl>
+                <dt>REQUEST</dt>
+                <dd>Method</dd>
+                <dt>SERVICE</dt>
+                <dd>WMS or WFS or WCS</dd> 
+                <dt>VERSION</dt>
+                <dd>which version of the service to use (see GetCapabilities for supported versions)</dd>
+            </dl>
+            <p>This list does not include all of the parameters required or supported by the OGC services. Refer to the Mapserver OGC documentation for parameters by service and method.</p>
 
-    <h4>Examples</h4>
-    <p>${base_url}/apps/rgis/datasets/b8989369-3183-49af-a817-1c9b37116ebc/services/ogc/wms?REQUEST=GetCapabilities&SERVICE=WMS&VERSION=1.1.1</p>
+            <h4>Examples</h4>
+            <p>${base_url}/apps/rgis/datasets/b8989369-3183-49af-a817-1c9b37116ebc/services/ogc/wms?REQUEST=GetCapabilities&SERVICE=WMS&VERSION=1.1.1</p>
 
-    <h3>Map Preview</h3>
-    <p></p>
-    <h4>Examples</h4>
-    <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/mapper</p>
+            <h3>Map Preview</h3>
+            <p></p>
+            <h4>Examples</h4>
+            <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/mapper</p>
 
-    <h2>Metadata</h2>
-    <p>Currently GSToRE only supports FGDC.</p>
-    <p>URL Structure: /apps/rgis/datasets/{uuid}/metadata/{standard}.{format}</p>
-    <p>where standard is a supported metadata standard (FGDC or, later, ISO, DC, etc) and format is a supported format (html, txt, or xml).</p>
-    <h4>Examples</h4>
-    <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/metadata/fgdc.html</p>  
-    
-    <h2>Search</h2>
-    <h3>Datasets</h3>
-    <dl>
-        <dt>version</dt>
-        <dd>(optional) 2 or 3. Defaults to version 2 output format if version not included. You are strongly encouraged to use version=3 for any new development.</dd>
-        <dt>limit</dt>
-        <dd>(optional) integer; number of objects to return. Defaults to 25.</dd>
-        <dt>offset</dt>
-        <dd>(optional) integer; start of result set based on number of records to return. Defaults to 0.</dd>
-        <dt>dir</dt>
-        <dd>(optional) ASC or DESC. Sort order of the result set.</dd>
-        <dt>sort</dt>
-        <dd>(optional) lastupdate or text; </dd>
-        <dt>start_time</dt>
-        <dd>(optional) Start date for date added comparison. Format yyyyMMdd. UTC.</dd>
-        <dt>end_time</dt>
-        <dd>(optional) End date for date added comparison. Format yyyyMMdd. UTC.</dd>
-        <dt>valid_start</dt>
-        <dd>(optional) Start date for valid date range comparison. Format yyyyMMdd. UTC.</dd>
-        <dt>valid_end</dt>
-        <dd>(optional) End date for valid date range comparison. Format yyyyMMdd. UTC.</dd>
-        <dt>box</dt>
-        <dd>(optional) Bounding box coordinates as a comma-delimited list (minx, minyy, maxx, maxy)</dd>
-        <dt>epsg</dt>
-        <dd>(optional) EPSG code for the specified box rectangle. Default is 4326.</dd>
-        <dt>theme</dt>
-        <dd>(optional) search term for the theme.</dd>
-        <dt>subtheme</dt>
-        <dd>(optional) search term for the subtheme</dd>
-        <dt>groupname</dt>
-        <dd>(optional) search term for the groupname</dd>
-        <dt>query</dt>
-        <dd>(optional) keyword search terms.</dd>
-        <dt>format</dt>
-        <dd>(optional) zip,shp,kml,csv,xls,json,rss,gml,tif,sid,ecw,dem,hdf,ascii,nc,grib,txt,html,pdf,doc,docx,xlsx,gz,png,gif,jpg. Not all formats are available for a given dataset. Availability is based on the dataset taxonomy.</dd>
-        <dt>service</dt>
-        <dd>(optional) wms, wcs, or wfs</dd>
-        <dt>taxonomy</dt>
-        <dd>(optional) file, vector, geoimage (raster) or service</dd>
-        <dt>geomtype</dt>
-        <dd>(optional) point, linestring, polygon, multipolygon, 3d linestring, 3d polygon</dd>
-    </dl>
+            <h2>Metadata</h2>
+            <p>Currently GSToRE only supports FGDC.</p>
+            <p>URL Structure: /apps/rgis/datasets/{uuid}/metadata/{standard}.{format}</p>
+            <p>where standard is a supported metadata standard (FGDC or, later, ISO, DC, etc) and format is a supported format (html, txt, or xml).</p>
+            <h4>Examples</h4>
+            <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/metadata/fgdc.html</p>  
+            
+            <h2>Search</h2>
+            <h3>Datasets</h3>
+            <dl>
+                <dt>version</dt>
+                <dd>(optional) 2 or 3. Defaults to version 2 output format if version not included. You are strongly encouraged to use version=3 for any new development.</dd>
+                <dt>limit</dt>
+                <dd>(optional) integer; number of objects to return. Defaults to 25.</dd>
+                <dt>offset</dt>
+                <dd>(optional) integer; start of result set based on number of records to return. Defaults to 0.</dd>
+                <dt>dir</dt>
+                <dd>(optional) ASC or DESC. Sort order of the result set.</dd>
+                <dt>sort</dt>
+                <dd>(optional) lastupdate or text; </dd>
+                <dt>start_time</dt>
+                <dd>(optional) Start date for date added comparison. Format yyyyMMdd. UTC.</dd>
+                <dt>end_time</dt>
+                <dd>(optional) End date for date added comparison. Format yyyyMMdd. UTC.</dd>
+                <dt>valid_start</dt>
+                <dd>(optional) Start date for valid date range comparison. Format yyyyMMdd. UTC.</dd>
+                <dt>valid_end</dt>
+                <dd>(optional) End date for valid date range comparison. Format yyyyMMdd. UTC.</dd>
+                <dt>box</dt>
+                <dd>(optional) Bounding box coordinates as a comma-delimited list (minx, minyy, maxx, maxy)</dd>
+                <dt>epsg</dt>
+                <dd>(optional) EPSG code for the specified box rectangle. Default is 4326.</dd>
+                <dt>theme</dt>
+                <dd>(optional) search term for the theme.</dd>
+                <dt>subtheme</dt>
+                <dd>(optional) search term for the subtheme</dd>
+                <dt>groupname</dt>
+                <dd>(optional) search term for the groupname</dd>
+                <dt>query</dt>
+                <dd>(optional) keyword search terms.</dd>
+                <dt>format</dt>
+                <dd>(optional) zip, shp ,kml ,csv, xls, geojson, json, rss, gml, tif, sid, ecw, dem, img, hdf, ascii, nc, grib, txt, html, pdf, doc, docx, xlsx, gz, png, gif, jpg. Not all formats are available for a given dataset. Availability is based on the dataset taxonomy.</dd>
+                <dt>service</dt>
+                <dd>(optional) wms, wcs, or wfs</dd>
+                <dt>taxonomy</dt>
+                <dd>(optional) file, vector, geoimage (raster) or service</dd>
+                <dt>geomtype</dt>
+                <dd>(optional) point, linestring, polygon, multipolygon, 3d linestring, 3d polygon</dd>
+            </dl>
 
-    <h4>Examples</h4>
-    <p>${base_url}/apps/rgis/search/datasets.json?version=3&start_time=20120201&dir=ASC</p>
-    <p>${base_url}/apps/rgis/search/datasets.json?version=3&box=-106.058,36.013,-105.200,36.996</p>
+            <h4>Examples</h4>
+            <p>${base_url}/apps/rgis/search/datasets.json?version=3&start_time=20120201&dir=ASC</p>
+            <p>${base_url}/apps/rgis/search/datasets.json?version=3&box=-106.058,36.013,-105.200,36.996</p>
 
-    <h3>Features</h3>
-    <p>Still working on it.</p>
-    <dl>
-        <dt></dt>
-        <dd></dd>
-        <dt></dt>
-        <dd></dd> 
-    </dl>
+            <h3>Features</h3>
+            <p>Still working on it.</p>
+            <dl>
+                <dt></dt>
+                <dd></dd>
+                <dt></dt>
+                <dd></dd> 
+            </dl>
 
-    <h3>Category Tree</h3>
-    <p></p>
-    <dl>
-        <dt>node</dt>
-        <dd>(optional) Theme, subtheme and groupname search terms. Separate each term by __|__. For example, to return the groupnames under the Contour section of Elevation, use Elevation__|__Contours.</dd>
-    </dl>  
+            <h3>Category Tree</h3>
+            <p></p>
+            <dl>
+                <dt>node</dt>
+                <dd>(optional) Theme, subtheme and groupname search terms. Separate each term by __|__. For example, to return the groupnames under the Contour section of Elevation, use Elevation__|__Contours.</dd>
+            </dl>  
 
-    <h4>Examples</h4>
-    <p>${base_url}/apps/rgis/search/categories.json</p>
-    <p>${base_url}/apps/rgis/search/categories.json?node=Boundaries__|__General</p>  
+            <h4>Examples</h4>
+            <p>${base_url}/apps/rgis/search/categories.json</p>
+            <p>${base_url}/apps/rgis/search/categories.json?node=Boundaries__|__General</p>  
 
-    <h3>Geospatial Lookups</h3>
-    <p>Search for quad names or placenames</p>
-    <p>The search request returns bounding boxes and names for either nm_quads (quad names) or nm_gnis (placenames). Indicate which lookup to use as nm_quads.json or nm_gnis.json.</p>
-    
-    <h4>Query Parameters</h4>
-    <dl>
-        <dt>query</dt>
-        <dd>(optional) Keywords to include in the name search. Replace any spaces with +.</dd> 
-        <dt>version</dt>
-        <dd>(optional) 2 or 3. Defaults to version 2 output format if version not included. You are strongly encouraged to use version=3 for any new development.</dd>
-        <dt>limit</dt>
-        <dd>(optional) integer; number of objects to return. Defaults to 25.</dd>
-        <dt>offset</dt>
-        <dd>(optional) integer; start of result set based on number of records to return. Defaults to 0.</dd>
-        <dt>dir</dt>
-        <dd>(optional) ASC or DESC. Sort order of the result set.</dd>
-        <dt>epsg</dt>
-        <dd>(optional) EPSG code for the result set bounding boxes. </dd>
-    </dl>
-    <h4>Examples</h4>
-    <p>${base_url}/apps/rgis/search/nm_quads.json?query=albu</p>
-    
-    
-    
-    
+            <h3>Geospatial Lookups</h3>
+            <p>Search for quad names or placenames</p>
+            <p>The search request returns bounding boxes and names for either nm_quads (quad names) or nm_gnis (placenames). Indicate which lookup to use as nm_quads.json or nm_gnis.json.</p>
+            
+            <h4>Query Parameters</h4>
+            <dl>
+                <dt>query</dt>
+                <dd>(optional) Keywords to include in the name search. Replace any spaces with +.</dd> 
+                <dt>version</dt>
+                <dd>(optional) 2 or 3. Defaults to version 2 output format if version not included. You are strongly encouraged to use version=3 for any new development.</dd>
+                <dt>limit</dt>
+                <dd>(optional) integer; number of objects to return. Defaults to 25.</dd>
+                <dt>offset</dt>
+                <dd>(optional) integer; start of result set based on number of records to return. Defaults to 0.</dd>
+                <dt>dir</dt>
+                <dd>(optional) ASC or DESC. Sort order of the result set.</dd>
+                <dt>epsg</dt>
+                <dd>(optional) EPSG code for the result set bounding boxes. </dd>
+            </dl>
+            <h4>Examples</h4>
+            <p>${base_url}/apps/rgis/search/nm_quads.json?query=albu</p>
+        </div>    
+
+        <div id="footer">
+            <a href="httP;//edac.unm.edu" style=""><img src="/images/edac-logo.png" align="left" boder="0" width="60px" alt="Earth Data Analysis Center" title="Earth Data Analysis Center"/></a>
+            <a href="http://www.unm.edu"><img src="/images/unm-logo.gif" align="right" border="0" width="100px" alt="University of New Mexico" title="University of New Mexico"/></a>
+            All content Copyright © 2012
+            by the <a href="http://edac.unm.edu">Earth Data Analysis Center</a><br/>
+            <span>Send all comments to <a href="mailto:webmaster@edac.unm.edu">webmaster</a>.</span>
+        </div>
+    </div>
 </body>
+</html>

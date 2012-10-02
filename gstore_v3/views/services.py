@@ -901,7 +901,7 @@ def mapper(request):
     for ds in dlds:
         key = ds[1]
         key = 'kmz' if key == 'kml' else key
-        url = '%s.%s.%s' % (base_url, ds[0], ds[1])
+        url = '%s/%s.%s.%s' % (base_url, d.basename, ds[0], ds[1])
         fmts.append({'title': key, 'text': url})
 
     c.update({'formats': fmts})

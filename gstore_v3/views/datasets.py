@@ -28,7 +28,14 @@ def return_fileresponse(output, mimetype, filename):
     fr.content_disposition = 'attachment; filename=%s' % filename
     
     #TODO: may want to reconsider the cookie age
-    #for the jquery file download progress widget
+    '''
+    This is specifically for the fileDownload jquery plugin in RGIS/EPSCoR.
+    It acts like a flag to close the modal popup and only works if the urls
+    from gstore are rewritten to interface_host/datasets... so that the cookie is set
+    for the client as is then usable there. Otherwise it's a whole CORS thing that we
+    don't really want to get into. Basically, don't change the key and don't chuck the cookie
+    as long as rgis/epscor use that plugin.
+    '''
     fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/')
     return fr
 
@@ -46,18 +53,12 @@ def show_html(request):
     #http://129.24.63.66/gstore_v3/apps/rgis/datasets/8fc27d61-285d-45f6-8ef8-83785d62f529/soils83.html
     #http://{load_balancer}/apps/.....
 
-#    #get the host url
-#    host = request.host_url
-#    g_app = request.script_name[1:]
-#    base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
-
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
     
     rsp = d.get_full_service_dict(base_url, request)
 
     return rsp
-    #return Response('html ' + str(d.uuid))
     
 
 @view_config(route_name='zip_dataset')
@@ -134,7 +135,11 @@ def dataset(request):
     #return the already packed zip (this assumes that everything set to zip is already a zip)
     if format == 'zip':
         output = src.get_location(format)
-        return return_fileresponse(output, mimetype, output.split('/')[-1])
+
+        ext = output.split('.')[-1]
+        if ext == format:
+            #it's not really a zip file, but we want it marked as zip (avoid confusion between source xls and exported xls, etc)
+            return return_fileresponse(output, mimetype, output.split('/')[-1])
     
     #check the cache for a zip
     output = os.path.join(fmtpath, str(d.uuid), format, '%s_%s.zip' % (str(d.basename), format))
