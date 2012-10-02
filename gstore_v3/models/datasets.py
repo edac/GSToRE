@@ -442,11 +442,12 @@ class Dataset(Base):
             prjfile.close()
 
         #and the metadata
-        if self.has_metadata_cache:
-            mt = str(self.original_metadata[0].original_xml.encode('utf8'))
-            mtfile = open('%s/%s.%s.xml' % (tmp_path, self.basename, format), 'w')
-            mtfile.write(mt)
-            mtfile.close()
+        files = []
+        if self.original_metadata:
+            orig_metadata = self.original_metadata[0]
+            metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
+            orig_metadata.write_xml_to_disk(metadata_file)
+            files.append(metadata_file)
                 
         #set up the formats directory WITHOUT BASENAMES
         #NO - move this to the view so that we can build vector formats wherever we want
@@ -454,7 +455,6 @@ class Dataset(Base):
         filename = os.path.join(basepath, '%s_%s.zip' % (self.basename, format))
         #get the files for the zip
         #and move them to the formats cache
-        files = []
         if format=='shp':
             exts = ['shp', 'shx', 'dbf', 'prj', 'shp.xml', 'sbn', 'sbx']
             for e in exts:
@@ -462,7 +462,7 @@ class Dataset(Base):
                     files.append(os.path.join(tmp_path, '%s.%s' % (self.basename, e)))
         else:
             files.append(os.path.join(tmp_path, '%s.%s' % (self.basename, format)))
-        files.append('%s/%s.%s.xml' % (tmp_path, self.basename, format))
+     
         output = create_zip(filename, files)
 
         #and copy everything in files to the formats cache
@@ -508,7 +508,7 @@ class Dataset(Base):
                 if not va:
                     value = ''
                 else:
-                    value = str(va[0]['val'])
+                    value = unicode(va[0]['val']).encode('ascii', 'xmlcharrefreplace')
                  
                 #convert it to the right type based on the field with string as default
                 value = convert_by_ogrtype(value, att.ogr_type)
@@ -526,16 +526,17 @@ class Dataset(Base):
         #write the file
         filename = os.path.join(basepath, '%s.xls' % (self.basename))
         workbook.save(filename)
+        files = [filename]
 
         #just to be consistent with all of the other types
         #let's pack up a zip file
-        if self.has_metadata_cache:
-            mt = str(self.original_metadata[0].original_xml.encode('utf8'))
-            mtfile = open('%s.xls.xml' % (os.path.join(basepath, self.basename)), 'w')
-            mtfile.write(mt)
-            mtfile.close()
+        if self.original_metadata:
+            orig_metadata = self.original_metadata[0]
+            metadata_file = '%s.xls.xml' % (os.path.join(basepath, self.basename))
+            orig_metadata.write_xml_to_disk(metadata_file)
+            files.append(metadata_file)
             
-        output = create_zip(os.path.join(basepath, '%s_xls.zip' % (self.uuid)), [filename, '%s.xls.xml' % (os.path.join(basepath, self.basename))])
+        output = create_zip(os.path.join(basepath, '%s_xls.zip' % (self.basename)), files)
         
         return (0, 'success')
 
@@ -799,11 +800,10 @@ class Dataset(Base):
             
         #add a metadata file if there's any metadata to add
         if self.original_metadata:
-            xml = self.original_metadata[0].original_xml.encode(encode_as)
-            mtfile = open('%s.%s.xml' % (os.path.join(tmp_path, self.basename), format), 'w')
-            mtfile.write(xml)
-            mtfile.close()
-            files.append('%s.%s.xml' % (os.path.join(tmp_path, self.basename), format))
+            orig_metadata = self.original_metadata[0]
+            metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
+            orig_metadata.write_xml_to_disk(metadata_file)
+            files.append(metadata_file)
 
         #create the zip file
         output = create_zip(filename, files)

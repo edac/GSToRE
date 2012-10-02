@@ -138,7 +138,8 @@ def dataset(request):
 
         ext = output.split('.')[-1]
         if ext == format:
-            #it's not really a zip file, but we want it marked as zip (avoid confusion between source xls and exported xls, etc)
+            #if it really is a zip file.
+            #otherwise we want to pack it with the redundant _zip.zip structure
             return return_fileresponse(output, mimetype, output.split('/')[-1])
     
     #check the cache for a zip
@@ -183,7 +184,7 @@ def dataset(request):
 
         #check the response for failure
         if success[0] != 0:
-            return HTTPServerError()    
+            return HTTPServerError(success[1])    
 
         #TODO: the vectors are returning as uuid.format.zip instead of basename.format.zip
         return return_fileresponse(cached_file, mimetype, outname)    

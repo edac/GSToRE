@@ -825,6 +825,9 @@ def base_services(request):
 mapper
 '''
 #TODO: migrate to the interfaces only
+#TODO: figure out the issue with the cookie timing for the fileDownload plugin. the code is in the template
+#      and is triggered to start but the cookie only shows up (in firebug) on reload. in rgis, the cookie
+#      shows up immediately and the callback is triggered. wacky.
 @view_config(route_name='mapper', renderer='mapper.mako')
 def mapper(request):
     #build the dict

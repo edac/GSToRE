@@ -14,6 +14,13 @@
   <script src="http://www.openlayers.org/api/2.10/OpenLayers.js"></script>
   <script type="text/javascript" src="${MEDIA_URL}/javascript/geoext/1.0/GeoExt.js"></script>
 
+<!--  
+  <script type="text/javascript" src="${MEDIA_URL}/javascript/jquery1_8/jquery-1.8.1.min.js"></script>
+  <script type="text/javascript" src="${MEDIA_URL}/javascript/jquery_plugins/jqueryui/1.8.9/jquery-ui.min.js"></script>
+  <script type="text/javascript" src="${MEDIA_URL}/javascript/fileDownload/jquery.fileDownload.js"></script>
+  <link rel="stylesheet" type="text/css" href="${MEDIA_URL}/javascript/jquery_plugins/jqueryui/1.8.9/css/redmond/jquery-ui-1.8.9.custom.css" />
+-->
+
   <script type="text/javascript" src= "${MEDIA_URL}/javascript/proj4js/proj4js-compressed.js"> </script>
   <script type="text/javascript" src= "${MEDIA_URL}/javascript/proj4js/defs/EPSG4326.js"> </script>
   <script type="text/javascript" src= "${MEDIA_URL}/javascript/proj4js/defs/EPSG26913.js"> </script>
@@ -28,6 +35,27 @@
   </script>
   <script type="text/javascript" src= "${MEDIA_URL}/javascript/maps/mapper.js"> </script>
 
+<!--  <script type="text/javascript">
+    $(function() {
+      $(document).on("click", "a.dataset_download", function() {
+        var $preparingFileModal = $('#preparing-file-modal');
+        $preparingFileModal.dialog({modal: true});
+
+        $.fileDownload($(this).attr('href'), {
+            successCallback: function(url) {
+                $preparingFileModal.dialog(close);
+            },
+            failCallback: function(responseHtml, url) {
+                $preparingFileModal.dialog(close);
+                $('#error-modal').dialog({modal:true});
+            }
+        });
+        return false;
+      });
+    });
+  </script>
+-->
+
 <style>
     #dataset_desc {
         width: 100%;
@@ -38,10 +66,21 @@
     a {
         text-decoration: none;
     }
+    div.download_notification {
+        background-color: #C3D9FF;
+        height: 500px;
+    }
 </style>
 </head>
 
 <body>
+    <!--<div id='preparing-file-modal' title='Preparing download...' style='display:none;'>
+        We are preparing your download file, please be patient...
+        <div class='ui-progressbar-value ui-corner-left ui-corner-right' style='width:100%;height:22px;margin-top:20px;'></div>
+    </div>
+    <div id='error-modal' title='Error' style='display:none;'>
+        There was a problem generating your download, please try again.
+    </div>-->
       <div id="description">
           <table id='dataset_desc'>
             <tr>
@@ -59,7 +98,7 @@
               </td>
               <td>
                     % for met in formats:
-                        <a href="${met['text']}">${met['title']}</a> &nbsp; &nbsp;
+                        <a class="dataset_download" href="${met['text']}">${met['title']}</a> &nbsp; &nbsp;
                     % endfor
               </td>
             </tr>
