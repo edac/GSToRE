@@ -17,6 +17,9 @@ from zope.sqlalchemy import ZopeTransactionExtension
 
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 
+#this is bad
+from pyramid.threadlocal import get_current_registry
+
 '''
 metadata
 (not called metadata to avoid any confusion/conflict with the sqlalchemy object)
@@ -38,16 +41,48 @@ class OriginalMetadata(Base):
     def __repr__(self):
         return '<Original Metadata (%s)>' % (self.id)
 
+    def append_onlink(self, base_url):
+        '''
+        add all of the download and service options for the dataset as onlink (online linkages)
+        to the citation (citeinfo) element
+        '''
+        xml = self.original_xml
+        if not xml:
+            return None
+
+        #parse the xml and insert all of the links
+        mod_xml = etree.fromstring(xml.encode('utf-8'))
+
+        citation = mod_xml.find('idinfo/citation/citeinfo')
+        if citation is None:
+            return None
+
+        #get all of the links
+        #TODO: maybe not this but for now, let's just roll with it
+        #go get the dictionary for the dataset
+        dct = self.datasets.get_full_service_dict(base_url, None)
+
+        onlinks = dct['services'][0].values() + dct['downloads'][0].values()
+
+        for onlink in onlinks:
+            link = etree.SubElement(citation, 'onlink')
+            link.text = onlink
+        
+        return etree.tostring(mod_xml)
+
     #generate the metadata for standard + format
     #except it's onyl fgdc today
-    #TODO: fix the to text transform (empty? response)
-    def transform(self, standard, format, xslt_path):
+    def transform(self, standard, format, xslt_path, base_url=''):
         #TODO: update this for iso, fgdc, dc, etc
         #TODO: xml-to-text transform iffy? or esri metadata in database so not valid fgdc
-        #original xslt - 'fgdc_classic_rgis.xsl'
+        #NOTE: dropped the text transform as not particularly necessary
+        #original xslt - 'fgdc_classic_rgis.xsl' 
         xslt = 'fgdc-details_update.xslt' if format == 'html' else 'xml-to-text.xsl'
 
         xml = self.original_xml
+
+        if standard == 'fgdc' and base_url:
+            xml = self.append_onlink(base_url)
 
         if format == 'xml':
             return xml.encode('utf8'), 'text/xml; charset=UTF-8'
@@ -73,10 +108,14 @@ class OriginalMetadata(Base):
             return xml.encode('utf8'), 'text/xml; charset=UTF-8'
 
     #export the xml to a file
-    def write_xml_to_disk(self, filename):
-        xml = self.original_xml.encode('utf-8')
+    def write_xml_to_disk(self, filename, include_onlinks=False, base_url=''):
+        xml = self.original_xml
+
+        if include_onlinks and base_url:
+            xml = self.append_onlink(base_url)
+            
         with open(filename, 'w') as f:
-            f.write(xml)
+            f.write(xml.encode('utf-8'))
         
 
 

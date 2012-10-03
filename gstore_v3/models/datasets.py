@@ -28,6 +28,9 @@ import os, tempfile, shutil
 import subprocess, re
 from xml.sax.saxutils import escape
 
+#this is bad and is just for the metadata right now
+from pyramid.threadlocal import get_current_registry
+
 
 '''
 gstoredata.datasets
@@ -88,7 +91,7 @@ class Dataset(Base):
 
     #TODO: update this when the new schema is in place. this is an intermediate step
     #relate to the metadata
-    original_metadata = relationship('OriginalMetadata')
+    original_metadata = relationship('OriginalMetadata', backref='datasets')
 
     #relate to projects
     projects = relationship('Project', secondary='gstoredata.projects_datasets', backref='datasets')
@@ -104,10 +107,22 @@ class Dataset(Base):
 
     #get the available formats for the dataset
     #use the excluded_formats & the taxonomy_list defaults to get the actual supported formats
-    def get_formats(self, req):
+    def get_formats(self, req=None):
         if not self.is_available:
             return []
-        lst = get_all_formats(req)
+
+        if not req:
+            #try to get the list from the current registry
+            lst = get_current_registry().settings['DEFAULT_FORMATS']
+        else:
+            lst = req.registry.settings['DEFAULT_FORMATS']
+
+        if not lst:
+            return None
+        lst = lst.split(',')
+                    
+        #lst = get_all_formats(req)
+        
         exc_lst = self.excluded_formats
 
         #get all from one not in the other
@@ -115,11 +130,20 @@ class Dataset(Base):
         return fmts
 
     #get the supported web services for the dataset
-    def get_services(self, req):
+    def get_services(self, req=None):
         if not self.is_available:
             return []
 
-        lst = get_all_services(req)
+        if not req:
+            lst = get_current_registry().settings['DEFAULT_SERVICES']
+        else:
+            lst = req.registry.settings['DEFAULT_SERVICES']
+
+        if not lst:
+            return None    
+        lst = lst.split(',')
+
+        #lst = get_all_services(req)
         exc_lst = self.excluded_services
 
         #get all from one not in the other

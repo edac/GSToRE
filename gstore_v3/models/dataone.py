@@ -66,6 +66,8 @@ class DataoneCore(Base):
         #return the obsolete_uuid for the set of uuids 
         #where current object is the uuid with the most recent date-modified value in dataone_obsoletes
         #THIS IS THE OBSOLETEDBY VALUE IN THE SYSTEM METADATA
+        #TODO: BUT ONLY IF THERE'S MORE THAN ONE
+        #if self.obsoletes and len(self.obsoletes) > 1:
         if self.obsoletes:
             return self.obsoletes[-1].obsolete_uuid
         else:
@@ -133,7 +135,8 @@ class DataoneCore(Base):
             return ''
             
         return os.path.getsize(f)
-        
+
+#TODO: update to handle the whole multiple formats per one metadata xml situation        
 class DataonePackage(Base):
     __table__ = Table('dataone_datapackages', Base.metadata,
         Column('id', Integer, primary_key=True),
@@ -217,13 +220,13 @@ class DataonePackage(Base):
 
         md_core = DBSession.query(DataoneCore).filter(DataoneCore.dataone_uuid==self.metadata_object).first()
         if not md_core:
-            return ''
+            return 'no core metadata'
         d_core = DBSession.query(DataoneCore).filter(DataoneCore.dataone_uuid==self.dataset_object).first()
         if not d_core:
-            return ''
+            return 'no core data object'
         pkg_core = DBSession.query(DataoneCore).filter(DataoneCore.object_uuid==self.package_uuid).first()        
         if not pkg_core:
-            return ''
+            return 'no core package'
 
         #need the most recent obsolete uuid for the correct paths to the data objects
         md_current = md_core.get_current()
@@ -231,7 +234,7 @@ class DataonePackage(Base):
         pkg_current = pkg_core.get_current()
 
         if not md_current or not d_current or not pkg_current:
-            return ''
+            return 'no current ids (%s, %s, %s)' % (md_current, d_current, pkg_current)
     
         #get the metadata object
         #where the about ref is gstore/apps/dataone/object/uuid
@@ -256,6 +259,7 @@ class DataonePackage(Base):
         #build the rdf
         rem = ResourceMap('%s/object/%s' % (base_url, pkg_current))
         rem.set_aggregation(aggregate)
+        rem.format = 'http://www.w3.org/TR/rdf-syntax-grammar'
 
         #use the rdf+xml format
         rdfxml = RdfLibSerializer('rdf')
@@ -303,29 +307,6 @@ class DataoneVector(Base):
     def __repr__(self):
         return '<DataONE Vector (%s, %s, %s)>' % (self.vector_uuid, self.format, self.dataset_uuid)
 
-    def add_vector(self, format, path):
-        '''
-        get the vector zip (if it's cached just copy the zip, otherwise build it and copy the zip)
-        for the dataset id and format requested (if format in supported list)
-        where the file name is the new vector uuid 
-        '''
-
-        #add a new vector record and get the uuid
-
-
-        #make the dataone zip
-        
-        pass
-    def build_vector_zip(self, format, path):
-        '''
-        go check the formats cache for the files (esp. the zip)
-        if it exists, copy it to dataone with the vector_uuid as the file name
-        carry on
-        if it doesn't, go build it for the dataset BUT not in the formats cache (we want to save space) and, if it's shp, chuck the bits that are not zip
-        '''
-
-        pass
-
 class DataoneObsolete(Base):
     __table__ = Table('dataone_obsoletes', Base.metadata,
         Column('id', Integer, primary_key=True),
@@ -335,7 +316,7 @@ class DataoneObsolete(Base):
         schema='gstoredata'
     )    
     '''
-    dataone_uuid = foriegn key to dataone_core
+    dataone_uuid = foreign key to dataone_core
     obsolete_uuid = new uuid if a dataone object has been modified
     date_changed = timestamp for when object changed and so we can return the most current uuid for an object
 

@@ -412,15 +412,15 @@ def mongo_bulkinsert(request):
     mongo_uri = gMongoUri(connstr, collection)
     gm = gMongo(mongo_uri)    
 
-    try:
-        fail = gm.insert(docs)
-        if fail:
-            #TODO: run a delete for the dataset id just in case it failed midstream
-            return HTTPServerError(fail)
-    except Exception as err:
-        return HTTPServerError(err)
-    finally:
-        gm.close()
+#    try:
+#        fail = gm.insert(docs)
+#        if fail:
+#            #TODO: run a delete for the dataset id just in case it failed midstream
+#            return HTTPServerError(fail)
+#    except Exception as err:
+#        return HTTPServerError(err)
+#    finally:
+#        gm.close()
     
     return {'key': key, 'id': dataset, 'docs': len(docs)}
 

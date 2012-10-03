@@ -64,7 +64,8 @@ def metadata(request):
     #get the xml metadata
     #TODO: the standard is a lie
     xslt_path = request.registry.settings['XSLT_PATH']
-    output, content_type = d.original_metadata[0].transform(standard, format, xslt_path) 
+    base_url = '%s/apps/%s/datasets/' % (request.registry.settings['BALANCER_URL'], app) if standard == 'fgdc' else ''
+    output, content_type = d.original_metadata[0].transform(standard, format, xslt_path, base_url) 
 
     return Response(output, content_type=content_type)
 

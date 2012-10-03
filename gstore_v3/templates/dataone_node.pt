@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <d1:node xmlns:d1="http://ns.dataone.org/service/types/v1" replicate="true" synchronize="true" type="mn" state="up">
-    <identifier>urn:node:DEMO2</identifier>
+    <identifier>urn:node:EDAC-GSTORE</identifier>
     <name>${name}</name>
     <description>${description}</description>
     <baseURL>${baseUrl}</baseURL>

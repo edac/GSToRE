@@ -184,7 +184,7 @@ def dataset(request):
 
         #check the response for failure
         if success[0] != 0:
-            return HTTPServerError(success[1])    
+            return HTTPServerError()    
 
         #TODO: the vectors are returning as uuid.format.zip instead of basename.format.zip
         return return_fileresponse(cached_file, mimetype, outname)    

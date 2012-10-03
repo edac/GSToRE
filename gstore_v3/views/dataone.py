@@ -38,10 +38,10 @@ see http://mule1.dataone.org/ArchitectureDocs-current/apis/MN_APIs.html
 some presets
 '''
 #TODO: move to config?
-NODE = 'urn:node:GSTORE'
-SUBJECT = 'CN=GStore,DC=dataone,DC=org'
-RIGHTSHOLDER = 'CN=GStore,DC=dataone,DC=org'
-CONTACTSUBJECT = 'CN=GStore,DC=dataone,DC=org'
+NODE = 'urn:node:EDAC-GSTORE'
+SUBJECT = 'CN=EDAC-GSTORE,DC=dataone,DC=org'
+RIGHTSHOLDER = 'CN=EDAC-GSTORE,DC=dataone,DC=org'
+CONTACTSUBJECT = 'CN=EDAC-GSTORE,DC=dataone,DC=org'
 NAME = ''
 DESCRIPTION = ''
 
@@ -158,7 +158,7 @@ def dataone(request):
 
     #set up the dict
     rsp = {'name': 'GSTORE Node',
-           'description': 'DATAONE member node for GSTORE',
+           'description': 'DATAONE member node for GSTORE (EDAC)',
            'baseUrl': base_url,
            'subject': SUBJECT,
            'contactsubject': CONTACTSUBJECT
@@ -557,12 +557,14 @@ def metadata(request):
     #and the latest and greatest
     obsoletedby = core_object.get_current()
 
+    obsoletedby = '' if obsoletedby == obsolete.obsolete_uuid else obsoletedby
+
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/apps/dataone/' % (load_balancer)
 
     #dates should be from postgres, i.e. in utc
     rsp = {'pid': pid, 'dateadded': datetime_to_dataone(core_object.date_added), 'obj_format': obj_format, 'file_size': file_size, 
-           'uid': 'GSTORE', 'o': 'EDAC', 'dc': 'everything', 'org': 'EDAC', 'hash_type': file_hashtype,
+           'uid': 'EDAC-GSTORE', 'o': 'EDAC', 'dc': 'everything', 'org': 'EDAC', 'hash_type': file_hashtype,
            'hash': file_hash, 'metadata_modified': datetime_to_dataone(obsolete.date_changed), 'mn': base_url, 'obsoletes': obsoletes, 'obsoletedby': obsoletedby}
 
     request.response.content_type = 'text/xml; charset=UTF-8'
@@ -705,8 +707,13 @@ def add_dataone_metadata(request):
         return HTTPBadRequest()
 
     #TODO: UPDATE THIS FOR THE METADATA SCHEMA CHANGES SOMEDAY
-    xml = d.original_metadata[0].original_xml
-    meta_id = d.original_metadata[0].id
+    load_balancer = request.registry.settings['BALANCER_URL']
+    base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
+
+    #get the xml and add the online linkages
+    orig_metadata = d.original_metadata[0]
+    xml = orig_metadata.append_onlink(base_url)
+    meta_id = orig_metadata.id
 
     #get the metadata object that we want
     meta_obj = DBSession.query(DatasetMetadata).filter(DatasetMetadata.original_id==meta_id).first()
@@ -868,6 +875,10 @@ def add_dataone_package(request):
         dataobject_uuid (core_uuid for this metadata object)
         dataobject_type 
     }
+
+    fyi: core_uuid == dataone_uuid
+
+    NOTE: this does NOT check to make sure that the metadata object is related in any way to the data object. so be careful.
     '''
 
     post_data = request.json_body
@@ -880,16 +891,16 @@ def add_dataone_package(request):
 
     #the object type is not 100% necessary but we like specificity here. and if not
     #TODO: just do an or (or in) for the two uuids and count the result set
-    data_obj = DBSession.query(DataoneCore).filter(and_(DataoneCore.object_uuid==dataobject_uuid, DataoneCore.object_type==dataobject_type)).first()
-    meta_obj = DBSession.query(DataoneCore).filter(and_(DataoneCore.object_uuid==metadata_uuid, DataoneCore.object_type=='metadata')).first()
+    data_obj = DBSession.query(DataoneCore).filter(and_(DataoneCore.dataone_uuid==dataobject_uuid, DataoneCore.object_type==dataobject_type)).first()
+    meta_obj = DBSession.query(DataoneCore).filter(and_(DataoneCore.dataone_uuid==metadata_uuid, DataoneCore.object_type=='metadata')).first()
 
     if not data_obj or not meta_obj:
         return HTTPBadRequest()
 
     #check for a package with these objects as well
-    package_obj = DBSession.query(DataonePackage).filter(and_(DataonePackage.dataset_uuid==dataobject_uuid, DataonePackage.metadata_uuid==metadata_uuid)).first()
+    package_obj = DBSession.query(DataonePackage).filter(and_(DataonePackage.dataset_object==dataobject_uuid, DataonePackage.metadata_object==metadata_uuid)).first()
     if package_obj:
-        return HTTPBadRequest()
+        return HTTPBadRequest('This data package already exists (%s).' % (package_obj.package_uuid))
 
     #add the new package
     package_obj = DataonePackage(dataobject_uuid, metadata_uuid)
@@ -902,16 +913,46 @@ def add_dataone_package(request):
         DBSession.rollback()
         return HTTPServerError()
 
+    #add it to the core table
+    format_id = DBSession.query(DataoneFormat).filter(DataoneFormat.format=='http://www.w3.org/TR/rdf-syntax-grammar').first()
+    if not format_id:
+        return HTTPBadRequest()
+    format_id = format_id.id
+
+    core_obj = DBSession.query(DataoneCore).filter(and_(DataoneCore.object_uuid==package_obj.package_uuid, DataoneCore.object_type=='package')).first()
+    if core_obj:
+        return HTTPBadRequest('An object with this uuid already exists.')
+
+    core_obj = DataoneCore(package_obj.package_uuid, 'package', format_id)
+    try:
+        DBSession.add(core_obj)
+        DBSession.commit()
+        DBSession.flush()
+        DBSession.refresh(core_obj)
+    except:
+        return HTTPServerError('Failed to add core')
+
+    #add it to the obsoletes
+    obsolete = DataoneObsolete(core_obj.dataone_uuid)
+    try:
+        DBSession.add(obsolete)
+        DBSession.commit()
+        DBSession.flush()
+        DBSession.refresh(obsolete)
+    except:
+        DBSession.rollback()
+        return HTTPServerError()
+
     #build the rdf
     LOAD_BALANCER = request.registry.settings['BALANCER_URL']
     DATAONE_PATH = request.registry.settings['DATAONE_PATH']
-    base_url = '%s/apps/dataone'
+    base_url = '%s/apps/dataone' % LOAD_BALANCER
     rdfpath = os.path.join(DATAONE_PATH, 'packages')
     success = package_obj.build_rdf(rdfpath, base_url)
-    if not success:
-        return HTTPServerError()
+    if success != 'success':
+        return HTTPServerError(success)
     
-    return Response(json.dumps({'object_uuid': package_obj.package_uuid, 'object_type': 'package', 'date_added': package_obj.date_added.strftime('%Y-%m-%dT%H:%M:%S')}))
+    return Response(json.dumps({'obsolete_uuid': obsolete.obsolete_uuid, 'core_uuid': core_obj.dataone_uuid, 'object_uuid': package_obj.package_uuid, 'object_type': 'package', 'date_added': package_obj.date_added.strftime('%Y-%m-%dT%H:%M:%S')}))
 
 @view_config(route_name='dataone_addobsolete', request_method='POST')
 def add_dataone_obsolete(request):
@@ -951,7 +992,18 @@ def update_dataone_package(request):
         metadata_uuid (core_uuid for this metadata object IF MODIFIED)
         dataobject_uuid (core_uuid for this metadata object IF MODIFIED)
     }
+
+    if metadata object or dataset object has been modified, go get the core object uuid
+    and add a new obsolete uuid for that core obj
+
+    then get core obj for package uuid and add a new obsolete uuid for that as well
+
+    finally overwrite the data package rdf (make sure that has the obsoleted by in it?)
+    
     '''
+
+    
+    
     return Response()
 
 
