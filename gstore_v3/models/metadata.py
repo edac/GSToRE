@@ -62,7 +62,10 @@ class OriginalMetadata(Base):
         #go get the dictionary for the dataset
         dct = self.datasets.get_full_service_dict(base_url, None)
 
-        onlinks = dct['services'][0].values() + dct['downloads'][0].values()
+        services = dct['services'][0].values() if dct['services'] else []
+        downloads = dct['downloads'][0].values() if dct['downloads'] else []
+
+        onlinks = services + downloads
 
         for onlink in onlinks:
             link = etree.SubElement(citation, 'onlink')
@@ -111,12 +114,16 @@ class OriginalMetadata(Base):
     def write_xml_to_disk(self, filename, include_onlinks=False, base_url=''):
         xml = self.original_xml
 
+        if not xml:
+            return False
+
         if include_onlinks and base_url:
             xml = self.append_onlink(base_url)
             
         with open(filename, 'w') as f:
             f.write(xml.encode('utf-8'))
-        
+
+        return True
 
 
 #TODO: implement the full metadata schema
