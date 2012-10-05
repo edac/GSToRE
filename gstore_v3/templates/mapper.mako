@@ -14,7 +14,7 @@
   <script src="http://www.openlayers.org/api/2.10/OpenLayers.js"></script>
   <script type="text/javascript" src="${MEDIA_URL}/javascript/geoext/1.0/GeoExt.js"></script>
 
-<!--  
+ <!--
   <script type="text/javascript" src="${MEDIA_URL}/javascript/jquery1_8/jquery-1.8.1.min.js"></script>
   <script type="text/javascript" src="${MEDIA_URL}/javascript/jquery_plugins/jqueryui/1.8.9/jquery-ui.min.js"></script>
   <script type="text/javascript" src="${MEDIA_URL}/javascript/fileDownload/jquery.fileDownload.js"></script>
@@ -35,7 +35,8 @@
   </script>
   <script type="text/javascript" src= "${MEDIA_URL}/javascript/maps/mapper.js"> </script>
 
-<!--  <script type="text/javascript">
+<!--
+<script type="text/javascript">
     $(function() {
       $(document).on("click", "a.dataset_download", function() {
         var $preparingFileModal = $('#preparing-file-modal');
@@ -74,13 +75,13 @@
 </head>
 
 <body>
-    <!--<div id='preparing-file-modal' title='Preparing download...' style='display:none;'>
+    <div id='preparing-file-modal' title='Preparing download...' style='display:none;'>
         We are preparing your download file, please be patient...
         <div class='ui-progressbar-value ui-corner-left ui-corner-right' style='width:100%;height:22px;margin-top:20px;'></div>
     </div>
     <div id='error-modal' title='Error' style='display:none;'>
         There was a problem generating your download, please try again.
-    </div>-->
+    </div>
       <div id="description">
           <table id='dataset_desc'>
             <tr>

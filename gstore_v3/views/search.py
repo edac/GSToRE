@@ -74,7 +74,7 @@ def search_categories(request):
         
         if len(parts) == 1:
             #clicked on theme so get the distinct subthemes
-            #and use the any() for datasets to make sure that we don't pull any empty category sets
+            #and use the any() for datasets to make sure that we don't pull any empty category sets (also with inactive check just in case 2003 color cir)
             cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any(Dataset.inactive==False))).distinct(Category.subtheme).order_by(Category.subtheme.asc()) 
 
             resp = {"total": 0, "results": [{"text": c.subtheme, "leaf": False, "id": '%s__|__%s' % (c.theme, c.subtheme)} for c in cats]}
@@ -160,10 +160,11 @@ def search_datasets(request):
     sort = params.get('sort') if 'sort' in params else 'lastupdate'
     #if sort not in ['lastupdate', 'text', 'theme', 'subtheme', 'groupname']:
     #this includes geo-relevance even though it is not used (it is part of the request from rgis though)
-    if sort not in ['lastupdate', 'text', 'geo_relevance']:
+    if sort not in ['lastupdate', 'description', 'geo_relevance']:
         return HTTPNotFound()
+    #TODO: make this less bad
     sort = 'dateadded' if sort == 'lastupdate' else sort
-    sort = 'description' if sort == 'text' else sort
+    sort = 'description' if sort == 'description' else sort
 
     #sort direction
     sortdir = params.get('dir').upper() if 'dir' in params else 'DESC'
@@ -203,7 +204,7 @@ def search_datasets(request):
 
     #set up the basic dataset clauses
     #always exclude deactivated datasets and the app from the url
-    dataset_clauses = [Dataset.inactive==False, "'%s'=ANY(apps_cache)" % (app)]
+    dataset_clauses = [Dataset.inactive==False, "apps_cache @> ARRAY['%s']" % (app)]
     if format:
         #check that it's a supported format
         default_formats = request.registry.settings['DEFAULT_FORMATS'].split(',')
@@ -332,7 +333,10 @@ def search_datasets(request):
     head = """{"total": %s, "results": [""" % (total)
     tail = ']}'
 
-    limit = total if total < limit else limit
+    subtotal = datas.count()
+    if subtotal < 1:
+        return {"total": 0, "results": []}
+    limit = subtotal if subtotal < limit else limit
     
     def yield_results():
     

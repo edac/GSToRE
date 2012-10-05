@@ -237,7 +237,7 @@
             <p>${base_url}/apps/rgis/search/datasets.json?version=3&start_time=20120201&dir=ASC</p>
             <p>${base_url}/apps/rgis/search/datasets.json?version=3&box=-106.058,36.013,-105.200,36.996</p>
 
-            <h3>Features</h3>
+ <!--           <h3>Features</h3>
             <p>Still working on it.</p>
             <dl>
                 <dt></dt>
@@ -245,7 +245,7 @@
                 <dt></dt>
                 <dd></dd> 
             </dl>
-
+-->
             <h3>Category Tree</h3>
             <p></p>
             <dl>
