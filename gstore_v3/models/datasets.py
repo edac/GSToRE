@@ -558,7 +558,7 @@ class Dataset(Base):
         if self.original_metadata:
             orig_metadata = self.original_metadata[0]
             metadata_file = '%s.xls.xml' % (os.path.join(basepath, self.basename))
-            orig_metadata.write_xml_to_disk(metadata_file)
+            written = orig_metadata.write_xml_to_disk(metadata_file)
             if written:
                 files.append(metadata_file)
             
@@ -623,7 +623,7 @@ class Dataset(Base):
         if self.original_metadata:
             orig_metadata = self.original_metadata[0]
             metadata_file = '%s.json.xml' % (os.path.join(tmp_path, self.basename))
-            orig_metadata.write_xml_to_disk(metadata_file)
+            written = orig_metadata.write_xml_to_disk(metadata_file)
             if written:
                 files.append(metadata_file)
 
@@ -829,7 +829,7 @@ class Dataset(Base):
         if self.original_metadata:
             orig_metadata = self.original_metadata[0]
             metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
-            orig_metadata.write_xml_to_disk(metadata_file)
+            written = orig_metadata.write_xml_to_disk(metadata_file)
             if written:
                 files.append(metadata_file)
 
