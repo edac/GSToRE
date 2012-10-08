@@ -29,6 +29,8 @@ def notfound_post(request):
 '''
 custom predicates for some quick url validation before hitting the views
 '''
+
+#TODO: add epht if necessary
 #add a custom predicate to limit routes to just the apps listed
 def any_of(segment_name, *allowed):
     def predicate(info, request):

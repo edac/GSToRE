@@ -57,6 +57,13 @@ class OriginalMetadata(Base):
         if citation is None:
             return None
 
+        #remove any exsting onlinks if they are not valid urls (or at least they don't start with http)
+        existing_onlinks = citation.findall('onlink')
+        if existing_onlinks:
+            for existing_onlink in existing_onlinks:
+                if existing_onlink.text[0:4] != 'http':
+                    citation.remove(existing_onlink)
+
         #get all of the links
         #TODO: maybe not this but for now, let's just roll with it
         #go get the dictionary for the dataset

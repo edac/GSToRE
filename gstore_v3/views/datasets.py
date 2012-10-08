@@ -157,6 +157,9 @@ def dataset(request):
     outname = '%s_%s.zip' % (d.basename, format)
     cached_file = os.path.join(cached_path, '%s_%s.zip' % (str(d.basename), format))
 
+    #TODO: add some check for derived v original for the vector datasets
+    #TODO: and also, what to do about that if there are in fact datasets with original shp and derived shp in clusterdata?
+
     #no zip. need to pack it up (raster/file) or generate it (vector)
     if taxonomy in ['geoimage', 'file']:
         #pack up the zip to the formats cache
