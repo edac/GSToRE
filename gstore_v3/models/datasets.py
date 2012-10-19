@@ -149,6 +149,7 @@ class Dataset(Base):
         #get all from one not in the other
         svcs = [i for i in lst if i not in exc_lst]
         return svcs
+       
 
     #return a source by set & extension for this dataset
     #default to active sources only
@@ -434,11 +435,9 @@ class Dataset(Base):
             #add the attribute data to the feature
             for fld in flds:
                 att = [a for a in atts if a['name'] == fld.name]
-                if att:
-                    value = att[0]['val']  
-                    #convert it to the right type based on the field with string (and encoded to utf-8) as default
-                    value = convert_by_ogrtype(value, fld.ogr_type)
-                    feature.SetField(str(fld.name), value)
+                #convert it to the right type based on the field with string (and encoded to utf-8) as default
+                value = convert_by_ogrtype(att[0]['val'], fld.ogr_type) if att else ""
+                feature.SetField(str(fld.name), value)
 
             #TODO: check on the format (it's utc, but maybe we want a specific structure)   
             obs = str(v['obs']) if 'obs' in v else ''
@@ -781,9 +780,8 @@ class Dataset(Base):
                 vals = []
                 for f in fields:
                     att = [a for a in atts if a[0] == f.name]
-                    if not att:
-                        continue
-                    vals.append(str(att[0][1]))
+                    v = att[0][1] if att else ""
+                    vals.append(v)
                 vals += [str(fid), str(did), obs]
                 feature = ','.join(vals)
             elif fmt == 'json':
@@ -804,7 +802,6 @@ class Dataset(Base):
             with open(tmp_file, 'a') as f:
                 f.write(g)  
                       
-
         #pack up the results, with metadata, as a zip
         filename = os.path.join(basepath, '%s_%s.zip' % (self.basename, format))
         files = []

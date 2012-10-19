@@ -67,6 +67,8 @@ def search_categories(request):
     {"total": 0, "results": []}
     '''
 
+    #TODO: add total value or get rid of it
+
     if node and node != 'root':
         parts = node.split('__|__')
 

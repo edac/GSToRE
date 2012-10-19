@@ -517,7 +517,8 @@ def features(request):
         #add the observed datetime for everything
         atts.append(('observed', obs))
 
-        #TODO: add observed to kml/gml and field list (also double check attribute schema for kml for observed)
+        #TODO: revise to handle features where the field value is null (and so it doesn't have an attribute in mongo) for kml, gml, etc 
+        #      (not csv that should be ok)
         if fmt == 'kml': 
             #make sure we've encoded the value string correctly for kml
             feature = "\n".join(["""<SimpleData name="%s">%s</SimpleData>""" % (v[0], re.sub(r'[^\x20-\x7E]', '', escape(str(v[1])))) for v in atts])
@@ -547,9 +548,8 @@ def features(request):
             vals = []
             for f in fields:
                 att = [a for a in atts if a[0] == f.name]
-                if not att:
-                    continue
-                vals.append(att[0][1])
+                v = att[0][1] if att else ""
+                vals.append(v)
             vals += [str(fid), str(did), obs]
             feature = ','.join(vals)
         elif fmt == 'json':
@@ -564,6 +564,8 @@ def features(request):
     #let's yield stuff
     response = Response()
     response.content_type = content_type
+    #because it will be an issue, let's go for cors.
+    response.headers['Access-Control-Allow-Origin'] = '*'
     response.app_iter = yield_results()
     return response
 
@@ -763,8 +765,9 @@ def add_attributes(request):
         finally:
             gm.close()    
 
-        #MISSING PATH!!!
-        #TODO: add the export to .json file (by dataset id/uuid) to clusterdata for backup, etc
+        #deal with the insert list - pymongo updates the list with _id (objectid)
+        #so that and the obs datetime cause json.dumps to fail. we don't care about the _id
+        #but we want the datetime
         archives = []
         for i in inserts:
             del i['_id']

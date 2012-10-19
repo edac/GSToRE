@@ -45,6 +45,59 @@ ecw test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ef4c8cdc-bec4-43aa-8f
 '''
 #TODO: refactor the mapfile generation part (see the awkwardness of the point symbol)
 
+'''
+wcs methods to deal with oddness out of mapserver getcoverage response
+''' 
+#parse the multipart response
+def parse_wcs_response(content, content_type):
+    '''
+    if the format requested is ascii grid, mapserver returns the ascii grid and the geotiff
+    in the multipart response. but that's data that doesn't need to be returned to the client
+    so we're repacking the response to just include the ascii grid and the header info
+    '''
+    boundary = 'wcs'
+    parser = Parser()
+    parts = parser.parsestr("Content-type:%s\n\n%s" % (content_type, content.rstrip("--%s--\n\n" % (boundary)))).get_payload()
+    new_parts = []
+    for p in parts:
+        if not isGeotiff(p.get_content_type()):
+            new_parts.append([p.get_payload(), p.items()])
+    return pack_multipart(new_parts, boundary)
+    
+#check for the geotiff chunk    
+def isGeotiff(content_type):
+    return content_type.split(';')[0].lower() in 'image/tiff'
+    
+#repack the response with only the parts we like
+def pack_multipart(parts, boundary):
+    '''
+    for the ascii grid response, we need to repack everything that's not a tiff (seriously mapserver, why do you do that?)
+
+    based off eoxserver: http://eoxserver.org/browser/trunk/eoxserver/core/util/multiparttools.py
+    '''
+    boundary = '--%s' % boundary
+    new_packet = []
+    for data, header in parts:
+        chunk = '%s' % boundary
+        
+        #repack the header
+        for key, value in header:
+            chunk += '\n%s: %s' % (key, value)
+
+        chunk += '\n\n'
+        
+        #and the data
+        chunk += data
+
+        #add to the set
+        new_packet.append(chunk)
+
+    new_packet.append('%s--' % boundary)
+    return '\n'.join(new_packet)
+'''
+end wcs section
+'''
+
 #so, neat trick, the order of the srs matters for wcs.describecoverage
 #this rebuilds the list so that the check_srs (the dataset srs, for example) is listed once and is listed first
 def build_supported_srs(check_srs, supported_srs):
@@ -93,7 +146,7 @@ def getType(geomtype):
 
 #get the layer obj by taxonomy (for now)
 #the bbox should be reprojected to the originnal epsg before this
-def getLayer(d, src, dataloc, bbox):
+def getLayer(d, src, dataloc, bbox, metadata_description={}):
     layer = mapscript.layerObj()
     layer.name = d.basename
     layer.status = mapscript.MS_ON
@@ -110,6 +163,16 @@ def getLayer(d, src, dataloc, bbox):
     layer.metadata.set('legend_display', 'yes')
     layer.metadata.set('wms_encoding', 'UTF-8')
     layer.metadata.set('ows_title', d.basename)
+
+    if metadata_description:
+        service = metadata_description['service']
+
+        #for whatever reason, the wcs layer metadata tags are not the same as the wms/wfs tags 
+        flag = 'link' if service == 'wcs' else 'url'
+
+        layer.metadata.set('%s_metadata%s_href' % (service, flag), metadata_description['url'])
+        layer.metadata.set('%s_metadata%s_format' % (service, flag), metadata_description['mimetype'])
+        layer.metadata.set('%s_metadata%s_type' % (service, flag), metadata_description['standard'])
     
     if d.taxonomy == 'vector':
         style = getStyle(d.geomtype)
@@ -148,6 +211,7 @@ def getLayer(d, src, dataloc, bbox):
         layer.metadata.set('annotation_name', '%s: %s' % (d.basename, d.dateadded))
         layer.metadata.set('wcs_label', 'imagery_wcs_%s' % (d.basename))
         layer.metadata.set('wcs_formats', 'GTiff GEOTIFF_16 AAIGRID')
+        #TODO: change the native format - not everything is a geotiff now
         layer.metadata.set('wcs_nativeformat', 'GTiff')
         layer.metadata.set('wcs_rangeset_name', d.basename)
         layer.metadata.set('wcs_rangeset_label', d.description)
@@ -343,6 +407,20 @@ def generateService(mapfile, params, mapname=''):
             mapfile.save(mapname)
             #TODO: make this some meaningful response (even though it isn't for public consumption)
             return Response('map generated')
+        elif request_type in ['getcoverage']:
+            mapscript.msIO_installStdoutToBuffer()
+            mapfile.OWSDispatch(req)
+            content_type = mapscript.msIO_stripStdoutBufferContentType()
+            content = mapscript.msIO_getStdoutBufferBytes()
+
+            #TODO: resolve the ascii grid issue
+            #i don't know quite what's going on with this, but the ascii grid includes the tiff data
+            #in the response from mapserver. so this repacks the mapserver response without the tif
+            #as a new multipart blob-o-stuff
+#            if 'multipart/mixed' in content_type and fmt == 'image/x-aaigrid':
+#                content = parse_wcs_response(content, content_type)
+
+            return Response(content, content_type=content_type)
         else:
             return HTTPNotFound('Invalid OGC request')
     except Exception as err:
@@ -358,7 +436,7 @@ wms
 wfs
 wcs
 
-getmapfile (fo testing/checking purposes)
+getmapfile (for testing/checking purposes)
 '''
 
 #/apps/{app}/{type}/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/services/{service_type}/{service}
@@ -492,7 +570,9 @@ def datasets(request):
         #TODO: again, pick a decent name here
         m.web.metadata.set('ows_name', 'imagery_wms_%s' % (d.basename))
         m.web.metadata.set('wms_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wms' % (base_url, app, d.uuid))
-        #m.web.metadata.set('OWS_SERVICE_ONLINERESOURCE', '%s/apps/%s/datasets/%s/services/ogc/wms' % (base_url, app, d.uuid))
+
+        #wcs getcapabilities needs this tag
+        m.web.metadata.set('ows_service_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wms' % (base_url, app, d.uuid))
         m.web.metadata.set('ows_abstract', 'WMS Service for %s dataset %s' % (app, d.description))
 
         m.web.metadata.set('wms_formatlist', 'image/png,image/gif,image/jpeg')
@@ -511,6 +591,7 @@ def datasets(request):
             m.web.metadata.set('wcs_name', 'imagery_wcs_%s' % (d.basename))
         if d.taxonomy == 'vector':
             m.web.metadata.set('wfs_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wfs' % (base_url, app, d.uuid))
+
 
         #add the edac info
         set_contact_metadata(m) 
@@ -541,9 +622,15 @@ def datasets(request):
             #add geotif and ascii grid
             of = get_outputformat('tif')
             m.appendOutputFormat(of)
+            #TODO: turn this back on once the fraky weird ascii issue is resolved 
+            '''
+            the services to test with
+            > curl --globoff "http://129.24.63.109/gstore_v3/apps/rgis/datasets/0f3ca80c-2d50-4a33-8df8-c80ff9e94588/services/ogc/wcs?VERSION=1.1.2&SERVICE=WCS&REQUEST=GetCoverage&COVERAGE=mod10a1_a2002193.fractional_snow_cover&CRS=EPSG:4326&FORMAT=image/tiff&HEIGHT=500&WIDTH=500&BBOX=-107.930153271352,34.9674233731823,-104.994718803013,38.5334870384629" > wcs_ae
 
-            of = get_outputformat('aaigrid')
-            m.appendOutputFormat(of)
+            > curl --globoff "http://129.24.63.109/gstore_v3/apps/rgis/datasets/0f3ca80c-2d50-4a33-8df8-c80ff9e94588/services/ogc/wcs?VERSION=1.1.2&SERVICE=WCS&REQUEST=GetCoverage&COVERAGE=mod10a1_a2002193.fractional_snow_cover&CRS=EPSG:4326&FORMAT=image/x-aaigrid&HEIGHT=500&WIDTH=500&BBOX=-107.930153271352,34.9674233731823,-104.994718803013,38.5334870384629&RangeSubset=mod10a1_a2002193.fractional_snow_cover:bilinear[bands[1]]" > wcs_af
+            '''
+#            of = get_outputformat('aaigrid')
+#            m.appendOutputFormat(of)
         #elif service == 'wfs':
             #add gml and ?
             #TODO:look into this
@@ -605,7 +692,11 @@ def datasets(request):
         #NOTE: the scalebar is added by mapscript default
         
         #add the layer (with the reprj bbox)
-        layer = getLayer(d, mapsrc, srcloc, bbox)
+        #TODO: update this for ISO vs FGDC, etc
+        laod_balancer = request.registry.settings['BALANCER_URL']
+        base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
+        metadata_description = {'service': service, 'standard': 'FGDC', 'mimetype': 'application/xml', 'url': '%s%s/metadata/fgdc.xml' % (base_url, d.uuid)}
+        layer = getLayer(d, mapsrc, srcloc, bbox, metadata_description)
 
         #what the. i don't even. why is it adding an invalid tileitem?
         if layer.tileitem:

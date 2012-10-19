@@ -11,6 +11,8 @@ from ..models.datasets import *
 from ..models.sources import Source, SourceFile
 from ..models.metadata import OriginalMetadata
 
+import os, json, re
+from xml.sax.saxutils import escape
 
 from ..lib.utils import *
 from ..lib.spatial import *
@@ -39,26 +41,27 @@ def return_fileresponse(output, mimetype, filename):
     fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/')
     return fr
 
-##TODO: add the html renderer to this
-@view_config(route_name='html_dataset', renderer='dataset_card.mako')
-def show_html(request):
-    dataset_id = request.matchdict['id']
-    app = request.matchdict['app']
+#REMOVED: run this functionality from the interface and use the services.json
+###TODO: add the html renderer to this
+#@view_config(route_name='html_dataset', renderer='dataset_card.mako')
+#def show_html(request):
+#    dataset_id = request.matchdict['id']
+#    app = request.matchdict['app']
 
-    d = get_dataset(dataset_id)
+#    d = get_dataset(dataset_id)
 
-    if not d:
-        return HTTPNotFound()
+#    if not d:
+#        return HTTPNotFound()
 
-    #http://129.24.63.66/gstore_v3/apps/rgis/datasets/8fc27d61-285d-45f6-8ef8-83785d62f529/soils83.html
-    #http://{load_balancer}/apps/.....
+#    #http://129.24.63.66/gstore_v3/apps/rgis/datasets/8fc27d61-285d-45f6-8ef8-83785d62f529/soils83.html
+#    #http://{load_balancer}/apps/.....
 
-    load_balancer = request.registry.settings['BALANCER_URL']
-    base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
-    
-    rsp = d.get_full_service_dict(base_url, request)
+#    load_balancer = request.registry.settings['BALANCER_URL']
+#    base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
+#    
+#    rsp = d.get_full_service_dict(base_url, request)
 
-    return rsp
+#    return rsp
     
 
 @view_config(route_name='zip_dataset')
@@ -83,6 +86,9 @@ def dataset(request):
     #TODO: replace this with the right status code
     if d.is_available == False:
         return HTTPNotFound('Temporarily unavailable')
+
+    if app not in d.apps_cache:
+        return HTTPBadRequest()
 
     #TODO: change this to be the right formats filter (given format in remainder of all formats - excluded formats)
     #TODO: add the format check. except better than this: .filter(Dataset.formats_cache.ilike('%'+format+'%')))
@@ -194,7 +200,192 @@ def dataset(request):
 
     #if we're here something really bad is happening
     return HTTPNotFound()
- 
+
+@view_config(route_name='dataset_streaming')
+def stream_dataset(request):
+    '''
+    stream dataset as json, kml, csv, geojson, gml
+    for improved access options (pull in json for a table on a webpage, etc)
+    BUT only for vector datasets
+
+    params:
+        bbox (return features intersecting box)
+        datetime (return features within time range (sensor data, etc))
+        
+    '''
+
+    app = request.matchdict['app']
+    dataset_id = request.matchdict['id']
+    format = request.matchdict['ext']
+
+    if format not in ['json', 'geojson', 'csv', 'kml', 'gml']:
+        return HTTPBadRequest()
+
+    #TODO: add the parmaeter searches
+    params = normalize_params(request.params)
+
+    #go get the dataset
+    d = get_dataset(dataset_id)    
+
+    if not d:
+        return HTTPNotFound()
+
+    if d.taxonomy != 'vector' or d.inactive or not d.is_available or app not in d.apps_cache:
+        return HTTPBadRequest()
+
+    connstr = request.registry.settings['mongo_uri']
+    collection = request.registry.settings['mongo_collection']
+    mongo_uri = gMongoUri(connstr, collection)
+    gm = gMongo(mongo_uri)
+
+    encode_as = 'utf-8'   
+    epsg = int(request.registry.settings['SRID'])
+    
+    fields = d.attributes
+
+    folder_head = ''
+    folder_tail = ''
+    delimiter = '\n'
+    schema_url = ''
+    field_set = ''
+    
+    if format == 'geojson':
+        content_type = 'application/json; charset=UTF-8'
+        head = """{"type": "FeatureCollection", "features": ["""
+        tail = "\n]}"
+        delimiter = ',\n'
+    elif format == 'json':
+        content_type = 'application/json; charset=UTF-8'
+        head = """{"features": ["""
+        tail = "]}"
+        delimiter = ',\n'
+    elif format == 'kml':
+        content_type = 'application/vnd.google-earth.kml+xml; charset=UTF-8'
+        head = """<?xml version="1.0" encoding="UTF-8"?>
+                        <kml xmlns="http://earth.google.com/kml/2.2">
+                        <Document>"""
+        tail = """\n</Document>\n</kml>"""
+        folder_head = "<Folder><name>%s</name>" % (d.description)
+        folder_tail = "</Folder>"
+
+        load_balancer = request.registry.settings['BALANCER_URL']
+        base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
+
+        kml_flds = [{'type': ogr_to_kml_fieldtype(f.ogr_type), 'name': f.name} for f in fields]
+        kml_flds.append({'type': 'string', 'name': 'observed'})
+        field_set = """<Schema name="%(name)s" id="%(id)s">%(sfields)s</Schema>""" % {'name': str(d.uuid), 'id': str(d.uuid), 
+            'sfields': '\n'.join(["""<SimpleField type="%s" name="%s"><displayName>%s</displayName></SimpleField>""" % (k['type'], k['name'], k['name']) for k in kml_flds])
+        }
+
+        schema_url = '%s%s/attributes.kml' % (base_url, d.uuid)
+
+    elif format == 'gml':
+        content_type = 'application/xml; subtype="gml/3.1.1; charset=UTF-8"'
+        head = """<?xml version="1.0" encoding="UTF-8"?>
+                                <gml:FeatureCollection 
+                                    xmlns:gml="http://www.opengis.net/gml" 
+                                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+                                    xmlns:xlink="http://www.w3.org/1999/xlink"
+                                    xmlns:ogr="http://ogr.maptools.org/">
+                                <gml:description>GSTORE API 3.0 Vector Stream</gml:description>\n""" 
+        tail = """\n</gml:FeatureCollection>"""
+    elif format == 'csv':
+        content_type = 'text/csv; charset=UTF-8'
+        head = '' 
+        tail = ''
+        delimiter = '\n'
+        field_set = ','.join([f.name for f in fields]) + ',fid,dataset,observed\n'
+    else:
+        return HTTPBadRequest()
+
+    vectors = gm.query({'d.id': d.id})
+    total = vectors.count()
+
+    def yield_results():
+        yield head
+
+        cnt = 0
+        for vector in vectors:
+            vector_result = convert_vector(vector, fields, format, d.basename, schema_url, epsg)
+            if cnt == 0:
+                vector_result = folder_head + field_set + vector_result + delimiter
+            elif cnt == total - 1:
+                vector_result += folder_tail
+            else:
+                vector_result += delimiter
+
+            cnt += 1
+            yield vector_result.encode(encode_as)
+
+        yield tail
+
+    #TODO: figure out a better solution (and revise the feature streamer) that can call some generic method 
+    #      and return a formatted vector chunk
+    def convert_vector(vector, fields, fmt, basename, schema_url, epsg):
+        '''
+        for notes, see the feature streamer methods
+        '''
+        fid = int(vector['f']['id'])
+        did = int(vector['d']['id'])
+        obs = vector['obs'] if 'obs' in vector else ''
+        obs = obs.strftime('%Y-%m-%dT%H:%M:%S+00') if obs else ''
+
+        #get the geometry
+        if not fmt in ['csv', 'json']:
+            wkb = vector['geom']['g'] if 'geom' in vector else ''
+            if not wkb:
+                #need to get it from shapes
+                feat = DBSession.query(Feature).filter(Feature.fid==fid).first()
+                wkb = feat.geom
+                
+            #and convert to geojson, kml, or gml
+            geom_repr = wkb_to_output(wkb, epsg, fmt)
+            if not geom_repr:
+                return ''
+                
+        atts = vector['atts']
+        atts = [(a['name'], unicode(a['val']).encode('ascii', 'xmlcharrefreplace')) for a in atts]
+        atts.append(('observed', obs))
+
+        if fmt == 'kml':
+            feature = "\n".join(["""<SimpleData name="%s">%s</SimpleData>""" % (v[0], re.sub(r'[^\x20-\x7E]', '', escape(str(v[1])))) for v in atts])
+            feature = """<Placemark id="%s">
+                        <name>%s</name>
+                        %s\n%s
+                        <ExtendedData><SchemaData schemaUrl="%s">%s</SchemaData></ExtendedData>
+                        <Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+                        </Placemark>""" % (fid, fid, geom_repr, '', schema_url, feature)
+        elif fmt == 'gml':
+            vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0], re.sub(r'[^\x20-\x7E]', '', escape(str(a[1]))), a[0]) for a in atts])
+            feature = """<gml:featureMember><ogr:g_%(basename)s><ogr:geometryProperty>%(geom)s</ogr:geometryProperty>%(values)s</ogr:g_%(basename)s></gml:featureMember>""" % {'basename': basename, 'geom': geom_repr, 'values': vals} 
+        elif fmt == 'json':
+            vals = dict([(a[0], a[1]) for a in atts])
+            feature = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals})
+        elif fmt == 'geojson':
+            vals = dict([(a[0], a[1]) for a in atts])
+            vals.update({'fid':fid, 'dataset_id': did})
+            feature = json.dumps({"type": "Feature", "properties": vals, "geometry": json.loads(geom_repr)})
+        elif fmt == 'csv':
+            vals = []
+            for f in fields:
+                att = [a for a in atts if a[0] == f.name]
+                #need to be sure to handle the fact that if the value for an attribute is null, it's not in mongo
+                #i hope that doesn't turn out to be really bad.
+                v = att[0][1] if att else ""
+                vals.append(v)
+            vals += [str(fid), str(did), obs]
+            feature = ','.join(vals)
+        else:
+            feature = ''
+
+        return feature
+                
+    response = Response()
+    response.content_type = content_type
+    #because it will be an issue, let's go for cors.
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.app_iter = yield_results()
+    return response
 
 @view_config(route_name='dataset_services', renderer='json')
 def services(request):

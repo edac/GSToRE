@@ -9,7 +9,7 @@
         dl dt {background: #bcdfbb; color: #285327; clear:both; float: left; font-weight:bold; margin-right: 10px; padding: 5px; width:100px;}
         dl dd {margin: 2px 0; padding: 5px 0;}
         dt:before, dd:before {content:" "; display:block; position:absolute; z-index:-1;}
-        pre {white-space:pre-wrap;}
+        pre {white-space:pre-wrap;font-size:smaller;}
     </style>
 </head>
 <body>
@@ -28,6 +28,8 @@
                 <dt>app</dt>
                 <dd>The GStore name of the application (rgis, epscor, etc). All API calls are limited to the APP data objects. The examples below refer to data objects in the RGIS application.</dd>
             </dl>
+
+            <hr width="100%">
             <h2>Datasets</h2>
             <p>This includes dataset downloads, OGC services, the map preview service, and a dataset service description.</p>
 
@@ -40,6 +42,9 @@
             <p>There are no query parameters for this request.</p>
             <h4>Examples</h4>
             <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/coalminepermitbounds.derived.shp</p>
+            <p>${base_url}/apps/rgis/datasets/82b6fc7e-2935-4c06-9fac-683227e7ec8b/snotel_201209_933.derived.kml</p>
+            <p>${base_url}/apps/rgis/datasets/a8614543-97f0-4bf6-a095-53aeb63d8d9d/doqq05_05_33106g66__11795.original.tif</p>
+            <p>${base_url}/apps/rgis/datasets/762fe47f-02ee-463a-a9e1-83b3234f778a/1967Map.original.pdf</p>
             
             <h3>Service Description</h3>
             <p>The service description provides a listing of all available downloads, web services, metadata files, and other basic dataset information. The structure of the JSON response is identical to the individual dataset objects in the dataset search results (see below).</p>
@@ -173,23 +178,26 @@
                 <dt>VERSION</dt>
                 <dd>which version of the service to use (see GetCapabilities for supported versions)</dd>
             </dl>
-            <p>This list does not include all of the parameters required or supported by the OGC services. Refer to the Mapserver OGC documentation for parameters by service and method.</p>
+            <p>This list does not include all of the parameters required or supported by the OGC services. Refer to the <a href="http://mapserver.org/ogc/index.html#ogc">Mapserver OGC</a> documentation for parameters by service and method.</p>
 
             <h4>Examples</h4>
             <p>${base_url}/apps/rgis/datasets/b8989369-3183-49af-a817-1c9b37116ebc/services/ogc/wms?REQUEST=GetCapabilities&SERVICE=WMS&VERSION=1.1.1</p>
+            <p>${base_url}/apps/rgis/datasets/36ef032e-534a-4183-adbb-ffd3e8e42002/services/ogc/wcs?SERVICE=WCS&REQUEST=GetCapabilities&VERSION=1.1.2</p>
 
             <h3>Map Preview</h3>
-            <p></p>
+            <p>The map preview request returns an HTML page containing a slippy map of the specified dataset. Note that this request is likely to be deprecated in future releases of GSToRE. You are strongly encouraged to implement local mapping solutions using the provided WxS services rather than the GSToRE mapper.</p>
             <h4>Examples</h4>
             <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/mapper</p>
 
+            <hr width="100%">
             <h2>Metadata</h2>
-            <p>Currently GSToRE only supports FGDC.</p>
+            <p>Currently GSToRE only supports FGDC metadata.</p>
             <p>URL Structure: /apps/rgis/datasets/{uuid}/metadata/{standard}.{format}</p>
-            <p>where standard is a supported metadata standard (FGDC or, later, ISO, DC, etc) and format is a supported format (html, txt, or xml).</p>
+            <p>where standard is a supported metadata standard (FGDC or, later, ISO, DC, etc) and format is a supported format (html or xml).</p>
             <h4>Examples</h4>
             <p>${base_url}/apps/rgis/datasets/04a22a6b-3b8b-4f73-b7f3-668a1f16f4d3/metadata/fgdc.html</p>  
-            
+
+            <hr width="100%">
             <h2>Search</h2>
             <h3>Datasets</h3>
             <dl>
@@ -237,17 +245,8 @@
             <p>${base_url}/apps/rgis/search/datasets.json?version=3&start_time=20120201&dir=ASC</p>
             <p>${base_url}/apps/rgis/search/datasets.json?version=3&box=-106.058,36.013,-105.200,36.996</p>
 
- <!--           <h3>Features</h3>
-            <p>Still working on it.</p>
-            <dl>
-                <dt></dt>
-                <dd></dd>
-                <dt></dt>
-                <dd></dd> 
-            </dl>
--->
             <h3>Category Tree</h3>
-            <p></p>
+            <p>A category tree is a listing of all category triplets, defined as theme, subtheme, groupname, available for a specified APP. This request also allows searches by theme or subtheme to retrieve the tree for the specified node, i.e. return all subthemes for theme Boundaries.</p>
             <dl>
                 <dt>node</dt>
                 <dd>(optional) Theme, subtheme and groupname search terms. Separate each term by __|__. For example, to return the groupnames under the Contour section of Elevation, use Elevation__|__Contours.</dd>
@@ -255,7 +254,55 @@
 
             <h4>Examples</h4>
             <p>${base_url}/apps/rgis/search/categories.json</p>
-            <p>${base_url}/apps/rgis/search/categories.json?node=Boundaries__|__General</p>  
+            <p>${base_url}/apps/rgis/search/categories.json?node=Boundaries__|__General</p> 
+
+            Example JSON responses
+
+            Basic category listing:
+            <pre>
+{
+    "total": 0, 
+    "results": [
+                    {
+                        "text": "Area Code Change - New Mexico", 
+                        "leaf": false, 
+                        "id": "Area Code Change - New Mexico"
+                    }, 
+                    {
+                        "text": "Boundaries", 
+                        "leaf": false, 
+                        "id": "Boundaries"
+                    }, 
+                    ...
+                    {
+                        "text": "Water Resources", 
+                        "leaf": false, 
+                        "id": "Water Resources"
+                    }
+                ]
+}
+            </pre> 
+
+            Basic groupname listing:
+            <pre>
+{
+    "total": 0, 
+    "results": [
+                    {
+                        "text": "New Mexico", 
+                        "leaf": true, 
+                        "id": "Boundaries__|__General__|__New Mexico", 
+                        "cls": "folder"
+                    }, 
+                    {
+                        "text": "United States", 
+                        "leaf": true, 
+                        "id": "Boundaries__|__General__|__United States", 
+                        "cls": "folder"
+                    }
+                ]
+}
+            </pre>
 
             <h3>Geospatial Lookups</h3>
             <p>Search for quad names or placenames</p>
@@ -278,6 +325,28 @@
             </dl>
             <h4>Examples</h4>
             <p>${base_url}/apps/rgis/search/nm_quads.json?query=albu</p>
+
+            <hr width="100%">
+            <h2>Experimental Services</h2>
+            <p>These requests are experimental. The requests and responses may change at any time.</p>
+            <h3>Dataset Streaming</h3>
+            <p>Retrieve any vector datasets's data as JSON, GeoJSON, KML, GML, or CSV. The response does not include metadata.</p>
+            <p>URL structure: /apps/rgis/datasets/{uuid}/dataset.{format}</p>
+            <p>where basename is the dataset file name, and format is the desired format (json, geojson, kml, gml, csv).</p>
+            <p>No query parameters at this time. Future options include valid date range searches (for data containing timeseries values) and bounding box filters.</p>
+            <h4>Examples</h4>
+            <p>${base_url}/apps/epscor/datasets/c4fcf8e8-e96d-4ccd-9353-97efe3f60756/dataset.json</p>
+            <p>${base_url}/apps/rgis/datasets/f667c71b-505a-4fcc-842f-4912a93caa93/dataset.kml</p>
+
+            <h3>Feature Streaming</h3>
+            <p>Coming soon.</p>
+<!--            <dl>
+                <dt></dt>
+                <dd></dd>
+                <dt></dt>
+                <dd></dd> 
+            </dl>
+            <h4>Examples</h4>-->
         </div>    
 
         <div id="footer">
