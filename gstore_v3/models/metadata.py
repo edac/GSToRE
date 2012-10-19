@@ -72,12 +72,14 @@ class OriginalMetadata(Base):
         services = dct['services'][0].values() if dct['services'] else []
         downloads = dct['downloads'][0].values() if dct['downloads'] else []
         
-        #TODO: add metadata links to the online linkages. that's a little meta.
-        metadatas = dct['metadata'] if 'metadata' in dct else []
-        #flatten the dictionary of links by standard
-        metadatas =  sum([e.values() for e in a.values() for a in metadatas], [])      
+#        #TODO: add metadata links to the online linkages. that's a little meta.
+#        metadatas = dct['metadata'] if 'metadata' in dct else []
+#        #flatten the dictionary of links by standard
+#        metadatas =  sum([e.values() for e in a.values() for a in metadatas if a], [])      
 
-        onlinks = services + downloads + metadatas
+#        onlinks = services + downloads + metadatas
+
+        onlinks = services + downloads
 
         for onlink in onlinks:
             link = etree.SubElement(citation, 'onlink')
