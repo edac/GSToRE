@@ -154,7 +154,7 @@ def dataone(request):
 
 
     load_balancer = request.registry.settings['BALANCER_URL']
-    base_url = '%s/apps/dataone/' % (load_balancer)
+    base_url = '%s/apps/dataone/v1/' % (load_balancer)
 
     #set up the dict
     rsp = {'name': 'GSTORE Node',
@@ -560,7 +560,7 @@ def metadata(request):
     obsoletedby = '' if obsoletedby == obsolete.obsolete_uuid else obsoletedby
 
     load_balancer = request.registry.settings['BALANCER_URL']
-    base_url = '%s/apps/dataone/' % (load_balancer)
+    base_url = '%s/apps/dataone/v1/' % (load_balancer)
 
     #dates should be from postgres, i.e. in utc
     rsp = {'pid': pid, 'dateadded': datetime_to_dataone(core_object.date_added), 'obj_format': obj_format, 'file_size': file_size, 

@@ -140,25 +140,25 @@ def main(global_config, **settings):
     config.add_route('schema', '/apps/{app}/datasets/{id:\d+}/schema.{ext}', custom_predicates=(applist,))
 
 #to dataone
-    config.add_route('dataone_ping', '/apps/{app}/monitor/ping', custom_predicates=(applist,))
-    config.add_route('dataone', '/apps/{app}/', custom_predicates=(applist,))
-    config.add_route('dataone_node', '/apps/{app}/node', custom_predicates=(applist,))
-    config.add_route('dataone_log', '/apps/{app}/log', custom_predicates=(applist,))
-    config.add_route('dataone_search', '/apps/{app}/object', custom_predicates=(applist,))
-    config.add_route('dataone_object', '/apps/{app}/object/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
-    config.add_route('dataone_meta', '/apps/{app}/meta/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
-    config.add_route('dataone_checksum', '/apps/{app}/checksum/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
-    config.add_route('dataone_replica', '/apps/{app}/replica/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
-    config.add_route('dataone_error', '/apps/{app}/error', custom_predicates=(applist,)) 
+    config.add_route('dataone_ping', '/apps/{app}/v1/monitor/ping', custom_predicates=(applist,))
+    config.add_route('dataone', '/apps/{app}/v1/', custom_predicates=(applist,))
+    config.add_route('dataone_node', '/apps/{app}/v1/node', custom_predicates=(applist,))
+    config.add_route('dataone_log', '/apps/{app}/v1/log', custom_predicates=(applist,))
+    config.add_route('dataone_search', '/apps/{app}/v1/object', custom_predicates=(applist,))
+    config.add_route('dataone_object', '/apps/{app}/v1/object/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
+    config.add_route('dataone_meta', '/apps/{app}/v1/meta/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
+    config.add_route('dataone_checksum', '/apps/{app}/v1/checksum/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
+    config.add_route('dataone_replica', '/apps/{app}/v1/replica/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
+    config.add_route('dataone_error', '/apps/{app}/v1/error', custom_predicates=(applist,)) 
 
     #maintenance routes
-    config.add_route('dataone_addcore', '/apps/{app}/core/add', custom_predicates=(applist,))
-    config.add_route('dataone_addmetadata', '/apps/{app}/metadata/add', custom_predicates=(applist,))
-    config.add_route('dataone_addvector', '/apps/{app}/vector/add', custom_predicates=(applist,))
-    config.add_route('dataone_addsource', '/apps/{app}/source/add', custom_predicates=(applist,))
-    config.add_route('dataone_addpackage', '/apps/{app}/package/add', custom_predicates=(applist,))
-    config.add_route('dataone_addobsolete', '/apps/{app}/obsolete/add', custom_predicates=(applist,))
-    config.add_route('dataone_updatepackage', '/apps/{app}/package/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/update', custom_predicates=(applist,))
+    config.add_route('dataone_addcore', '/apps/{app}/v1/core/add', custom_predicates=(applist,))
+    config.add_route('dataone_addmetadata', '/apps/{app}/v1/metadata/add', custom_predicates=(applist,))
+    config.add_route('dataone_addvector', '/apps/{app}/v1/vector/add', custom_predicates=(applist,))
+    config.add_route('dataone_addsource', '/apps/{app}/v1/source/add', custom_predicates=(applist,))
+    config.add_route('dataone_addpackage', '/apps/{app}/v1/package/add', custom_predicates=(applist,))
+    config.add_route('dataone_addobsolete', '/apps/{app}/v1/obsolete/add', custom_predicates=(applist,))
+    config.add_route('dataone_updatepackage', '/apps/{app}/v1/package/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/update', custom_predicates=(applist,))
 
 #to the dataset
     #use the integer dataset_id or the uuid
