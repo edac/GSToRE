@@ -61,7 +61,7 @@ class OriginalMetadata(Base):
         existing_onlinks = citation.findall('onlink')
         if existing_onlinks:
             for existing_onlink in existing_onlinks:
-                if existing_onlink.text[0:4] != 'http':
+                if existing_onlink is None or (existing_onlink.text and existing_onlink.text[0:4] != 'http') or not existing_onlink.text:
                     citation.remove(existing_onlink)
 
         #get all of the links
