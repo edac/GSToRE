@@ -92,6 +92,7 @@ def ogr_to_kml_fieldtype(ogr_type):
 
 #convert to python by ogr_type
 #probably want to make sure it's not null and not nodata (as defined by the attribute)
+#and convert to str before encoding in case it is nodata
 def convert_by_ogrtype(value, ogr_type, datefmt=''):
     if not value:
         #do nothing
@@ -100,12 +101,12 @@ def convert_by_ogrtype(value, ogr_type, datefmt=''):
         try :
             return int(value)
         except:
-            return value.encode('utf-8')
+            return str(value).encode('utf-8')
     if ogr_type == ogr.OFTReal:
         try:
             return float(value)
         except:
-            return value.encode('utf-8')
+            return str(value).encode('utf-8')
     if ogr_type == ogr.OFTDateTime:
         #no expected format, no datetime
         if not datefmt:
@@ -114,8 +115,8 @@ def convert_by_ogrtype(value, ogr_type, datefmt=''):
             #try to parse
             return datetime.strptime(value, datefmt)
         except:
-            return value.encode('utf-8')
-    return value.encode('utf-8')
+            return str(value).encode('utf-8')
+    return str(value).encode('utf-8')
 
 
 '''
