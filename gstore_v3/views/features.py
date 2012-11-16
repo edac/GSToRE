@@ -734,13 +734,20 @@ def add_attributes(request):
             bad_recs.append(r)
             continue
 
+        #check the geometry size!
+        geom_size = check_wkb_size(geom)
+
         #build the shard key from the dataset uuid and the feature uuid
         shardkey = dataset_uuid.split('-')[0] + uid.split('-')[0]
 
         #build the mongo object
         #we are including the year, month, day, hour, minute as separate items in case we want to 
         #do aggregation later (easier now than trying to update a gajillion docs)
-        obj = {'key': shardkey, 'f': {'id': fid, 'u': uid}, 'd': {'id': dataset_id, 'u': dataset_uuid}, 'atts': atts, 'geom': {'g': geom}}
+        obj = {'key': shardkey, 'f': {'id': fid, 'u': uid}, 'd': {'id': dataset_id, 'u': dataset_uuid}, 'atts': atts}
+        if geom_size < 3.0:
+            #check the size of the wkb and if it's bigger than 3.0 mb, do not write it to mongo (insert will fail).
+            #technically, our limit is 4mb but that's for the doc NOT just the one element
+            obj.update({'geom': {'g': geom}})
         if obsd:
             obj.update({'obs': obsd, 'year': obsd.year, 'mon': obsd.month, 'day': obsd.day, 'hour': obsd.hour, 'mnt': obsd.minute})
         inserts.append(obj)
@@ -748,22 +755,42 @@ def add_attributes(request):
     #insert everything to mongo if there's stuff to insert
 #    if len(inserts) != the_dataset.record_count:
 #        return HTTPBadRequest('')
-        
+
+    failed_to_post = []    
+    failed_errors = []
     if inserts:
         connstr = request.registry.settings['mongo_uri']
         collection = request.registry.settings['mongo_collection']
         mongo_uri = gMongoUri(connstr, collection)
         gm = gMongo(mongo_uri)
-        try:
-            fail = gm.insert(inserts)
-            if fail:
-                #TODO: run a delete for the dataset id just in case it failed midstream
-                return HTTPServerError(fail)
-        except:
-            #remove anything that got entered
-            pass
-        finally:
-            gm.close()    
+
+        #go for smaller bits - bulk inserts can fail with really big (either in terms of count or in terms of data size)
+        #sets so we're running them in batches
+        #but this limit is arbitrary (i just picked one based on not very much)
+        limit = 5000
+        #NOTE: also, this is not enough to prevent the bulk insert from bonking. really big vectors (big geometries + 
+        #      boatloads of attributes) will need to be posted in chunks
+        for i in range(0, len(inserts), limit):
+            j = i + limit if i + limit < len(inserts) else len(inserts)
+            inserts_to_post = inserts[i:j]
+
+            #hang on the to the fids? although it means nothing for the sensor data
+            fids = [x['f']['id'] for x in inserts_to_post]
+            
+            try:
+                fail = gm.insert(inserts_to_post)
+                if fail:
+                    #TODO: run a delete for the dataset id just in case it failed midstream
+                    #return HTTPServerError(fail)
+                    failed_to_post.append(fids)
+                    failed_errors.append(fail)
+            except Exception as err:
+                #remove anything that got entered
+                #pass
+                failed_to_post.append(fids)
+                failed_errors.append(err)
+            finally:
+                gm.close()    
 
         #deal with the insert list - pymongo updates the list with _id (objectid)
         #so that and the obs datetime cause json.dumps to fail. we don't care about the _id
@@ -771,7 +798,10 @@ def add_attributes(request):
         archives = []
         for i in inserts:
             del i['_id']
-            i['obs'] = i['obs'].strftime('%Y%m%dT%H:%M:%S')
+            
+            if 'obs' in i:
+                i['obs'] = i['obs'].strftime('%Y%m%dT%H:%M:%S') 
+                
             archives.append(i)
         VECTOR_PATH = request.registry.settings['VECTOR_IMPORT_PATH']
         vector_file = os.path.join(VECTOR_PATH, '%s.json' % (dataset_uuid))
@@ -781,6 +811,8 @@ def add_attributes(request):
     output = {'features': len(inserts)}
     if bad_recs:
         output.update({'errors': bad_recs})
+    if failed_to_post:
+        output.update({'bulk insert errors': {'fids': failed_to_post, 'errors': failed_errors}})
     return output
 
 @view_config(route_name='update_feature', request_method='PUT')
