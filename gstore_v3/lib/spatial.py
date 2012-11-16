@@ -119,6 +119,8 @@ def convert_by_ogrtype(value, ogr_type, datefmt=''):
     return str(value).encode('utf-8')
 
 
+#unicode(a['val']).encode('ascii', 'xmlcharrefreplace'))
+
 '''
 transformations & reprojections
 '''
@@ -150,6 +152,10 @@ def geom_to_wkt(geom, srid=''):
     wkt = geom.ExportToWkt()
     wkt = 'SRID=%s;%s' % (srid, wkt) if srid else wkt
     return wkt
+
+#calculate the geom's wkb size as mb (mongoimport limited to 4mb for our install)
+def check_wkb_size(wkb):
+    return len(wkb.encode('utf-8')) *  0.0000009536743
 
 '''
 0103000000010000000500000098CD95A187FB5AC0D7A37287D47B414098CD95A187FB5AC04499A34D494443407BE60D79A93F5AC04499A34D494443407BE60D79A93F5AC0D7A37287D47B414098CD95A187FB5AC0D7A37287D47B4140
