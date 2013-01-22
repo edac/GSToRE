@@ -36,7 +36,7 @@ def any_of(segment_name, *allowed):
         if info['match'][segment_name] in allowed:
             return True
     return predicate
-applist = any_of('app', 'myapp', 'dataone', 'hydroserver')
+applist = any_of('app', 'rgis', 'epscor', 'dataone', 'hydroserver', 'epht', 'elseweb')
 
 #check for the dataset type (original vs. derived) for downloads
 def any_type(segment_name, *allowed):
@@ -131,28 +131,28 @@ def main(global_config, **settings):
 
 #to dataone
 #TODO: revise backslashes (global option not the greatest for gstore api)
-    config.add_route('dataone_ping', '/apps/dataone/v1/monitor/ping')
-    config.add_route('dataone_ping_slash', '/apps/dataone/v1/monitor/ping/')
-    config.add_route('dataone_noversion', '/apps/dataone')
-    config.add_route('dataone_noversion_slash', '/apps/dataone/')
-    config.add_route('dataone', '/apps/dataone/v1')
-    config.add_route('dataone_slash', '/apps/dataone/v1/')
-    config.add_route('dataone_node', '/apps/dataone/v1/node')
-    config.add_route('dataone_node_slash', '/apps/dataone/v1/node/')
-    config.add_route('dataone_log', '/apps/dataone/v1/log')
-    config.add_route('dataone_log_slash', '/apps/dataone/v1/log/')
-    config.add_route('dataone_search', '/apps/dataone/v1/object')
-    config.add_route('dataone_search_slash', '/apps/dataone/v1/object/')
-    config.add_route('dataone_object', '/apps/dataone/v1/object/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}')
-    config.add_route('dataone_object_slash', '/apps/dataone/v1/object/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/')
-    config.add_route('dataone_meta', '/apps/dataone/v1/meta/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}')
-    config.add_route('dataone_meta_slash', '/apps/dataone/v1/meta/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/')
-    config.add_route('dataone_checksum', '/apps/dataone/v1/checksum/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}')
-    config.add_route('dataone_checksum_slash', '/apps/dataone/v1/checksum/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/')
-    config.add_route('dataone_replica', '/apps/dataone/v1/replica/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}')
-    config.add_route('dataone_replica_slash', '/apps/dataone/v1/replica/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/')
-    config.add_route('dataone_error', '/apps/dataone/v1/error')
-    config.add_route('dataone_error_slash', '/apps/dataone/v1/error/') 
+    config.add_route('dataone_ping', '/apps/{app}/v1/monitor/ping', custom_predicates=(applist,))
+    config.add_route('dataone_ping_slash', '/apps/{app}/v1/monitor/ping/', custom_predicates=(applist,))
+    config.add_route('dataone_noversion', '/apps/{app}', custom_predicates=(applist,))
+    config.add_route('dataone_noversion_slash', '/apps/{app}/', custom_predicates=(applist,))
+    config.add_route('dataone', '/apps/{app}/v1', custom_predicates=(applist,))
+    config.add_route('dataone_slash', '/apps/{app}/v1/', custom_predicates=(applist,))
+    config.add_route('dataone_node', '/apps/{app}/v1/node', custom_predicates=(applist,))
+    config.add_route('dataone_node_slash', '/apps/{app}/v1/node/', custom_predicates=(applist,))
+    config.add_route('dataone_log', '/apps/{app}/v1/log', custom_predicates=(applist,))
+    config.add_route('dataone_log_slash', '/apps/{app}/v1/log/', custom_predicates=(applist,))
+    config.add_route('dataone_search', '/apps/{app}/v1/object', custom_predicates=(applist,))
+    config.add_route('dataone_search_slash', '/apps/{app}/v1/object/', custom_predicates=(applist,))
+    config.add_route('dataone_object', '/apps/{app}/v1/object/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
+    config.add_route('dataone_object_slash', '/apps/{app}/v1/object/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/', custom_predicates=(applist,))
+    config.add_route('dataone_meta', '/apps/{app}/v1/meta/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
+    config.add_route('dataone_meta_slash', '/apps/{app}/v1/meta/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/', custom_predicates=(applist,))
+    config.add_route('dataone_checksum', '/apps/{app}/v1/checksum/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
+    config.add_route('dataone_checksum_slash', '/apps/{app}/v1/checksum/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/', custom_predicates=(applist,))
+    config.add_route('dataone_replica', '/apps/{app}/v1/replica/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
+    config.add_route('dataone_replica_slash', '/apps/{app}/v1/replica/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/', custom_predicates=(applist,))
+    config.add_route('dataone_error', '/apps/{app}/v1/error', custom_predicates=(applist,))
+    config.add_route('dataone_error_slash', '/apps/{app}/v1/error/', custom_predicates=(applist,)) 
 
     #maintenance routes
     config.add_route('dataone_addcore', '/apps/{app}/v1/core/add', custom_predicates=(applist,))

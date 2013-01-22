@@ -100,8 +100,8 @@ def log_entry(identifier, ip, event, useragent='public'):
 
 
 #TODO: modify the cache settings
-@view_config(route_name='dataone_ping', http_cache=3600)
-@view_config(route_name='dataone_ping_slash', http_cache=3600)
+@view_config(route_name='dataone_ping', http_cache=3600, match_param='app=dataone')
+@view_config(route_name='dataone_ping_slash', http_cache=3600, match_param='app=dataone')
 def ping(request):
     #curl -v  http://129.24.63.66/gstore_v3/apps/dataone/monitor/ping
     
@@ -123,12 +123,12 @@ def ping(request):
 
     return Response()
 
-@view_config(route_name='dataone_noversion', renderer='../templates/dataone_node.pt')
-@view_config(route_name='dataone_noversion_slash', renderer='../templates/dataone_node.pt')	
-@view_config(route_name='dataone', renderer='../templates/dataone_node.pt')
-@view_config(route_name='dataone_slash', renderer='../templates/dataone_node.pt')
-@view_config(route_name='dataone_node', renderer='../templates/dataone_node.pt')
-@view_config(route_name='dataone_node_slash', renderer='../templates/dataone_node.pt')
+@view_config(route_name='dataone_noversion', renderer='../templates/dataone_node.pt', match_param='app=dataone')
+@view_config(route_name='dataone_noversion_slash', renderer='../templates/dataone_node.pt', match_param='app=dataone')	
+@view_config(route_name='dataone', renderer='../templates/dataone_node.pt', match_param='app=dataone')
+@view_config(route_name='dataone_slash', renderer='../templates/dataone_node.pt', match_param='app=dataone')
+@view_config(route_name='dataone_node', renderer='../templates/dataone_node.pt', match_param='app=dataone')
+@view_config(route_name='dataone_node_slash', renderer='../templates/dataone_node.pt', match_param='app=dataone')
 def dataone(request):
     '''
     system metadata about the member node
@@ -172,8 +172,8 @@ def dataone(request):
     return rsp
 
 #, renderer='dataone_logs.mako'
-@view_config(route_name='dataone_log')
-@view_config(route_name='dataone_log_slash')
+@view_config(route_name='dataone_log', match_param='app=dataone')
+@view_config(route_name='dataone_log_slash', match_param='app=dataone')
 def log(request):
     '''
     <?xml version="1.0" encoding="UTF-8"?>
@@ -260,8 +260,8 @@ def log(request):
 #    rsp.update({'docs': docs})
 #    return rsp
 	
-@view_config(route_name='dataone_search', renderer='dataone_search.mako')
-@view_config(route_name='dataone_search_slash', renderer='dataone_search.mako')
+@view_config(route_name='dataone_search', renderer='dataone_search.mako', match_param='app=dataone')
+@view_config(route_name='dataone_search_slash', renderer='dataone_search.mako', match_param='app=dataone')
 def search(request):
     '''
     <?xml version="1.0"?>
@@ -372,8 +372,8 @@ def search(request):
 
     return {'total': total, 'count': cnt, 'start': offset, 'docs': docs}
 	
-@view_config(route_name='dataone_object', request_method='GET')
-@view_config(route_name='dataone_object_slash', request_method='GET')
+@view_config(route_name='dataone_object', request_method='GET', match_param='app=dataone')
+@view_config(route_name='dataone_object_slash', request_method='GET', match_param='app=dataone')
 def show(request):
     '''
     return the file object for this uuid
@@ -415,8 +415,8 @@ def show(request):
     fr.content_disposition = 'attachment; filename=%s.%s' % (pid, ext)
     return fr
 
-@view_config(route_name='dataone_object', request_method='HEAD')
-@view_config(route_name='dataone_object_slash', request_method='HEAD')
+@view_config(route_name='dataone_object', request_method='HEAD', match_param='app=dataone')
+@view_config(route_name='dataone_object_slash', request_method='HEAD', match_param='app=dataone')
 def head(request):
     '''
     d1.method = describe
@@ -490,8 +490,8 @@ def head(request):
     rsp.headerlist = lst
     return rsp
 
-@view_config(route_name='dataone_meta', renderer='dataone_metadata.mako')
-@view_config(route_name='dataone_meta_slash', renderer='dataone_metadata.mako')
+@view_config(route_name='dataone_meta', renderer='dataone_metadata.mako', match_param='app=dataone')
+@view_config(route_name='dataone_meta_slash', renderer='dataone_metadata.mako', match_param='app=dataone')
 def metadata(request):
     '''
     <?xml version="1.0" encoding="UTF-8"?>
@@ -580,8 +580,8 @@ def metadata(request):
     request.response.content_type = 'text/xml; charset=UTF-8'
     return rsp
 
-@view_config(route_name='dataone_checksum')
-@view_config(route_name='dataone_checksum_slash')
+@view_config(route_name='dataone_checksum', match_param='app=dataone')
+@view_config(route_name='dataone_checksum_slash', match_param='app=dataone')
 def checksum(request):
     '''
     <checksum algorithm="SHA-1">2e01e17467891f7c933dbaa00e1459d23db3fe4f</checksum>
@@ -608,16 +608,16 @@ def checksum(request):
     #TODO: double-check list of hash algorithm terms
     return Response('<checksum algorithm="%s">%s</checksum>' % (algo, h), content_type='application/xml')
 
-@view_config(route_name='dataone_error', request_method='POST')
-@view_config(route_name='dataone_error_slash', request_method='POST')
+@view_config(route_name='dataone_error', request_method='POST', match_param='app=dataone')
+@view_config(route_name='dataone_error_slash', request_method='POST', match_param='app=dataone')
 def error(request):
 
     #TODO: parse a multipart post (without examples) and log to mongo as an error
     #return HTTPServerError('', status=501)
     return HTTPNotImplemented()
 
-@view_config(route_name='dataone_replica')
-@view_config(route_name='dataone_replica_slash')
+@view_config(route_name='dataone_replica', match_param='app=dataone')
+@view_config(route_name='dataone_replica_slash', match_param='app=dataone')
 def replica(request):
     '''
     log as replica request not just GET
@@ -648,7 +648,7 @@ as dataone core objects using the object uuid and type. and then push the core o
 that means three posts per object right now. the basic object posts always return the object uuid to register, the object type
 and the utc datetime it was posted.
 '''
-@view_config(route_name='dataone_addcore', request_method='POST')
+@view_config(route_name='dataone_addcore', request_method='POST', match_param='app=dataone')
 def add_dataone_core(request):
     '''
     {
@@ -689,7 +689,7 @@ def add_dataone_core(request):
     
     return Response(json.dumps({"core_uuid": core_obj.dataone_uuid, "date_added": core_obj.date_added.strftime('%Y-%m-%dT%H:%M:%S'), "object_uuid": core_obj.object_uuid, "object_type": core_obj.object_type}))
     
-@view_config(route_name='dataone_addmetadata', request_method='POST')
+@view_config(route_name='dataone_addmetadata', request_method='POST', match_param='app=dataone')
 def add_dataone_metadata(request):
     '''
     {
@@ -745,7 +745,7 @@ def add_dataone_metadata(request):
 
     return Response(json.dumps({'object_uuid': meta_uuid, 'object_type': 'metadata', 'date_added': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}))
 
-@view_config(route_name='dataone_addvector', request_method='POST')
+@view_config(route_name='dataone_addvector', request_method='POST', match_param='app=dataone')
 def add_dataone_vector(request):
     '''
     {
@@ -830,7 +830,7 @@ def add_dataone_vector(request):
         return HTTPServerError(err)
     return Response(json.dumps({'object_uuid': vector.vector_uuid, 'object_type': 'vector', 'date_added': vector.date_added.strftime('%Y-%m-%dT%H:%M:%S')}))
 
-@view_config(route_name='dataone_addsource', request_method='POST')
+@view_config(route_name='dataone_addsource', request_method='POST', match_param='app=dataone')
 def add_dataone_source(request):
     '''
     {
@@ -880,7 +880,7 @@ def add_dataone_source(request):
 #TODO: modify this to create packages for 1+ datasets and 1 metadata (all versions of vector (shp, kml, csv, etc) use same metadata). 
 #      should just be a matter of magically finding all vector objects for a dataset uuid and doing that. but the build_package
 #      method will also have to be updated. and what to do about source objects? 
-@view_config(route_name='dataone_addpackage', request_method='POST')
+@view_config(route_name='dataone_addpackage', request_method='POST', match_param='app=dataone')
 def add_dataone_package(request):
     '''
     {
@@ -967,7 +967,7 @@ def add_dataone_package(request):
     
     return Response(json.dumps({'obsolete_uuid': obsolete.obsolete_uuid, 'core_uuid': core_obj.dataone_uuid, 'object_uuid': package_obj.package_uuid, 'object_type': 'package', 'date_added': package_obj.date_added.strftime('%Y-%m-%dT%H:%M:%S')}))
 
-@view_config(route_name='dataone_addobsolete', request_method='POST')
+@view_config(route_name='dataone_addobsolete', request_method='POST', match_param='app=dataone')
 def add_dataone_obsolete(request):
     '''
     {
@@ -997,7 +997,7 @@ def add_dataone_obsolete(request):
      
     return Response(json.dumps({'obsolete_uuid': obsolete.obsolete_uuid, 'core_uuid': core_uuid, 'date_added': obsolete.date_changed.strftime('%Y-%m-%dT%H:%M:%S')}))
 
-@view_config(route_name='dataone_updatepackage', request_method='POST')
+@view_config(route_name='dataone_updatepackage', request_method='POST', match_param='app=dataone')
 def update_dataone_package(request):
     '''
     {
