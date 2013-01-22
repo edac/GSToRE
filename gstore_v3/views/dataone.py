@@ -100,7 +100,8 @@ def log_entry(identifier, ip, event, useragent='public'):
 
 
 #TODO: modify the cache settings
-@view_config(route_name='dataone_ping', match_param='app=dataone', http_cache=3600)
+@view_config(route_name='dataone_ping', http_cache=3600)
+@view_config(route_name='dataone_ping_slash', http_cache=3600)
 def ping(request):
     #curl -v  http://129.24.63.66/gstore_v3/apps/dataone/monitor/ping
     
@@ -113,17 +114,21 @@ def ping(request):
         d = get_dataset('61edaf94-2339-4096-9cc0-4bfb79a9c848')
     except:
         return HTTPServerError()
-    if not d:
-        return HTTPServerError()
+    #if not d:
+        #return HTTPServerError()
 
     #TODO: add check for insufficient resources (except we don't seem to know that)
     #      (413)
 
 
     return Response()
-	
-@view_config(route_name='dataone', match_param='app=dataone', renderer='../templates/dataone_node.pt')
-@view_config(route_name='dataone_node', match_param='app=dataone', renderer='../templates/dataone_node.pt')
+
+@view_config(route_name='dataone_noversion', renderer='../templates/dataone_node.pt')
+@view_config(route_name='dataone_noversion_slash', renderer='../templates/dataone_node.pt')	
+@view_config(route_name='dataone', renderer='../templates/dataone_node.pt')
+@view_config(route_name='dataone_slash', renderer='../templates/dataone_node.pt')
+@view_config(route_name='dataone_node', renderer='../templates/dataone_node.pt')
+@view_config(route_name='dataone_node_slash', renderer='../templates/dataone_node.pt')
 def dataone(request):
     '''
     system metadata about the member node
@@ -167,7 +172,8 @@ def dataone(request):
     return rsp
 
 #, renderer='dataone_logs.mako'
-@view_config(route_name='dataone_log', match_param='app=dataone')
+@view_config(route_name='dataone_log')
+@view_config(route_name='dataone_log_slash')
 def log(request):
     '''
     <?xml version="1.0" encoding="UTF-8"?>
@@ -254,7 +260,8 @@ def log(request):
 #    rsp.update({'docs': docs})
 #    return rsp
 	
-@view_config(route_name='dataone_search', match_param='app=dataone', renderer='dataone_search.mako')
+@view_config(route_name='dataone_search', renderer='dataone_search.mako')
+@view_config(route_name='dataone_search_slash', renderer='dataone_search.mako')
 def search(request):
     '''
     <?xml version="1.0"?>
@@ -365,7 +372,8 @@ def search(request):
 
     return {'total': total, 'count': cnt, 'start': offset, 'docs': docs}
 	
-@view_config(route_name='dataone_object', request_method='GET', match_param='app=dataone')
+@view_config(route_name='dataone_object', request_method='GET')
+@view_config(route_name='dataone_object_slash', request_method='GET')
 def show(request):
     '''
     return the file object for this uuid
@@ -407,7 +415,8 @@ def show(request):
     fr.content_disposition = 'attachment; filename=%s.%s' % (pid, ext)
     return fr
 
-@view_config(route_name='dataone_object', request_method='HEAD', match_param='app=dataone')
+@view_config(route_name='dataone_object', request_method='HEAD')
+@view_config(route_name='dataone_object_slash', request_method='HEAD')
 def head(request):
     '''
     d1.method = describe
@@ -481,7 +490,8 @@ def head(request):
     rsp.headerlist = lst
     return rsp
 
-@view_config(route_name='dataone_meta', match_param='app=dataone', renderer='dataone_metadata.mako')
+@view_config(route_name='dataone_meta', renderer='dataone_metadata.mako')
+@view_config(route_name='dataone_meta_slash', renderer='dataone_metadata.mako')
 def metadata(request):
     '''
     <?xml version="1.0" encoding="UTF-8"?>
@@ -570,7 +580,8 @@ def metadata(request):
     request.response.content_type = 'text/xml; charset=UTF-8'
     return rsp
 
-@view_config(route_name='dataone_checksum', match_param='app=dataone')
+@view_config(route_name='dataone_checksum')
+@view_config(route_name='dataone_checksum_slash')
 def checksum(request):
     '''
     <checksum algorithm="SHA-1">2e01e17467891f7c933dbaa00e1459d23db3fe4f</checksum>
@@ -597,14 +608,16 @@ def checksum(request):
     #TODO: double-check list of hash algorithm terms
     return Response('<checksum algorithm="%s">%s</checksum>' % (algo, h), content_type='application/xml')
 
-@view_config(route_name='dataone_error', request_method='POST', match_param='app=dataone')
+@view_config(route_name='dataone_error', request_method='POST')
+@view_config(route_name='dataone_error_slash', request_method='POST')
 def error(request):
 
     #TODO: parse a multipart post (without examples) and log to mongo as an error
     #return HTTPServerError('', status=501)
     return HTTPNotImplemented()
 
-@view_config(route_name='dataone_replica', match_param='app=dataone')
+@view_config(route_name='dataone_replica')
+@view_config(route_name='dataone_replica_slash')
 def replica(request):
     '''
     log as replica request not just GET
