@@ -104,6 +104,11 @@ def dataset(request):
     if not sources && vector - check the cache
     if not sources && vector && no cache - generate cache file
     '''  
+    
+    #TODO: change this to handle the standard (if fgdc not supported, etc)
+    base_url = '%s/apps/%s/datasets/' % (request.registry.settings['BALANCER_URL'], app)
+    metadata_info = {'app': app, 'base_url': base_url, 'standard': 'fgdc'}
+    
     taxonomy = str(d.taxonomy)
     if taxonomy in ['services']:
         src = d.get_source(datatype, format)
@@ -169,7 +174,7 @@ def dataset(request):
     #no zip. need to pack it up (raster/file) or generate it (vector)
     if taxonomy in ['geoimage', 'file']:
         #pack up the zip to the formats cache
-        output = src.pack_source(cached_path, outname, xslt_path)
+        output = src.pack_source(cached_path, outname, xslt_path, metadata_info)
         
         return return_fileresponse(output, mimetype, outname)
     elif taxonomy in ['vector']:
@@ -184,11 +189,12 @@ def dataset(request):
         srid = int(request.registry.settings['SRID'])
 
         #for the original write to ogr directly build option
-        success = d.build_vector(format, cached_path, mongo_uri, srid)
+        success = d.build_vector(format, cached_path, mongo_uri, srid, metadata_info)
 
         #for the new stream to ogr2ogr option (or just stream if not shapefile)
 #        load_balancer = request.registry.settings['BALANCER_URL']
 #        base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
+#        TODO: don't forget the metadata_info HERE!
 #        success = d.stream_vector(format, cached_path, mongo_uri, srid, base_url)
 
         #check the response for failure

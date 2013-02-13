@@ -14,6 +14,7 @@ from zope.sqlalchemy import ZopeTransactionExtension
 
 from sqlalchemy.dialects.postgresql import UUID
 
+import math
 from ..lib.utils import *
 from datasets import *
 from hstore import HStore, HStoreColumn
@@ -61,30 +62,33 @@ class Source(Base):
     def __repr__(self):
         return '<Source (%s, %s, %s)>' % (self.extension, self.set, self.uuid)
 
-    def pack_source(self, outpath, outname, xslt_path):
+    def pack_source(self, outpath, outname, xslt_path, metadata_info):
         #pack up the zip (if it's not a zip) with all files in the set
         #and add the metadata based on the src.dataset ref
         files = [f.location for f in self.src_files]
-
-        #now append the new metadata file to the list
-        md_output, md_contenttype = self.datasets.original_metadata[0].transform('fgdc', 'xml', xslt_path)
-        #add the metadata xml file unless there is one in the source list (good way to tell?)
-        #except we don't have any .xml listed in the source_files table so tada!
-        md_filename = os.path.join(outpath, outname.replace('.zip', '.xml'))
-        md_file = open(md_filename, 'w')
-        md_file.write(md_output)
-        md_file.close()
-
-        files.append(md_filename)
+        if not files:
+            #we may have a problem with an nfs mount that can lead to empty zips
+            #which will be cached. that's not great
+            return ''
+            
+        metadata_file = os.path.join(outpath, outname.replace('.zip', '.xml'))
+        
+        #let's get the metadata obj
+        om = [o for o in self.datasets.original_metadata if self.datasets.has_metadata_cache and o.original_xml_standard == metadata_info['standard']]
+        if om:
+            written = om[0].write_xml_to_disk(metadata_file, metadata_info)
+            if written:
+                files.append(metadata_file)        
         
         output = create_zip(os.path.join(outpath, outname), files)
 
         #and delete the new xml
-        os.remove(md_filename)
+        if os.path.isfile(metadata_file):
+            os.remove(metadata_file)
         
         return output
 
-    #TODO: check if this will work with service loactions, i.e. links, that don't have a format
+    #TODO: check if this will work with service locations, i.e. links, that don't have a format
     #      since we assume that a service source will only have one source_file. fyi.
     def get_location(self, format=None):
         #get a specific file from the src_files set for this source obj
@@ -94,6 +98,27 @@ class Source(Base):
         else:
             f = self.src_files[0]
         return f.location if f is not None else ''
+
+    def get_filesize_mb(self):
+        '''
+        this is not, NOT!, the size of the final zipfile (unless the source is actually a zip)
+        this is pretty much the size of the raster file.
+        this does not include the estimate for the schrodinger's vectors, btw.
+        '''
+        
+        #don't know. don't care. we don't host it. it's a cruel, cruel world.
+        if self.is_external:
+            return -99
+        
+        files = self.src_files
+        #sort out the right file which assumes that the extension matches one of the actual file extensions. 
+        #TODO: this might not be a good assumption
+        test_file = [f.location for f in files if f.location[-len(self.extension):] == self.extension]
+        if not test_file:
+            return -99
+        
+        filesize = os.path.getsize(test_file[0]) / (1024 * 1024.0)
+        return math.ceil(filesize)
 
 '''
 and the actual file paths on the server (geodata, etc)

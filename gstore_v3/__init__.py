@@ -30,6 +30,7 @@ def notfound_post(request):
 custom predicates for some quick url validation before hitting the views
 '''
 
+#TODO: add epht if necessary
 #add a custom predicate to limit routes to just the apps listed
 def any_of(segment_name, *allowed):
     def predicate(info, request):
@@ -84,6 +85,15 @@ def main(global_config, **settings):
 
     config.add_static_view('static', 'static', cache_max_age=3600)
     config.add_route('home', '/')    
+
+#    #TEST ROUTE
+#    config.add_route('test', '/test/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}')
+#    config.add_route('test_url', '/test/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}')
+#    config.add_route('test_wcs', '/test/services/wcs')
+#    config.add_route('test_fmt', '/test/services/{fmt}')
+#    config.add_route('test_fidsearch', '/test/mongo')
+#    config.add_route('test_insert', '/test/insert')
+#    config.add_route('test_bulkinsert', '/test/chunk/{id}/{amount}')
     
     #to the attributes
     config.add_route('attributes', '/apps/{app}/attributes/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
@@ -130,15 +140,14 @@ def main(global_config, **settings):
     config.add_route('schema', '/apps/{app}/datasets/{id:\d+}/schema.{ext}', custom_predicates=(applist,))
 
 #to dataone
-#TODO: revise backslashes (global option not the greatest for gstore api)
-    config.add_route('dataone_ping', '/apps/{app}/v1/monitor/ping', custom_predicates=(applist,))
-    config.add_route('dataone_ping_slash', '/apps/{app}/v1/monitor/ping/', custom_predicates=(applist,))
     config.add_route('dataone_noversion', '/apps/{app}', custom_predicates=(applist,))
     config.add_route('dataone_noversion_slash', '/apps/{app}/', custom_predicates=(applist,))
     config.add_route('dataone', '/apps/{app}/v1', custom_predicates=(applist,))
     config.add_route('dataone_slash', '/apps/{app}/v1/', custom_predicates=(applist,))
     config.add_route('dataone_node', '/apps/{app}/v1/node', custom_predicates=(applist,))
     config.add_route('dataone_node_slash', '/apps/{app}/v1/node/', custom_predicates=(applist,))
+    config.add_route('dataone_ping', '/apps/{app}/v1/monitor/ping', custom_predicates=(applist,))
+    config.add_route('dataone_ping_slash', '/apps/{app}/v1/monitor/ping/', custom_predicates=(applist,))
     config.add_route('dataone_log', '/apps/{app}/v1/log', custom_predicates=(applist,))
     config.add_route('dataone_log_slash', '/apps/{app}/v1/log/', custom_predicates=(applist,))
     config.add_route('dataone_search', '/apps/{app}/v1/object', custom_predicates=(applist,))
@@ -151,7 +160,7 @@ def main(global_config, **settings):
     config.add_route('dataone_checksum_slash', '/apps/{app}/v1/checksum/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/', custom_predicates=(applist,))
     config.add_route('dataone_replica', '/apps/{app}/v1/replica/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
     config.add_route('dataone_replica_slash', '/apps/{app}/v1/replica/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/', custom_predicates=(applist,))
-    config.add_route('dataone_error', '/apps/{app}/v1/error', custom_predicates=(applist,))
+    config.add_route('dataone_error', '/apps/{app}/v1/error', custom_predicates=(applist,)) 
     config.add_route('dataone_error_slash', '/apps/{app}/v1/error/', custom_predicates=(applist,)) 
 
     #maintenance routes

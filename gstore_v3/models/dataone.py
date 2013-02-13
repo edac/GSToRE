@@ -267,7 +267,7 @@ class DataonePackage(Base):
 
         #and finally, get the generated rdf
         doc = rem.get_serialization()
-        location = os.path.join(location, '%s.xml' % (self.package_uuid))
+        #location = os.path.join(location, '%s.xml' % (self.package_uuid))
         #TODO: fix permissions issue with the dataone dirs (needs to be web-dev as well?)
         with open(location, 'w') as pkg:
             pkg.write(doc.data)

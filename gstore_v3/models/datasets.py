@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from osgeo import ogr, osr
 import xlwt
 import json
+import pytz
 
 from ..lib.utils import get_all_formats, get_all_services, create_zip
 from ..lib.spatial import *
@@ -160,7 +161,7 @@ class Dataset(Base):
 
     #get the source location (path) for the mapfile
     #return the source id (for the mapfile) and the data filepath
-    def get_mapsource(self, fmtpath='', mongo_uri=None, srid=4326):
+    def get_mapsource(self, fmtpath='', mongo_uri=None, srid=4326, metadata_info=None):
         '''
         if file:
             return null
@@ -234,7 +235,7 @@ class Dataset(Base):
                 if not os.path.isdir(os.path.join(fmtpath, str(self.uuid))):
                     os.mkdir(os.path.join(fmtpath, str(self.uuid)))
                 os.mkdir(os.path.join(fmtpath, str(self.uuid), 'shp'))
-            success, message = self.build_vector('shp', os.path.join(fmtpath, str(self.uuid), 'shp'), mongo_uri, srid)
+            success, message = self.build_vector('shp', os.path.join(fmtpath, str(self.uuid), 'shp'), mongo_uri, srid, metadata_info)
             if success != 0: 
                 return None, None
                 
@@ -301,8 +302,22 @@ class Dataset(Base):
             #combine the links (don't change url) with downloads (build url)
             dlds = [{s[1]: '%s/%s.%s.%s' % (base_url, self.basename, s[0], s[1]) for s in dlds}] if dlds else []
             dlds = links + dlds
+            
+            #update the wxs services to have the more complete url (version, request, service)
+            svc_list = []
+            for s in svcs:
+                url = '%s/services/ogc/%s?SERVICE=%s&REQUEST=GetCapabilities' % (base_url, s, s)
+                if s in ['wms', 'wfs']:
+                    vsn = '1.1' if s == 'wms'  else '0.0'
+                else:
+                    vsn = '1.2'
 
-            results.update({'services': [{s: '%s/services/ogc/%s' % (base_url, s) for s in svcs}] if svcs else [], 'downloads': dlds})
+                url += '&VERSION=1.' + vsn
+                
+                svc_list.append({s: url})
+
+            #results.update({'services': [{s: '%s/services/ogc/%s' % (base_url, s) for s in svcs}] if svcs else [], 'downloads': dlds})
+            results.update({'services': svc_list, 'downloads': dlds})
 
             #add the link to the mapper 
             #TODO: when the mapper moves, get rid of this
@@ -314,18 +329,39 @@ class Dataset(Base):
             results.update({'services': [], 'downloads': [], 'preview': '', 'availability': False})
 
         #check on the metadata
+        #TODO: fix this to handle multiple standards based on the supported standards of the dataset
         if self.has_metadata_cache:
             standards = ['fgdc']
             exts = ['html', 'xml'] 
             #removing txt format as per karl (8/21/2012) - transform doesn't work properly and provides little benefit
             '''
             as {fgdc: {ext: url}}
+
+            + metadata_modified element:
+            metadata_modified: {'fgdc': 'yyyyMMdd', 'iso': 'yyyyMMd'} AS UTC!
+
+            this is not one of the keys under metadata['fgdc'] to avoid borking rgis/epscor
             '''
+
+            #get the date-modified by standard
+            utc = pytz.utc
+            md = {}
+            om = [o for o in self.original_metadata]
+            for o in om:
+                #get the standard and the date (2013-01-30 20:23:49.694577-07)
+                if o.date_modified and o.original_xml_standard:
+                    md.update({o.original_xml_standard: o.date_modified.astimezone(utc).strftime('%Y-%m-%dT%H:%M:%SZ')})
+           
             mt = [{s: {e: '%s/metadata/%s.%s' % (base_url, s, e) for e in exts} for s in standards}]
 
         else:
+            md = {}
             mt = []
+        
         results.update({'metadata': mt})
+        
+        if md:
+            results.update({'metadata-modified': md})
         
 
         #TODO: add the html card view also maybe
@@ -342,7 +378,7 @@ class Dataset(Base):
 
 
     #build any vector format that comes from OGR (shp, kml, csv, gml, geojson)
-    def build_vector(self, format, basepath, mongo_uri, epsg):
+    def build_vector(self, format, basepath, mongo_uri, epsg, metadata_info):
         '''
         pull the data from mongo
         get the attribute data
@@ -361,11 +397,11 @@ class Dataset(Base):
 
         if format == 'xls':
             #do something else
-            return self.build_excel(basepath, mongo_uri)
+            return self.build_excel(basepath, mongo_uri, metadata_info)
 
         if format == 'json':
             #this is just plain jane json with no geometry at all
-            return self.build_json(basepath, mongo_uri)
+            return self.build_json(basepath, mongo_uri, metadata_info)
 
         #get the data
         gm = gMongo(mongo_uri)
@@ -465,11 +501,19 @@ class Dataset(Base):
             prjfile.close()
 
         #and the metadata
+#        files = []
+#        if self.original_metadata:
+#            orig_metadata = self.original_metadata[0]
+#            metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
+#            written = orig_metadata.write_xml_to_disk(metadata_file)
+#            if written:
+#                files.append(metadata_file)
+
         files = []
-        if self.original_metadata:
-            orig_metadata = self.original_metadata[0]
+        om = [o for o in self.original_metadata if self.has_metadata_cache and o.original_xml_standard == metadata_info['standard']]
+        if om:
             metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
-            written = orig_metadata.write_xml_to_disk(metadata_file)
+            written = om[0].write_xml_to_disk(metadata_file, metadata_info)
             if written:
                 files.append(metadata_file)
                 
@@ -498,7 +542,7 @@ class Dataset(Base):
         return (0, 'success')
 
     #build an excel file for the data
-    def build_excel(self, basepath, mongo_uri):
+    def build_excel(self, basepath, mongo_uri, metadata_info):
         style = xlwt.easyxf('font: name Times New Roman, color-index black, bold on', num_format_str='#,##0.00')
         workbook = xlwt.Workbook()
         sheetname = self.basename[0:29]
@@ -552,22 +596,30 @@ class Dataset(Base):
         workbook.save(filename)
         files = [filename]
 
-        #just to be consistent with all of the other types
-        #let's pack up a zip file
-        if self.original_metadata:
-            orig_metadata = self.original_metadata[0]
+#        #just to be consistent with all of the other types
+#        #let's pack up a zip file
+#        if self.original_metadata:
+#            orig_metadata = self.original_metadata[0]
+#            metadata_file = '%s.xls.xml' % (os.path.join(basepath, self.basename))
+#            written = orig_metadata.write_xml_to_disk(metadata_file)
+#            if written:
+#                files.append(metadata_file)
+            
+        om = [o for o in self.original_metadata if self.has_metadata_cache and o.original_xml_standard == metadata_info['standard']]
+        if om:
             metadata_file = '%s.xls.xml' % (os.path.join(basepath, self.basename))
-            written = orig_metadata.write_xml_to_disk(metadata_file)
+            written = om[0].write_xml_to_disk(metadata_file, metadata_info)
             if written:
                 files.append(metadata_file)
-            
+                
+                    
         output = create_zip(os.path.join(basepath, '%s_xls.zip' % (self.basename)), files)
         
         return (0, 'success')
 
     #build the plain json (ogr generates geojson) without the geometry
     #it is effectively streaming the results
-    def build_json(self, basepath, mongo_uri):
+    def build_json(self, basepath, mongo_uri, metadata_info):
         #get the data
         gm = gMongo(mongo_uri)
 
@@ -618,13 +670,21 @@ class Dataset(Base):
         filename = os.path.join(basepath, '%s_json.zip' % (self.basename))
         files = [tmp_file]
         
-        #add a metadata file if there's any metadata to add
-        if self.original_metadata:
-            orig_metadata = self.original_metadata[0]
+#        #add a metadata file if there's any metadata to add
+#        if self.original_metadata:
+#            orig_metadata = self.original_metadata[0]
+#            metadata_file = '%s.json.xml' % (os.path.join(tmp_path, self.basename))
+#            written = orig_metadata.write_xml_to_disk(metadata_file)
+#            if written:
+#                files.append(metadata_file)
+        
+        om = [o for o in self.original_metadata if self.has_metadata_cache and o.original_xml_standard == metadata_info['standard']]
+        if om:
             metadata_file = '%s.json.xml' % (os.path.join(tmp_path, self.basename))
-            written = orig_metadata.write_xml_to_disk(metadata_file)
+            written = om[0].write_xml_to_disk(metadata_file, metadata_info)
             if written:
                 files.append(metadata_file)
+
 
         #create the zip file
         output = create_zip(filename, files)
@@ -635,7 +695,7 @@ class Dataset(Base):
 
         return (0, 'success')
 
-    def stream_vector(self, format, basepath, mongo_uri, epsg, baseurl=''):
+    def stream_vector(self, format, basepath, mongo_uri, epsg, metadata_info, baseurl=''):
         '''
         optimization to speed up the file generation, especially for large vector datasets  
 
@@ -653,7 +713,7 @@ class Dataset(Base):
 
         #send the excel off for processing
         if format == 'xls':
-            return self.build_excel(basepath, mongo_uri)    
+            return self.build_excel(basepath, mongo_uri, metadata_info)    
 
         fields = self.attributes
         encode_as = 'utf-8'
@@ -823,12 +883,19 @@ class Dataset(Base):
         #return (1, ','.join(files))
             
         #add a metadata file if there's any metadata to add
-        if self.original_metadata:
-            orig_metadata = self.original_metadata[0]
-            metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
-            written = orig_metadata.write_xml_to_disk(metadata_file)
+        om = [o for o in self.original_metadata if self.has_metadata_cache and o.original_xml_standard == metadata_info['standard']]
+        if om:
+            metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), fmt)
+            written = om[0].write_xml_to_disk(metadata_file, metadata_info)
             if written:
                 files.append(metadata_file)
+                        
+#        if self.original_metadata:
+#            orig_metadata = self.original_metadata[0]
+#            metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
+#            written = orig_metadata.write_xml_to_disk(metadata_file)
+#            if written:
+#                files.append(metadata_file)
 
         #create the zip file
         output = create_zip(filename, files)
