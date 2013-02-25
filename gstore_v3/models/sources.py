@@ -154,6 +154,15 @@ class MapfileSetting(Base):
     classes = relationship('MapfileClass', secondary='gstoredata.mapfile_settings_classes')
     styles = relationship('MapfileStyle', secondary='gstoredata.mapfile_settings_styles')
 
+#    def __init__(self, source_id, values):
+#        self.source_id = source_id
+#        #value = {'key': 'value', 'key': 'value'}
+#        self.settings = values
+
+    def __init__(self, values):
+        #value = {'key': 'value', 'key': 'value'}
+        self.settings = values
+
     def __repr__(self):
         return '<MapfileSetting (%s, %s)>' % (self.id, self.source_id)
 

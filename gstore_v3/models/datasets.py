@@ -472,7 +472,7 @@ class Dataset(Base):
             for fld in flds:
                 att = [a for a in atts if a['name'] == fld.name]
                 #convert it to the right type based on the field with string (and encoded to utf-8) as default
-                value = convert_by_ogrtype(att[0]['val'], fld.ogr_type) if att else ""
+                value = convert_by_ogrtype(att[0]['val'], fld.ogr_type, format) if att else ""
                 feature.SetField(str(fld.name), value)
 
             #TODO: check on the format (it's utc, but maybe we want a specific structure)   
@@ -579,7 +579,7 @@ class Dataset(Base):
                     value = unicode(va[0]['val']).encode('ascii', 'xmlcharrefreplace')
                  
                 #convert it to the right type based on the field with string as default
-                value = convert_by_ogrtype(value, att.ogr_type)
+                value = convert_by_ogrtype(value, att.ogr_type, 'xls')
 
                 worksheet.write(y, x, value)
                 x += 1
@@ -695,7 +695,7 @@ class Dataset(Base):
 
         return (0, 'success')
 
-    def stream_vector(self, format, basepath, mongo_uri, epsg, metadata_info, baseurl=''):
+    def stream_vector(self, format, basepath, mongo_uri, epsg, metadata_info):
         '''
         optimization to speed up the file generation, especially for large vector datasets  
 
@@ -718,7 +718,8 @@ class Dataset(Base):
         fields = self.attributes
         encode_as = 'utf-8'
 
-        fmt = 'gml' if format == 'shp' else format
+        #convert from the geojson to avoid the encoding issues (ignored chars, etc)
+        fmt = 'geojson' if format == 'shp' else format
 
         #gml generator
         #TODO: update kml/gml (+shp) to include observed field + values
@@ -741,7 +742,7 @@ class Dataset(Base):
                 folder_head = "<Folder><name>%s</name>" % (self.description)
                 folder_tail = "</Folder>"
 
-                schema_url = baseurl + '%s/attributes.kml' % (self.uuid)
+                schema_url = metadata_info['base_url'] + '%s/attributes.kml' % (self.uuid)
 
                 kml_flds = [{'type': ogr_to_kml_fieldtype(f.ogr_type), 'name': f.name} for f in fields]
                 kml_flds.append({'type': 'string', 'name': 'observed'})
@@ -809,7 +810,8 @@ class Dataset(Base):
             atts = vector['atts']
             #there's some wackiness with a unicode char and mongo (and also a bad char in the data, see fid 6284858)
             #convert atts to name, value tuples so we only have to deal with the wackiness once
-            atts = [(a['name'], unicode(a['val']).encode('ascii', 'xmlcharrefreplace')) for a in atts]
+#            atts = [(a['name'], unicode(a['val']).encode('ascii', 'xmlcharrefreplace')) for a in atts]
+            atts =[(a['name'], (a['val'].encode('ascii', 'xmlcharrefreplace') if fmt in ['kml', 'gml', 'csv'] else a['val'].encode('utf-8')) if isinstance(a['val'], str) else a['val']) for a in atts]
 
             #add the observed datetime for everything
             atts.append(('observed', obs))
@@ -817,7 +819,7 @@ class Dataset(Base):
             #TODO: add observed to kml/gml and field list (also double check attribute schema for kml for observed)
             if fmt == 'kml': 
                 #make sure we've encoded the value string correctly for kml
-                feature = "\n".join(["""<SimpleData name="%s">%s</SimpleData>""" % (v[0], re.sub(r'[^\x20-\x7E]', '', escape(str(v[1])))) for v in atts])
+                feature = "\n".join(["""<SimpleData name="%s">%s</SimpleData>""" % (v[0], v[1]) for v in atts])
 
                 #and no need for a schema url since it can be an internal schema linked by uuid here
                 feature = """<Placemark id="%s">
@@ -829,7 +831,8 @@ class Dataset(Base):
             elif fmt == 'gml':
                 #going to match the gml from the dataset downloader
                 #need a list of values as <ogr:{att name}>VAL</ogr:{att name}>
-                vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0], re.sub(r'[^\x20-\x7E]', '', escape(str(a[1]))), a[0]) for a in atts])
+                #vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0], re.sub(r'[^\x20-\x7E]', '', escape(str(a[1]))), a[0]) for a in atts])
+                vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0], a[1], a[0]) for a in atts])
                 feature = """<gml:featureMember><ogr:g_%(basename)s><ogr:geometryProperty>%(geom)s</ogr:geometryProperty>%(values)s</ogr:g_%(basename)s></gml:featureMember>""" % {
                         'basename': self.basename, 'geom': geom_repr, 'values': vals} 
             elif fmt == 'geojson':
@@ -839,14 +842,15 @@ class Dataset(Base):
             elif fmt == 'csv':
                 vals = []
                 for f in fields:
-                    att = [a for a in atts if a[0] == f.name]
-                    v = att[0][1] if att else ""
-                    vals.append(v)
+                    att = [a for a in atts if str(a[0]) == f.name]
+                    #this is, quite possibly, the stupidest thing ever. but it 'solves' the unicode error
+                    v = '%s' % att[0][1] if att else ""
+                    vals.append(v.encode('ascii', 'xmlcharrefreplace'))
                 vals += [str(fid), str(did), obs]
                 feature = ','.join(vals)
             elif fmt == 'json':
                 #no geometry, just attributes (good for timeseries requests)
-                vals = dict([(a[0], str(a[1])) for a in atts])
+                vals = dict([(a[0], ('%s' % a[1]).encode('ascii', 'xmlcharrefreplace') if isinstance(a[1], str) else a[1]) for a in atts])
                 feature = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals})
             else:
                 feature = ''
@@ -868,7 +872,7 @@ class Dataset(Base):
         if format == 'shp':
             #TODO: if we use this, change it back to the tmp folder and copy? 
             #convert it first
-            s = subprocess.Popen(['ogr2ogr', '-f', 'ESRI Shapefile', os.path.join(basepath, '%s.shp' % (self.basename)), tmp_file], shell=False)    
+            s = subprocess.Popen(['ogr2ogr', '-f', 'ESRI Shapefile', os.path.join(basepath, '%s.shp' % (self.basename)), tmp_file, '-lco', 'ENCODING=UTF-8'], shell=False)    
             status = s.wait()
             #note: the prj file should be generated already
             #TODO: add a spatial index

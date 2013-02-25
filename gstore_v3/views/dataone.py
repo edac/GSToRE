@@ -18,6 +18,7 @@ from ..models import DBSession, DataoneSession
 from ..models.datasets import (
     Dataset,
     )
+from ..models.metadata import DatasetMetadata
 from ..models.dataone import *
 from ..models.dataone_logs import DataoneLog
 
@@ -67,8 +68,39 @@ def dataone_to_datetime(dt):
     '''
     fmt = '%Y-%m-%dT%H:%M:%S'
     dt = dt.replace('+00:00', '') if '+00:00' in dt else dt
-    return datetime.strptime(dt, fmt)
+    try:
+        d = datetime.strptime(dt, fmt)
+    except:
+        d = None
+    return d
 
+#add some validation for the limit/offset - isn't null, is int, is positive
+def is_good_int(s, default):
+    if not s:
+        #not provided is okay, we have a default
+        return True, default
+    try:
+        i = int(s)
+
+        if i >= 0:
+            return True, i
+        else:
+            #it's negative, which we could replace with default, but let's fail as a bad request instead
+            return False, -99
+    except:
+        #it's not an integer, which we could replace with default, but let's fail as a bad request instead
+        return False, -99
+    ##not sure what this is, which we could replace with default, but let's fail as a bad request instead
+    return False, -99
+
+#this assumes that we care about anything that isn't a uuid? but the d1 tests will always be 404 anyway. i don't get it.
+#and they don't really explain what they expect as far as fails go.
+def is_valid_url(url):
+    try:
+        url = urllib2.unquote(url.decode('unicode_escape'))
+    except:
+        return False    
+    return True
 
 #some generic error handling 
 #that would be nicer if dataone was consistent in their error handling (or their documentation was consistent, i don't know which)
@@ -98,6 +130,7 @@ def log_entry(identifier, ip, event, useragent='public'):
         DataoneSession.rollback()
         raise
 
+#TODO: deal with the trailing slash situation (see init). d1 wants consistency across both no slash and slash responses.
 
 #TODO: modify the cache settings
 @view_config(route_name='dataone_ping', http_cache=3600, match_param='app=dataone')
@@ -114,12 +147,9 @@ def ping(request):
         d = get_dataset('61edaf94-2339-4096-9cc0-4bfb79a9c848')
     except:
         return HTTPServerError()
-    #if not d:
-        #return HTTPServerError()
-
-    #TODO: add check for insufficient resources (except we don't seem to know that)
-    #      (413)
-
+#   this isn't actually an error. it connected without failure so this is actually okay (especially if that uuid gets junked)        
+#    if not d:
+#        return HTTPServerError()
 
     return Response()
 
@@ -202,41 +232,58 @@ def log(request):
 
     '''
 
-    #TODO: check opn filters again (pidFilter not working??)
+    #TODO: check on filters again (pidFilter not working??)
 
+    #check the encoding
+    url = request.path_qs
+    good_encoding = is_valid_url(url)
+    if good_encoding == False:
+        return HTTPBadRequest()
 
     params = normalize_params(request.params)
+    params = decode_params(params)
 
-    offset = int(request.params.get('start')) if 'start' in request.params else 0
-    limit = int(request.params.get('count')) if 'count' in request.params else 1000
+    offset = params['start'] if 'start' in params else ''
+    limit = params['count'] if 'count' in params else ''
 
-    fromDate = request.params.get('fromdate') if 'fromdate' in request.params else ''
-    toDate = request.params.get('todate') if 'todate' in request.params else ''
+    is_good_offset, offset = is_good_int(offset, 0)
+    is_good_limit, limit = is_good_int(limit, 1000)
+
+    if not is_good_offset or not is_good_limit:
+        return HTTPBadRequest()
+
+    fromDate = params.get('fromdate') if 'fromdate' in params else ''
+    toDate = params.get('todate') if 'todate' in params else ''
 
     #return objects with pid that start with this string
-    pid_init = request.params.get('pidfilter') if 'pidfilter' in request.params else ''
+    pid_init = params.get('pidfilter') if 'pidfilter' in params else '' 
 
-    event = request.params.get('event') if 'event' in request.params else ''
+    event = params.get('event') if 'event' in params else ''
 
     #TODO: add the session request
 
     clauses = []
     if pid_init:
         clauses.append(DataoneLog.identifier.like(pid_init + '%'))
-
     if event:
         clauses.append(DataoneLog.event.like(event))
 
     if fromDate and not toDate:
         from_date = dataone_to_datetime(fromDate)
+        if not from_date:
+            return HTTPBadRequest()
         clauses.append(DataoneLog.logged>=from_date)
     elif not fromDate and toDate:
         to_date = dataone_to_datetime(toDate)
+        if not to_date:
+            return HTTPBadRequest()
         clauses.append(DataoneLog.logged<=to_date)
     elif fromDate and toDate:
         from_date = dataone_to_datetime(fromDate)
         to_date = dataone_to_datetime(toDate)
-        clauses.append(between(DataoneLog.logged, fromDate, toDate))
+        if not from_date or not to_date:
+            return HTTPBadRequest()
+        clauses.append(between(DataoneLog.logged, from_date, to_date))
            
 
     query = DataoneSession.query(DataoneLog).filter(and_(*clauses))
@@ -287,13 +334,26 @@ def search(request):
 
     '''
 
-    params = normalize_params(request.params)
+    #check the encoding
+    url = request.path_qs
+    good_encoding = is_valid_url(url)
+    if good_encoding == False:
+        return HTTPBadRequest()
 
-    offset = int(params.get('start')) if 'start' in params else 0
-    limit = int(params.get('count')) if 'count' in params else 1000
+    params = normalize_params(request.params)
+    params = decode_params(params)
+
+    offset = params.get('start') if 'start' in params else ''
+    limit = params.get('count') if 'count' in params else ''
+
+    is_good_offset, offset = is_good_int(offset, 0)
+    is_good_limit, limit = is_good_int(limit, 1000)
+
+    if not is_good_offset or not is_good_limit:
+        return HTTPBadRequest()
 
     fromDate = params.get('fromdate', '') 
-    toDate = request.params.get('todate', '') 
+    toDate = params.get('todate', '') 
 
     formatId = params.get('formatid', '')
 
@@ -326,19 +386,25 @@ def search(request):
         if fromDate and not toDate:
             #greater than from
             fd = dataone_to_datetime(fromDate)
+            if not fd:
+                return HTTPBadRequest()
             search_clauses.append(DataoneSearch.the_date >= fd)
         elif not fromDate and toDate:
             #less than to
             ed = dataone_to_datetime(toDate)
+            if not ed:
+                return HTTPBadRequest()
             search_clauses.append(DataoneSearch.the_date < ed)
         else:
             #between
             fd = dataone_to_datetime(fromDate)
             ed = dataone_to_datetime(toDate)
+            if not fd or not ed:
+                return HTTPBadRequest()
             search_clauses.append(between(DataoneSearch.the_date, fd, ed))
 
     if formatId:
-        formatId = urllib2.unquote(formatId)
+        #formatId = urllib2.unquote(formatId)
         search_clauses.append(DataoneSearch.format==formatId)
         
     #join to the core so we don't have to query for those later
@@ -385,6 +451,10 @@ def show(request):
     </error>
     '''
     pid = request.matchdict['pid']
+    try:
+        pid = urllib2.unquote(urllib2.unquote(pid).decode('unicode_escape'))
+    except:
+        return HTTPBadRequest()
     
     #go check in the obsolete table
     obsolete = DBSession.query(DataoneObsolete).filter(DataoneObsolete.obsolete_uuid==pid).first()
@@ -443,6 +513,10 @@ def head(request):
     '''
 
     pid = request.matchdict['pid']
+    try:
+        pid = urllib2.unquote(urllib2.unquote(pid).decode('unicode_escape'))
+    except:
+        return HTTPBadRequest()
 
     #go check in the obsolete table
     obsolete = DBSession.query(DataoneObsolete).filter(DataoneObsolete.obsolete_uuid==pid).first()
@@ -538,6 +612,10 @@ def metadata(request):
     </error>
     '''
     pid = request.matchdict['pid']
+    try:
+        pid = urllib2.unquote(urllib2.unquote(pid).decode('unicode_escape'))
+    except:
+        return HTTPBadRequest()
     
     #go check in the obsolete table
     obsolete = DBSession.query(DataoneObsolete).filter(DataoneObsolete.obsolete_uuid==pid).first()
@@ -587,8 +665,20 @@ def checksum(request):
     <checksum algorithm="SHA-1">2e01e17467891f7c933dbaa00e1459d23db3fe4f</checksum>
     '''
     pid = request.matchdict['pid']
+    try:
+        pid = urllib2.unquote(urllib2.unquote(pid).decode('unicode_escape'))
+    except:
+        return HTTPBadRequest()
 
-    algo = request.params.get('checksumAlgorithm', '')
+    url = request.path_qs
+    good_encoding = is_valid_url(url)
+    if good_encoding == False:
+        return HTTPBadRequest()
+
+    params = normalize_params(request.params)
+    params = decode_params(params)
+
+    algo = params.get('checksumalgorithm', '')
     if not algo:
         return HTTPNotFound()
 
@@ -605,7 +695,7 @@ def checksum(request):
     h = core_object.get_hash(algo, dataone_path)
     
     #TODO: double check output
-    #TODO: double-check list of hash algorithm terms
+    #TODO: double-check list of hash algorithm terms (plus - caps, no caps, what?)
     return Response('<checksum algorithm="%s">%s</checksum>' % (algo, h), content_type='application/xml')
 
 @view_config(route_name='dataone_error', request_method='POST', match_param='app=dataone')
@@ -716,16 +806,37 @@ def add_dataone_metadata(request):
     if not d:
         return HTTPBadRequest()
 
-    if not d.has_metadata_cache or not d.original_metadata or not d.original_metadata[0].original_xml:
+    #TODO: make sure this dataset has been registered as a D1 data object FIRST. and then use that to generate the correct onlinks
+    #      make sure a source object for this dataset is registered as a data object first and then use that source's dataset.
+    '''
+    FUTURE CHANGES
+
+    this assumes one metadata record per dataset, however D1 objects are registered as the source uuid NOT the dataset uuid
+    so we could be headed towards listing multiple source objects per dataset and the larger aggregate rdf deal.
+
+    to do that:
+    - 
+    '''
+    om = [o for o in d.original_metadata if o.original_xml_standard == standard]
+
+    if not d.has_metadata_cache or not om:
         return HTTPBadRequest()
 
     #TODO: UPDATE THIS FOR THE METADATA SCHEMA CHANGES SOMEDAY
+    #TODO: change this so that the version is not hardcoded
     load_balancer = request.registry.settings['BALANCER_URL']
-    base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
+    base_url = '%s/apps/dataone/v1/object' % load_balancer
 
     #get the xml and add the online linkages
-    orig_metadata = d.original_metadata[0]
-    xml = orig_metadata.append_onlink(base_url)
+    
+    #TODO: fix this if we register multiple formats/sources per dataset
+    #generate the onlink(s) for the associated dataset
+    #get dataset, get sources, get source in dataone table, get most recent obsolete_uuid for source
+    
+    #and the download link(s)
+
+    xslt_path = request.registry.settings['XSLT_PATH']
+    xml = om[0].transform('xml', xslt_path, {'base_url': base_url, 'app': 'dataone', 'standard': standard, 'dataone': {'onlinks': [], 'downloads': {}}})
     meta_id = orig_metadata.id
 
     #get the metadata object that we want
@@ -800,11 +911,15 @@ def add_dataone_vector(request):
         if source:
             #make a copy 
             source = source[0]
+            #TODO whatever this isn't doing
 #            xslt_path = request.registry.settings['XSLT_PATH']
 #            output = source.pack_source(dataone_path, '%s.zip' % (vector_uuid), xslt_path)
         else:   
 
-            outpath = os.path.join(FORMATS_PATH, d.uuid, format, '%s.%s.zip' % (d.uuid, format))
+            load_balancer = request.registry.settings['BALANCER_URL']
+            base_url = '%s/apps/%s/datasets/' % (load_balancer, d.apps_cache[0])
+
+            outpath = os.path.join(FORMATS_PATH, d.uuid, format, '%s_%s.zip' % (d.basename, format))
             if os.path.isfile(outpath):
                 #copy the file to dataone and rename
                 shutil.copyfile(outpath, datapath)
@@ -821,7 +936,7 @@ def add_dataone_vector(request):
                 mcoll = request.registry.settings['mongo_collection']
                 mongo_uri = gMongoUri(mconn, mcoll)
                 srid = int(request.registry.settings['SRID'])
-                success = d.build_vector(format, cachepath, mongo_uri, srid)
+                success = d.build_vector(format, cachepath, mongo_uri, srid, {'base_url': base_url, 'app': 'dataone', 'standard': 'fgdc'})
                 if success[0] != 0:
                     return HTTPServerError(success[1])
                 #and copy to dataone
@@ -865,6 +980,9 @@ def add_dataone_source(request):
 
     #check for the zipped source file in the dataone cache
     DATAONE_PATH = request.registry.settings['DATAONE_PATH']
+
+    load_balancer = request.registry.settings['BALANCER_URL']
+    base_url = '%s/apps/%s/datasets/' % (load_balancer, d.apps_cache[0])
     
     dataone_path = os.path.join(DATAONE_PATH, 'datasets')
     outfile = os.path.join(dataone_path, '%s.zip' % (source.uuid))
@@ -873,7 +991,7 @@ def add_dataone_source(request):
 
     #pack up the data
     xslt_path = request.registry.settings['XSLT_PATH']
-    output = source.pack_source(dataone_path, '%s.zip' % (source.uuid), xslt_path)
+    output = source.pack_source(dataone_path, '%s.zip' % (source.uuid), xslt_path, {'base_url': base_url, 'app': 'dataone', 'standard': 'fgdc'})
     
     return Response(json.dumps({'object_uuid': source.uuid, 'object_type': 'source', 'date_added': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}))
 
@@ -959,7 +1077,7 @@ def add_dataone_package(request):
     #build the rdf
     LOAD_BALANCER = request.registry.settings['BALANCER_URL']
     DATAONE_PATH = request.registry.settings['DATAONE_PATH']
-    base_url = '%s/apps/dataone' % LOAD_BALANCER
+    base_url = '%s/apps/dataone/v1' % LOAD_BALANCER
     rdfpath = os.path.join(DATAONE_PATH, 'packages')
     success = package_obj.build_rdf(rdfpath, base_url)
     if success != 'success':
@@ -1001,23 +1119,80 @@ def add_dataone_obsolete(request):
 def update_dataone_package(request):
     '''
     {
-        package_uuid
-        metadata_uuid (core_uuid for this metadata object IF MODIFIED)
-        dataobject_uuid (core_uuid for this metadata object IF MODIFIED)
+        object_uuid
+        object_type (vector/source or metadata)
     }
 
-    if metadata object or dataset object has been modified, go get the core object uuid
-    and add a new obsolete uuid for that core obj
+    get the package(s) for the object
 
-    then get core obj for package uuid and add a new obsolete uuid for that as well
+    add new obsolete for package core uuid 
 
-    finally overwrite the data package rdf (make sure that has the obsoleted by in it?)
-    
+    rewrite rdf for package(s)
+
+    NOTE: post the core uuid of the given object (if not a package) to obsoletes FIRST. this just 
+    rebuilds the rdf for any data package containing the data or metadata object
     '''
 
+    post_data = request.json_body
+    if 'object_uuid' not in post_data or 'object_type' not in post_data:
+        return HTTPBadRequest()
+
+    object_uuid = post_data['object_uuid']
+    object_type = post_data['object_type']
+
+    if object_type == 'metadata':
+        q = DataonePackage.metadata_object==object_uuid
+    elif object_type in ['source', 'vector']:
+        q = DataonePackage.dataset_object==object_uuid
+    elif object_type == 'package':
+        q = DataonePackage.package_uuid==object_uuid
+    else:
+        return HTTPBadRequest()
+
+    #rewrite FOR ANY PACKAGE THAT HAS THE OBJECT
+    packages = DBSession.query(DataonePackage).filter(q)
+
+    if not packages:
+        return HTTPBadRequest('unable to locate data package')
+
+    LOAD_BALANCER = request.registry.settings['BALANCER_URL']
+    DATAONE_PATH = request.registry.settings['DATAONE_PATH']
+    base_url = '%s/apps/dataone/v1' % (LOAD_BALANCER)
+    rdfpath = os.path.join(DATAONE_PATH, 'packages')
+
+    invalid_packages = []
+    for package in packages:
+        #NOTE: this assumes that the data/metadata object has been obsoleted PRIOR to running this and the trace is up-to-date
+        package_core_uuid = DBSession.query(DataoneCore).filter(and_(DataoneCore.object_uuid==package.package_uuid,DataoneCore.object_type=='package'))
+        if not package_core_uuid:
+            invalid_packages.append({"package": package.package_uuid, "error": "no core uuid"})
+            continue
+        package_core_uuid = package_core_uuid[0].dataone_uuid
+        obsolete_package = DataoneObsolete(package_core_uuid)
+        try:
+            DBSession.add(obsolete_package)
+            DBSession.commit()
+            DBSession.flush()
+            DBSession.refresh(obsolete_package)
+        except:
+            DBSession.rollback()
+            invalid_packages.append({"package": package.package_uuid, "error": "failed to register new obsolete"})
+            continue
+
+        #rewrite the rdf
+        success = package.build_rdf(rdfpath, base_url)
+        if success != 'success':
+            invalid_packages.append({"package": package.package_uuid, "error": "failed to write rdf"})
+            continue
+
+    output = {"errors": invalid_packages} if invalid_packages else {}
     
-    
-    return Response()
+    return Response(json.dumps(output))
+
+
+
+
+
 
 
 

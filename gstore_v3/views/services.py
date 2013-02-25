@@ -8,6 +8,9 @@ from email.parser import Parser
 from email.message import Message
 from urlparse import urlparse
 
+import urllib2
+import json
+
 #make we sure we have pil
 import Image
 import mapscript
@@ -94,6 +97,19 @@ def pack_multipart(parts, boundary):
 
     new_packet.append('%s--' % boundary)
     return '\n'.join(new_packet)
+
+
+def parse_tiff_response(content, content_type):
+    '''
+    this strips out just the tiff and returns the image 
+    JUST FOR TESTING THE WCS because the clients are sketchy at best
+    '''
+    parser = Parser()
+    parts = parser.parsestr("Content-type:%s\n\n%s" % (content_type, content.rstrip("--wcs--\n\n"))).get_payload()
+    for p in parts:
+        if isGeotiff(p.get_content_type()):
+            return p.get_payload(), p.items()
+    return None, None
 '''
 end wcs section
 '''
@@ -210,11 +226,13 @@ def getLayer(d, src, dataloc, bbox, metadata_description={}):
         layer.metadata.set('static', 'no')
         layer.metadata.set('annotation_name', '%s: %s' % (d.basename, d.dateadded))
         layer.metadata.set('wcs_label', 'imagery_wcs_%s' % (d.basename))
-        layer.metadata.set('wcs_formats', 'GTiff GEOTIFF_16 AAIGRID')
+        layer.metadata.set('wcs_formats', 'GTiff GEOTIFF_16')
+        #TODO: change the native format - not everything is a geotiff now
         #TODO: change the native format - not everything is a geotiff now
         layer.metadata.set('wcs_nativeformat', 'GTiff')
         layer.metadata.set('wcs_rangeset_name', d.basename)
         layer.metadata.set('wcs_rangeset_label', d.description)
+        
 
         '''
         for the dems:
@@ -236,6 +254,11 @@ def getLayer(d, src, dataloc, bbox, metadata_description={}):
             processing_directives = mapsettings.get_processing()
             for directive in processing_directives:
                 layer.setProcessing(directive)
+
+            if d.taxonomy == 'geoimage' and 'WCS-NODATA' in mapsettings.settings:
+                #add the wcs nullvalue flag
+                nodata = mapsettings.settings['WCS-NODATA']
+                layer.metadata.set('wcs_rangeset_nullvalue', nodata)
 
             mapclasses = mapsettings.classes if mapsettings.classes else None    
 
@@ -361,12 +384,16 @@ def generateService(mapfile, params, mapname=''):
 
     '''
 
+    #for the wcs tiff coverage tester ONLY because we want the mapserver wcs response
+    if request_type == 'gettiffcoverage':
+        params['request'] = 'getcoverage'
+
     #set up the params
     keys = params.keys()
     for k in keys:
-        req.setParameter(k.upper(), params[k])
-
-    #TODO add the featureinfo, getcoverage, getfeature bits
+        #this seems bad. for many reasons bad. but it decodes stuff
+        val = urllib2.unquote(urllib2.unquote(params[k]).decode('unicode_escape')) 
+        req.setParameter(k.upper(), val)
 
     fmt = params['format'] if 'format' in params else 'PNG'
 
@@ -421,6 +448,31 @@ def generateService(mapfile, params, mapname=''):
 #                content = parse_wcs_response(content, content_type)
 
             return Response(content, content_type=content_type)
+        elif request_type in ['gettiffcoverage']:
+            '''
+            prism example:
+
+            http://129.24.63.115/apps/epscor/datasets/1b063b4f-6368-45f0-87cd-f994cbcd31b7/services/ogc/wcs?SERVICE=WCS&REQUEST=GetTiffCoverage&Version=1.1.0&COVERAGE=us_tmin_1971_2000_05&FORMAT=image/tiff&CRS=EPSG:4326&BBOX=-125.021,24.0625,-66.4792,49.9375&HEIGHT=500&WIDTH=800
+    
+            '''
+
+            mapscript.msIO_installStdoutToBuffer()
+            mapfile.OWSDispatch(req)
+            content_type = mapscript.msIO_stripStdoutBufferContentType()
+            content = mapscript.msIO_getStdoutBufferBytes()
+            coverage = str(params['coverage']) if 'coverage' in params else 'output'
+            if 'multipart/mixed' in content_type:
+                tiff, headers = parse_tiff_response(content, content_type)
+                output_headers = {}
+                headers = [] if not headers else headers
+                for h in headers:
+                    if h[0].lower() not in ['content-disposition']:
+                        output_headers[h[0]] = str(h[1])
+                output_headers['Content-disposition'] = 'attachment; filename=%s.tif' % (coverage)
+                return Response(tiff, headers=output_headers)
+
+            #probably an error. neat.
+            return Response(content, content_type=content_type)
         else:
             return HTTPNotFound('Invalid OGC request')
     except Exception as err:
@@ -458,7 +510,7 @@ def datasets(request):
     #go get the dataset
     d = get_dataset(dataset_id)   
 
-    if not d:
+    if not d or d.inactive:
         return HTTPNotFound()
 
     if d.is_available == False:
@@ -485,11 +537,15 @@ def datasets(request):
         mconn = request.registry.settings['mongo_uri']
         mcoll = request.registry.settings['mongo_collection']
         mongo_uri = gMongoUri(mconn, mcoll)
+
+        metadata_info = {'app': app, 'base_url': base_url, 'standard': 'fgdc'}
     else:
         fmtpath = ''
         mongo_uri = None
-        
-    mapsrc, srcloc = d.get_mapsource(fmtpath, mongo_uri, int(srid)) # the source obj, the file path
+        metadata_info = None
+
+    #TODO: revise for new build_vector params (metadata!!!!)    
+    mapsrc, srcloc = d.get_mapsource(fmtpath, mongo_uri, int(srid), metadata_info) # the source obj, the file path
 
     #need both for a raster, but just the file path for the vector (we made it!)
     if ((not mapsrc or not srcloc) and d.taxonomy == 'geoimage') or (d.taxonomy == 'vector' and not srcloc):
@@ -957,6 +1013,9 @@ def mapper(request):
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/apps/%s/datasets/%s' % (load_balancer, app, d.uuid)
 
+    #TODO: add the load balancer url for the mapper and update the js (drop local_app_name and 
+    #      use the load_balancer value in the template)
+    #TODO: replace the integer ID with the UUID for future-proofing (if we're keeping this around)
     c = {'MEDIA_URL': media_url, 'AppId': app}    
 
     svcs = []

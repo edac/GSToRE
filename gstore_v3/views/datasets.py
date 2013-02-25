@@ -1,5 +1,6 @@
 from pyramid.view import view_config
 from pyramid.response import Response, FileResponse
+from pyramid.renderers import render_to_response
 from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError, HTTPBadRequest
 
 from sqlalchemy.exc import DBAPIError
@@ -8,7 +9,7 @@ from sqlalchemy.exc import DBAPIError
 from ..models import DBSession
 #from the generic model loader (like meta from gstore v2)
 from ..models.datasets import *
-from ..models.sources import Source, SourceFile
+from ..models.sources import Source, SourceFile, MapfileSetting
 from ..models.metadata import OriginalMetadata
 
 import os, json, re
@@ -189,13 +190,13 @@ def dataset(request):
         srid = int(request.registry.settings['SRID'])
 
         #for the original write to ogr directly build option
-        success = d.build_vector(format, cached_path, mongo_uri, srid, metadata_info)
+        #success = d.build_vector(format, cached_path, mongo_uri, srid, metadata_info)
 
         #for the new stream to ogr2ogr option (or just stream if not shapefile)
-#        load_balancer = request.registry.settings['BALANCER_URL']
-#        base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
+        load_balancer = request.registry.settings['BALANCER_URL']
+        base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
 #        TODO: don't forget the metadata_info HERE!
-#        success = d.stream_vector(format, cached_path, mongo_uri, srid, base_url)
+        success = d.stream_vector(format, cached_path, mongo_uri, srid, metadata_info)
 
         #check the response for failure
         if success[0] != 0:
@@ -392,8 +393,10 @@ def stream_dataset(request):
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.app_iter = yield_results()
     return response
+   
 
-@view_config(route_name='dataset_services', renderer='json')
+#@view_config(route_name='dataset_services', renderer='json')
+@view_config(route_name='dataset_services', renderer='dataset.mako')
 def services(request):
     #return .json (or whatever) with all services for dataset defined 
     #i.e. links to the ogc services, links to the downloads, etc
@@ -426,7 +429,7 @@ def services(request):
         epsg: 
         downloads: [] as {fmt: url}
         services: [] as {wxs: url}
-        metadata: [] as {standard: url}
+        metadata: [] as {standard: {fmt: url}}
     }
     '''
 
@@ -440,8 +443,13 @@ def services(request):
 
     rsp = d.get_full_service_dict(base_url, request)
 
-    return rsp
-
+    if format == 'json':
+        response = render_to_response('json', rsp, request=request)
+        response.content_type='application/json'
+        return response
+    elif format == 'html':
+        #TODO: split out into 2 html formats: one basic one for the kml and one complete nice looking one for everything else?
+        return rsp
 
 @view_config(route_name='dataset_statistics')
 def statistics(request):
@@ -514,13 +522,16 @@ def add_dataset(request):
                 'mimetype':
                 'identifier':
                 'identifier_type':
-                'files': []
+                'files': [],
+                'settings': {'basic': {'WCS-NODATA': 'some value'}, 'classes': {'class': {style stuff here}}}
                 
             }
         ]
     }
 
     '''
+
+    #TODO: finish the settings insert (class & style)
 
     #get the data as json
     post_data = request.json_body
@@ -629,10 +640,20 @@ def add_dataset(request):
         s.is_external = external
         s.active = True
 
+        settings = src['settings'] if 'settings' in src else {}
+
         files = src['files']
         for f in files:
             sf = SourceFile(f)
             s.src_files.append(sf)
+
+        #TODO: finish implementing the settings (classes, styles)
+        if settings and 'basic' in settings:
+            new_settings = {}
+            for key in settings['basic'].iterkeys():
+                new_settings.update({str(key): str(settings['basic'][key])})
+            new_settings = MapfileSetting(new_settings)
+            s.map_settings.append(new_settings)
 
         new_dataset.sources.append(s)        
 

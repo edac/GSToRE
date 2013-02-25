@@ -28,9 +28,10 @@ from ..lib.utils import normalize_params, convert_timestamp, get_single_date_cla
 search
 '''
 #return the category tree
-@view_config(route_name='search', match_param='resource=categories', renderer='json')
-@view_config(route_name='search', match_param='resource=datasets', request_param='categories=1', renderer='json')
+@view_config(route_name='search_categories', renderer='json')
+#@view_config(route_name='search', match_param='resource=datasets', request_param='categories=1', renderer='json')
 def search_categories(request):
+    #TODO: allow other formats (kml, etc) 
     #IT IS POST FROM RGIS FOR SOME REASON
     #get the starting location for the tree
     #root OR Census Data OR Census Data__|__2008 TIGER
@@ -79,12 +80,12 @@ def search_categories(request):
             #and use the any() for datasets to make sure that we don't pull any empty category sets (also with inactive check just in case 2003 color cir)
             cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any(Dataset.inactive==False))).distinct(Category.subtheme).order_by(Category.subtheme.asc()) 
 
-            resp = {"total": 0, "results": [{"text": c.subtheme, "leaf": False, "id": '%s__|__%s' % (c.theme, c.subtheme)} for c in cats]}
+            resp = {"total": cats.count(), "results": [{"text": c.subtheme, "leaf": False, "id": '%s__|__%s' % (c.theme, c.subtheme)} for c in cats]}
         elif len(parts) == 2:
             #clicked on the subtheme
             cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any(Dataset.inactive==False))).filter(Category.subtheme==parts[1]).order_by(Category.groupname.asc()) 
 
-            resp = {"total": 0, "results": [{"text": c.groupname, "leaf": True, "id": '%s__|__%s__|__%s' % (c.theme, c.subtheme, c.groupname), "cls": "folder"} for c in cats]}
+            resp = {"total": cats.count(), "results": [{"text": c.groupname, "leaf": True, "id": '%s__|__%s__|__%s' % (c.theme, c.subtheme, c.groupname), "cls": "folder"} for c in cats]}
         else:
             #clicked on the groupname or something
             #return nothing right now, it isn't meaningful
@@ -94,13 +95,14 @@ def search_categories(request):
     else:
         #just pull all of the categories for the app
         cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.datasets.any(Dataset.inactive==False))).distinct(Category.theme).order_by(Category.theme.asc()).order_by(Category.subtheme.asc()).order_by(Category.groupname.asc()) 
-        resp = {"total": 0, "results": [{"text": c.theme, "leaf": False, "id": c.theme} for c in cats]}
+        resp = {"total": cats.count(), "results": [{"text": c.theme, "leaf": False, "id": c.theme} for c in cats]}
 
     return resp
 
 #return datasets
 #TODO: maybe not renderer - firefox open with?   
-@view_config(route_name='search', match_param='resource=datasets', renderer='json')
+#@view_config(route_name='search', match_param='resource=datasets', renderer='json')
+@view_config(route_name='search_datasets')
 def search_datasets(request):
     '''
     PARAMS:
@@ -126,6 +128,7 @@ def search_datasets(request):
     /search/datasets.json?query=property&offset=0&sort=lastupdate&dir=desc&limit=15&theme=Boundaries&subtheme=General&groupname=New+Mexico
     '''
 
+    ext = request.matchdict['ext']
     app = request.matchdict['app']
 
     params = normalize_params(request.params)
@@ -334,10 +337,24 @@ def search_datasets(request):
     #NOTE: calls to get_current_registry during the app_iter yield part returns NONE so there's an error and we can't get what we need
     head = """{"total": %s, "results": [""" % (total)
     tail = ']}'
+    
+
+    if ext=='kml':
+        head = """<?xml version="1.0" encoding="UTF-8"?>
+                        <kml xmlns="http://earth.google.com/kml/2.2">
+                        <Document>"""
+        tail = """\n</Document>\n</kml>"""
+        folder_head = "<Folder><name>Search Results</name>"
+        folder_tail = "</Folder>"
+        field_set = """<Schema name="searchFields"><SimpleField type="string" name="DatasetUUID"><displayName>Dataset UUID</displayName></SimpleField><SimpleField type="string" name="DatasetName"><displayName>Dataset Name</displayName></SimpleField><SimpleField type="string" name="Category"><displayName>Category</displayName></SimpleField><SimpleField type="string" name="DatasetServices"><displayName>Dataset Information</displayName></SimpleField></Schema>"""
 
     subtotal = datas.count()
     if subtotal < 1:
-        return {"total": 0, "results": []}
+        if format == 'json':
+            return {"total": 0, "results": []}
+        else:
+            #TODO: return empty kml set
+            return Response()
     limit = subtotal if subtotal < limit else limit
     
     def yield_results():
@@ -418,16 +435,72 @@ def search_datasets(request):
                 cnt += 1
                 yield to_yield                    
 
+    def yield_kml():
+        '''
+        geometry = bbox
+        description = html chunk with description, link to services.html(?), downloads, services?, metadata, some other stuff
+
+        point test = http://129.24.63.115/apps/rgis/search/datasets.kml?theme=Climate&subtheme=SNOTEL&limit=100
+        polygon test = http://129.24.63.115/apps/rgis/search/datasets.kml?theme=Boundaries&limit=50
+        '''
+        yield head
+
+        cnt = 0
+
+        for ds in datas:
+            kml = build_kml(ds)
+
+            if cnt == 0:
+                kml = folder_head + field_set + kml + '\n'
+            elif cnt == limit - 1:
+                kml += folder_tail
+            else:
+                kml += '\n'
+
+            cnt += 1
+            yield kml.encode('utf-8')
+        yield tail      
+        
+
+    def build_kml(d):
+        bbox = [float(b) for b in d.box]
+        geom = d.geom
+        if not check_for_valid_extent(bbox):
+            #the extent area == 0, it's a point so let's just use the point
+            geom = wkt_to_geom('POINT (%s %s)' % (bbox[0], bbox[1]), 4326)
+            geom = geom_to_wkb(geom)
+        geom_repr = wkb_to_output(geom, 4326, 'kml')
+
+        rst = d.get_full_service_dict(base_url, request)
+        
+        flds = """<SimpleData name="DatasetUUID">%s</SimpleData><SimpleData name="DatasetName">%s</SimpleData><SimpleData name="Category">%s</SimpleData><SimpleData name="DatasetServices">%s</SimpleData>""" % (d.uuid, d.description.replace('&', '&amp;') if '&amp;' not in d.description else d.description, rst['categories'][0]['theme'] + ' | ' + rst['categories'][0]['subtheme'] + ' | ' + rst['categories'][0]['groupname'], '/'.join([base_url, d.uuid, 'services.json']))
+        
+        feature = """<Placemark id="%s">
+                    <name>%s</name>
+                    <TimeStamp><when>%s</when></TimeStamp>
+                    %s\n
+                    <ExtendedData><SchemaData schemaUrl="#searchFields">%s</SchemaData></ExtendedData>
+                    <Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+                    </Placemark>""" % (d.id, d.description.replace('&', '&amp;') if '&amp;' not in d.description else d.description, d.dateadded.strftime('%Y-%m-%d'), geom_repr, flds)
+                    
+        return feature
+
     response = Response()
-    response.content_type = 'application/json'
-    response.app_iter = yield_results()
+    if ext == 'json':
+        response.content_type = 'application/json'
+        response.app_iter = yield_results()
+    elif ext == 'kml':
+        response.content_type = 'application/vnd.google-earth.kml+xml; charset=UTF-8'
+        response.app_iter = yield_kml()
+    else:
+        return HTTPNotFound()
     return response
 
 
 #TODO: finish this
 #return fids for the features that match the params
 #this is NOT the streamer (see views.features)
-@view_config(route_name='search', match_param='resource=features', renderer='json')
+@view_config(route_name='search_features', renderer='json')
 def search_features(request):
     '''
     return a listing of fids that match the filters (for potentially some interface later or as an option to the streamer)
@@ -598,7 +671,7 @@ def search_features(request):
 #NOTE: we chucked the geolookups structure completely to just keep a cleaner url moving forward.
 whats = ["nm_counties", "nm_gnis", "nm_quads"]
 #return geolookup data
-@view_config(route_name='search', renderer='json')
+@view_config(route_name='search_geolookups', renderer='json')
 def search(request):
     '''
     quad = /search/geolookups.json?query=albuquer&layer=nm_quads&limit=20
@@ -606,7 +679,7 @@ def search(request):
 
     current working request = http://129.24.63.66/gstore_v3/apps/rgis/search/nm_quads.json?query=albu
     '''
-    geolookup = request.matchdict['resource']
+    geolookup = request.matchdict['geolookup']
     if geolookup not in whats:
         return HTTPNotFound()
 

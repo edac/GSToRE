@@ -63,6 +63,14 @@ def any_standard(segment_name, *allowed):
     return predicate
 standardslist = any_standard('standard', 'fgdc', 'iso', 'dc')
 
+#check for the geolookup type 
+def any_geolookup(segment_name, *allowed):
+    def predicate(info, request):
+        if info['match'][segment_name] in allowed:
+            return True
+    return predicate
+geolookuplist = any_type('geolookup', 'nm_counties', 'nm_quads', 'nm_gnis')
+
 #TODO: check for version query param as custom predicate 
 #def any_version():
 #versionlist = any_version('version', 2, 3)
@@ -94,6 +102,8 @@ def main(global_config, **settings):
 #    config.add_route('test_fidsearch', '/test/mongo')
 #    config.add_route('test_insert', '/test/insert')
 #    config.add_route('test_bulkinsert', '/test/chunk/{id}/{amount}')
+
+    #config.add_route('test_urlencoding', '/test/encoder/{test}')
     
     #to the attributes
     config.add_route('attributes', '/apps/{app}/attributes/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
@@ -122,7 +132,10 @@ def main(global_config, **settings):
     config.add_route('xlink_metadata', '/apps/{app}/metadata/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
 
 #to the search
-    config.add_route('search', '/apps/{app}/search/{resource}.json', custom_predicates=(applist,))
+    config.add_route('search_datasets', '/apps/{app}/search/datasets.{ext}', custom_predicates=(applist,))
+    config.add_route('search_features', '/apps/{app}/search/features.json', custom_predicates=(applist,))
+    config.add_route('search_geolookups', '/apps/{app}/search/{geolookup}.json', custom_predicates=(applist,geolookuplist,))
+    config.add_route('search_categories', '/apps/{app}/search/categories.json', custom_predicates=(applist,))
 
 #to ogc services (datasets | tile indexes)
     #for the base layers

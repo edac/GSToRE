@@ -24,6 +24,7 @@ _FORMATS = {
 }
 
 
+#TODO: check on the encoding (html encoding for title, etc)
 class FGDC():
     '''
     intermediate fgdc object to handle the modifications 
@@ -58,8 +59,8 @@ class FGDC():
         '''
         title = self.xml.find('idinfo/citation/citeinfo/title')
         if title is None:
-            raise Exception()
-        title.text = dataset_description
+            return ''
+        title.text = dataset_description.replace('&', '&amp;') if '&amp;' not in dataset_description and '&' in dataset_description else dataset_description
 
     def update_onlinks(self, onlinks):
         '''
@@ -68,7 +69,7 @@ class FGDC():
         '''
         citation = self.xml.find('idinfo/citation/citeinfo')
         if citation is None:
-            raise Exception()
+            return ''
         
         #chuck any bad ones or any existing gstore ones
         #TODO: change to chuck any onlinks from the HOST 
@@ -98,7 +99,7 @@ class FGDC():
         '''
         distinfo = self.xml.find('distinfo')
         if distinfo is None:
-            raise Exception()
+            return ''
             
         for child in distinfo:
             distinfo.remove(child)
@@ -142,7 +143,7 @@ class FGDC():
         '''
         metc = self.xml.find('metainfo/metc')
         if metc is None:
-            raise Exception()
+            return ''
         
         for child in metc:
             metc.remove(child)

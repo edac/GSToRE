@@ -90,10 +90,16 @@ def ogr_to_kml_fieldtype(ogr_type):
         return 'string'
     pass
 
+def encode_as_ascii(s):
+    return s.encode('ascii', 'xmlcharrefreplace')
+
 #convert to python by ogr_type
 #probably want to make sure it's not null and not nodata (as defined by the attribute)
 #and convert to str before encoding in case it is nodata
-def convert_by_ogrtype(value, ogr_type, datefmt=''):
+def convert_by_ogrtype(value, ogr_type, fmt='', datefmt=''):
+    '''
+    TODO: maybe also  (u'Pe<n with a tilde>asco CCD').encode('iso-8859-1') but xml replace for kml/gml (any xml format)?
+    '''
     if not value:
         #do nothing
         return ''
@@ -101,25 +107,27 @@ def convert_by_ogrtype(value, ogr_type, datefmt=''):
         try :
             return int(value)
         except:
-            return str(value).encode('utf-8')
+            #return value
+            pass
     if ogr_type == ogr.OFTReal:
         try:
             return float(value)
         except:
-            return str(value).encode('utf-8')
+            #return value
+            pass
     if ogr_type == ogr.OFTDateTime:
         #no expected format, no datetime
-        if not datefmt:
-            return value
-        try:
-            #try to parse
-            return datetime.strptime(value, datefmt)
-        except:
-            return str(value).encode('utf-8')
-    return str(value).encode('utf-8')
+#        if not datefmt:
+#            return value
+        if datefmt:
+            try:
+                #try to parse
+                return datetime.strptime(value, datefmt)
+            except:
+                #return value
+                pass
+    return encode_as_ascii(value) if fmt in ['kml', 'gml', 'shp'] else value.encode('utf-8')
 
-
-#unicode(a['val']).encode('ascii', 'xmlcharrefreplace'))
 
 '''
 transformations & reprojections

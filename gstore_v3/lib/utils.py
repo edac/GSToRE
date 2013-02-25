@@ -7,6 +7,7 @@ from sqlalchemy.sql import between
 from datetime import datetime
 
 import uuid
+import urllib2
 
 
 '''
@@ -107,6 +108,15 @@ def normalize_params(params):
         new_params[k.lower()] = params[k]
     return new_params 
 
+'''
+decode a params dict
+for dataone? see dataone view for all the ways they baffle me
+'''
+def decode_params(params):
+    new_params = {}
+    for k in params.keys():
+        new_params[urllib2.unquote(urllib2.unquote(k.lower()).decode('unicode_escape'))] = urllib2.unquote(urllib2.unquote(params[k]).decode('unicode_escape')) 
+    return new_params
 
 '''
 datetime utils
