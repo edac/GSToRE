@@ -295,7 +295,7 @@ def search_datasets(request):
 
     total = query.count()
     if total < 1:
-        return {"total": 0, "results": []}
+        return Response(json.dumps({"total": 0, "results": []}), content_type = 'application/json')
 
     #add the georelevance bit to the results so we don't calculate it for everything we don't need
     if has_georel:
