@@ -625,6 +625,8 @@ def add_dataset(request):
     if metadatas:
         o = OriginalMetadata()
         o.original_xml = metadatas
+        #TODO: update this for actually setting it in the json
+        o.original_xml_standard = 'fgdc'
         new_dataset.original_metadata.append(o)
 
     #add the sources to sources
