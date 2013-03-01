@@ -91,7 +91,7 @@ def ogr_to_kml_fieldtype(ogr_type):
     pass
 
 def encode_as_ascii(s):
-    return s.encode('ascii', 'xmlcharrefreplace')
+    return ('%s' % s).encode('ascii', 'xmlcharrefreplace')
 
 #convert to python by ogr_type
 #probably want to make sure it's not null and not nodata (as defined by the attribute)
@@ -126,7 +126,7 @@ def convert_by_ogrtype(value, ogr_type, fmt='', datefmt=''):
             except:
                 #return value
                 pass
-    return encode_as_ascii(value) if fmt in ['kml', 'gml', 'shp'] else value.encode('utf-8')
+    return encode_as_ascii(value) if fmt in ['kml', 'gml', 'shp'] else value
 
 
 '''
