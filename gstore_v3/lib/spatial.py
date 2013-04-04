@@ -7,6 +7,8 @@ from TileCache.Layers import WMS as WMS
 
 from pyramid.wsgi import wsgiapp
 
+from xml.sax.saxutils import escape, unescape
+
 '''
 the ogr field constants
 '''
@@ -126,8 +128,16 @@ def convert_by_ogrtype(value, ogr_type, fmt='', datefmt=''):
             except:
                 #return value
                 pass
-    return encode_as_ascii(value) if fmt in ['kml', 'gml', 'shp'] else value
-
+    #it's just a string
+    value = encode_as_ascii(value) if fmt in ['kml', 'gml', 'csv'] else value.encode('utf-8')
+    
+    #and do one last check for kml, gml & ampersands
+    value = escape(unescape(value)) if fmt in ['kml', 'gml'] else value
+    
+    #wrap the string in double-quotes if it's a csv 
+    #TODO: change the csv handling to something else
+    value = '"%s"' % value if fmt in ['csv'] and ',' in value else value
+    return value
 
 '''
 transformations & reprojections

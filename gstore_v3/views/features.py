@@ -596,6 +596,12 @@ def add_feature(request):
         y:
     }
     where x, y at lon, lat in wgs84 and we just make the geom here
+
+
+    or FOR BULK INSERTS:
+    {
+        features: [{gid: , geom: , epsg: }, ...]
+    }
     '''
     dataset_id = request.matchdict['id']
     the_dataset = get_dataset(dataset_id)
@@ -604,32 +610,51 @@ def add_feature(request):
 
     post_data = request.json_body
 
-    if ('geom' not in post_data and 'x' not in post_data and 'y' not in post_data) or not 'gid' in post_data:
-        return HTTPBadRequest()
+    if 'gid' not in post_data and 'features' not in post_data:
+        return HTTPBadRequest('invalid feature: no gid')
 
-    
-    gid = int(post_data['gid'])
-    geom = post_data['geom'] if 'geom' in post_data else ''
-    x = post_data['x'] if 'x' in post_data else ''
-    y = post_data['y'] if 'y' in post_data else ''
+    if 'geom' not in post_data and ('x' not in post_data and 'y' not in post_data) and 'features' not in post_data:
+        return HTTPBadRequest('invalid geometry')
 
-    if x and y:
-        geom = wkt_to_geom('POINT (%s %s)' % (x, y), 4326)
-        geom = geom_to_wkb(geom)
+    if 'features' in post_data:
+        #bulk insert
+        geoms_to_post = post_data['features']
+    else:
+        gid = int(post_data['gid'])
+        geom = post_data['geom'] if 'geom' in post_data else ''
+        x = post_data['x'] if 'x' in post_data else ''
+        y = post_data['y'] if 'y' in post_data else ''
+
+        if x and y:
+            geom = wkt_to_geom('POINT (%s %s)' % (x, y), 4326)
+            geom = geom_to_wkb(geom)
+
+        geoms_to_post = [{"gid": gid, "geom": geom, "epsg": 4326}]
 
     #TODO: add something for the epsg reprojection, if we want that
 
-    feature = Feature(gid, geom, the_dataset.id)
+
+    features_to_post = []
+    for geom_to_post in geoms_to_post:
+        feature = Feature(int(geom_to_post['gid']), geom_to_post['geom'], the_dataset.id)
+        features_to_post.append(feature)
 
     try:
-        DBSession.add(feature)
+        DBSession.add_all(features_to_post)
         DBSession.commit()
         DBSession.flush()
-        DBSession.refresh(feature)
     except Exception as err:
-        return HTTPServerError(err)
+        DBSession.rollback()
+        return HTTPServerError(err)    
 
-    return {'fid': feature.fid, 'uuid': feature.uuid, 'gid': gid}
+    if len(features_to_post) > 1:
+        output = []
+        for feature in features_to_post:
+            output.append({"fid": feature.fid, "uuid": feature.uuid, "gid": feature.gid, "dataset": feature.dataset_id})
+        return {"features": output}
+    else:
+        return {"fid": feature.fid, "uuid": feature.uuid, "gid": feature.gid, "dataset": feature.dataset_id}
+    #return {'fid': feature.fid, 'uuid': feature.uuid, 'gid': gid}
 
 @view_config(route_name='add_feature_attributes', request_method='POST', renderer='json')
 def add_attributes(request):
@@ -768,8 +793,7 @@ def add_attributes(request):
         #sets so we're running them in batches
         #but this limit is arbitrary (i just picked one based on not very much)
         limit = 5000
-        #NOTE: also, this is not enough to prevent the bulk insert from bonking. really big vectors (big geometries + 
-        #      boatloads of attributes) will need to be posted in chunks
+        
         for i in range(0, len(inserts), limit):
             j = i + limit if i + limit < len(inserts) else len(inserts)
             inserts_to_post = inserts[i:j]

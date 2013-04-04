@@ -2,7 +2,7 @@
 <d1:systemMetadata xmlns:d1="http://ns.dataone.org/service/types/v1">
     <serialVersion>1</serialVersion>
     <identifier>${pid}</identifier>
-    <objectFormat>${obj_format}</objectFormat>
+    <formatId>${obj_format}</formatId>
     <size>${file_size}</size>
     <checksum algorithm="${hash_type}">${hash}</checksum>
     <submitter>uid=${uid},o=${o},dc=${dc},dc=${org}</submitter>

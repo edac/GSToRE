@@ -39,10 +39,10 @@ see http://mule1.dataone.org/ArchitectureDocs-current/apis/MN_APIs.html
 some presets
 '''
 #TODO: move to config?
-NODE = 'urn:node:EDAC-GSTORE'
-SUBJECT = 'CN=EDAC-GSTORE,DC=dataone,DC=org'
-RIGHTSHOLDER = 'CN=EDAC-GSTORE,DC=dataone,DC=org'
-CONTACTSUBJECT = 'CN=EDAC-GSTORE,DC=dataone,DC=org'
+NODE = 'urn:node:EDACGSTORE'
+SUBJECT = 'CN=EDACGSTORE,DC=dataone,DC=org'
+RIGHTSHOLDER = 'CN=EDACGSTORE,DC=dataone,DC=org'
+CONTACTSUBJECT = 'CN=EDACGSTORE,DC=dataone,DC=org'
 NAME = ''
 DESCRIPTION = ''
 
@@ -63,15 +63,23 @@ def datetime_to_http(dt):
 def dataone_to_datetime(dt):
     #TODO: deal with more datetime issues (could be gmt or utc, with or without milliseconds)
     '''
-    YYYY-MM-DDTHH:MM:SS.mmm
-    YYYY-MM-DDTHH:MM:SS.mmm+00:00
+    YYYY-MM-DDTHH:MM:SS:mm.fff
+    YYYY-MM-DDTHH:MM:SS:mm.fff+00:00
     '''
-    fmt = '%Y-%m-%dT%H:%M:%S'
+
+    fmts = ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%S.%f']
+
+    
+    #fmt = '%Y-%m-%dT%H:%M:%S'
     dt = dt.replace('+00:00', '') if '+00:00' in dt else dt
-    try:
-        d = datetime.strptime(dt, fmt)
-    except:
-        d = None
+
+    d = None
+    for fmt in fmts:
+        try:
+            d = datetime.strptime(dt, fmt)
+        except:
+            #d = None
+            pass
     return d
 
 #add some validation for the limit/offset - isn't null, is int, is positive
@@ -99,21 +107,40 @@ def is_valid_url(url):
     try:
         url = urllib2.unquote(url.decode('unicode_escape'))
     except:
-        return False    
-    return True
+        return False
+    return True    
+
+def is_valid_uuid(u):
+    pattern = '[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}'
+    return match_pattern(pattern, u)
 
 #some generic error handling 
 #that would be nicer if dataone was consistent in their error handling (or their documentation was consistent, i don't know which)
 def return_error(error_type, detail_code, error_code, error_message='', pid=''):  
     if error_code == 404 and error_type == 'object':
-        xml = '<?xml version="1.0" encoding="UTF-8"?><error detailCode="%s" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: DOESNTEXIST</description></error>' % (detail_code, error_code)
+        xml = '<?xml version="1.0" encoding="UTF-8"?><error detailCode="%s" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: DOESNTEXIST</description></error>' % (detail_code)
         return Response(xml, content_type='text/xml; charset=UTF-8', status='404')
 
     elif error_code == 404 and error_type == 'metadata':
         xml = '<?xml version="1.0" encoding="UTF-8"?><error detailCode="%s" errorCode="404"><description>No system metadata could be found for given PID: %s</description></error>' % (detail_code, pid)
         return Response(xml, content_type='text/xml; charset=UTF-8', status='404')
+    elif error_code == 400:
+        error_message = error_message if error_message else 'Invalid Request'
+        xml = '<?xml version="1.0" encoding="UTF-8"?><error detailCode="%s" errorCode="400"><description>%s</description></error>' % (detail_code, error_message)
+        return Response(xml.encode('utf-8'), content_type='text/xml; charset=UTF-8', status='400')
 
+    elif error_code == 501:
+        xml = '<?xml version="1.0" encoding="UTF-8"?><error detailCode="1001" errorCode="501"><description>Not implemented</description></error>'
+        return Response(xml, content_type='text/xml; charset=UTF-8', status='501')
     return Response()
+
+def return_error_head(pid):
+    return [('Content-Type', 'text/xml'), 
+               ('DataONE-Exception-Name', 'NotFound'), 
+               ('DataONE-Exception-DetailCode', '1380'), 
+               ('DataONE-Exception-Description', 'The specified object does not exist on this node.'),
+               ('DataONE-Exception-PID', ('%s' % pid).encode('utf-8'))]
+    
 '''
 dataone logging in mongodb
 '''
@@ -133,8 +160,8 @@ def log_entry(identifier, ip, event, useragent='public'):
 #TODO: deal with the trailing slash situation (see init). d1 wants consistency across both no slash and slash responses.
 
 #TODO: modify the cache settings
-@view_config(route_name='dataone_ping', http_cache=3600, match_param='app=dataone')
-@view_config(route_name='dataone_ping_slash', http_cache=3600, match_param='app=dataone')
+@view_config(route_name='dataone_ping', http_cache=3600)
+@view_config(route_name='dataone_ping_slash', http_cache=3600)
 def ping(request):
     #curl -v  http://129.24.63.66/gstore_v3/apps/dataone/monitor/ping
     
@@ -153,12 +180,18 @@ def ping(request):
 
     return Response()
 
-@view_config(route_name='dataone_noversion', renderer='../templates/dataone_node.pt', match_param='app=dataone')
-@view_config(route_name='dataone_noversion_slash', renderer='../templates/dataone_node.pt', match_param='app=dataone')	
-@view_config(route_name='dataone', renderer='../templates/dataone_node.pt', match_param='app=dataone')
-@view_config(route_name='dataone_slash', renderer='../templates/dataone_node.pt', match_param='app=dataone')
-@view_config(route_name='dataone_node', renderer='../templates/dataone_node.pt', match_param='app=dataone')
-@view_config(route_name='dataone_node_slash', renderer='../templates/dataone_node.pt', match_param='app=dataone')
+#@view_config(route_name='dataone_noversion', renderer='../templates/dataone_node.pt', match_param='app=dataone')
+#@view_config(route_name='dataone_noversion_slash', renderer='../templates/dataone_node.pt', match_param='app=dataone')	
+#@view_config(route_name='dataone', renderer='../templates/dataone_node.pt', match_param='app=dataone')
+#@view_config(route_name='dataone_slash', renderer='../templates/dataone_node.pt', match_param='app=dataone')
+#@view_config(route_name='dataone_node', renderer='../templates/dataone_node.pt', match_param='app=dataone')
+#@view_config(route_name='dataone_node_slash', renderer='../templates/dataone_node.pt', match_param='app=dataone')
+@view_config(route_name='dataone_noversion', renderer='../templates/dataone_node.pt')
+@view_config(route_name='dataone_noversion_slash', renderer='../templates/dataone_node.pt')	
+@view_config(route_name='dataone', renderer='../templates/dataone_node.pt')
+@view_config(route_name='dataone_slash', renderer='../templates/dataone_node.pt')
+@view_config(route_name='dataone_node', renderer='../templates/dataone_node.pt')
+@view_config(route_name='dataone_node_slash', renderer='../templates/dataone_node.pt')
 def dataone(request):
     '''
     system metadata about the member node
@@ -189,10 +222,12 @@ def dataone(request):
 
 
     load_balancer = request.registry.settings['BALANCER_URL']
-    base_url = '%s/apps/dataone/v1/' % (load_balancer)
+    base_url = '%s/dataone/v1/' % (load_balancer)
 
     #set up the dict
-    rsp = {'name': 'GSTORE Node',
+    rsp = {
+           'node': NODE,
+           'name': 'GSTORE Node',
            'description': 'DATAONE member node for GSTORE (EDAC)',
            'baseUrl': base_url,
            'subject': SUBJECT,
@@ -202,8 +237,10 @@ def dataone(request):
     return rsp
 
 #, renderer='dataone_logs.mako'
-@view_config(route_name='dataone_log', match_param='app=dataone')
-@view_config(route_name='dataone_log_slash', match_param='app=dataone')
+#@view_config(route_name='dataone_log', match_param='app=dataone')
+#@view_config(route_name='dataone_log_slash', match_param='app=dataone')
+@view_config(route_name='dataone_log')
+@view_config(route_name='dataone_log_slash')
 def log(request):
     '''
     <?xml version="1.0" encoding="UTF-8"?>
@@ -238,7 +275,7 @@ def log(request):
     url = request.path_qs
     good_encoding = is_valid_url(url)
     if good_encoding == False:
-        return HTTPBadRequest()
+        return return_error('object', 1504, 400)
 
     params = normalize_params(request.params)
     params = decode_params(params)
@@ -250,7 +287,7 @@ def log(request):
     is_good_limit, limit = is_good_int(limit, 1000)
 
     if not is_good_offset or not is_good_limit:
-        return HTTPBadRequest()
+        return return_error('object', 1504, 400)
 
     fromDate = params.get('fromdate') if 'fromdate' in params else ''
     toDate = params.get('todate') if 'todate' in params else ''
@@ -271,18 +308,18 @@ def log(request):
     if fromDate and not toDate:
         from_date = dataone_to_datetime(fromDate)
         if not from_date:
-            return HTTPBadRequest()
+            return return_error('object', 1504, 400)
         clauses.append(DataoneLog.logged>=from_date)
     elif not fromDate and toDate:
         to_date = dataone_to_datetime(toDate)
         if not to_date:
-            return HTTPBadRequest()
+            return return_error('object', 1504, 400)
         clauses.append(DataoneLog.logged<=to_date)
     elif fromDate and toDate:
         from_date = dataone_to_datetime(fromDate)
         to_date = dataone_to_datetime(toDate)
         if not from_date or not to_date:
-            return HTTPBadRequest()
+            return return_error('object', 1504, 400)
         clauses.append(between(DataoneLog.logged, from_date, to_date))
            
 
@@ -307,8 +344,10 @@ def log(request):
 #    rsp.update({'docs': docs})
 #    return rsp
 	
-@view_config(route_name='dataone_search', renderer='dataone_search.mako', match_param='app=dataone')
-@view_config(route_name='dataone_search_slash', renderer='dataone_search.mako', match_param='app=dataone')
+#@view_config(route_name='dataone_search', renderer='dataone_search.mako', match_param='app=dataone')
+#@view_config(route_name='dataone_search_slash', renderer='dataone_search.mako', match_param='app=dataone')
+@view_config(route_name='dataone_search', renderer='dataone_search.mako')
+@view_config(route_name='dataone_search_slash', renderer='dataone_search.mako')
 def search(request):
     '''
     <?xml version="1.0"?>
@@ -338,10 +377,13 @@ def search(request):
     url = request.path_qs
     good_encoding = is_valid_url(url)
     if good_encoding == False:
-        return HTTPBadRequest()
+        return return_error('object', 1504, 400)
 
     params = normalize_params(request.params)
     params = decode_params(params)
+
+#    rsp = Response(json.dumps(params, indent=4), content_type='test/json')
+#    return rsp
 
     offset = params.get('start') if 'start' in params else ''
     limit = params.get('count') if 'count' in params else ''
@@ -350,7 +392,7 @@ def search(request):
     is_good_limit, limit = is_good_int(limit, 1000)
 
     if not is_good_offset or not is_good_limit:
-        return HTTPBadRequest()
+        return return_error('object', 1504, 400)
 
     fromDate = params.get('fromdate', '') 
     toDate = params.get('todate', '') 
@@ -387,20 +429,20 @@ def search(request):
             #greater than from
             fd = dataone_to_datetime(fromDate)
             if not fd:
-                return HTTPBadRequest()
+                return return_error('object', 1504, 400)
             search_clauses.append(DataoneSearch.the_date >= fd)
         elif not fromDate and toDate:
             #less than to
             ed = dataone_to_datetime(toDate)
             if not ed:
-                return HTTPBadRequest()
+                return return_error('object', 1504, 400)
             search_clauses.append(DataoneSearch.the_date < ed)
         else:
             #between
             fd = dataone_to_datetime(fromDate)
             ed = dataone_to_datetime(toDate)
             if not fd or not ed:
-                return HTTPBadRequest()
+                return return_error('object', 1504, 400)
             search_clauses.append(between(DataoneSearch.the_date, fd, ed))
 
     if formatId:
@@ -438,8 +480,10 @@ def search(request):
 
     return {'total': total, 'count': cnt, 'start': offset, 'docs': docs}
 	
-@view_config(route_name='dataone_object', request_method='GET', match_param='app=dataone')
-@view_config(route_name='dataone_object_slash', request_method='GET', match_param='app=dataone')
+#@view_config(route_name='dataone_object', request_method='GET', match_param='app=dataone')
+#@view_config(route_name='dataone_object_slash', request_method='GET', match_param='app=dataone')
+@view_config(route_name='dataone_object', request_method='GET')
+@view_config(route_name='dataone_object_slash', request_method='GET')
 def show(request):
     '''
     return the file object for this uuid
@@ -451,10 +495,15 @@ def show(request):
     </error>
     '''
     pid = request.matchdict['pid']
+    
     try:
         pid = urllib2.unquote(urllib2.unquote(pid).decode('unicode_escape'))
     except:
-        return HTTPBadRequest()
+        return return_error('object', 1800, 404)
+
+    is_uuid = is_valid_uuid(pid)
+    if not is_uuid:
+        return return_error('object', 1800, 404)
     
     #go check in the obsolete table
     obsolete = DBSession.query(DataoneObsolete).filter(DataoneObsolete.obsolete_uuid==pid).first()
@@ -485,8 +534,10 @@ def show(request):
     fr.content_disposition = 'attachment; filename=%s.%s' % (pid, ext)
     return fr
 
-@view_config(route_name='dataone_object', request_method='HEAD', match_param='app=dataone')
-@view_config(route_name='dataone_object_slash', request_method='HEAD', match_param='app=dataone')
+#@view_config(route_name='dataone_object', request_method='HEAD', match_param='app=dataone')
+#@view_config(route_name='dataone_object_slash', request_method='HEAD', match_param='app=dataone')
+@view_config(route_name='dataone_object', request_method='HEAD')
+#@view_config(route_name='dataone_object_slash', request_method='HEAD')
 def head(request):
     '''
     d1.method = describe
@@ -513,20 +564,30 @@ def head(request):
     '''
 
     pid = request.matchdict['pid']
+    
     try:
         pid = urllib2.unquote(urllib2.unquote(pid).decode('unicode_escape'))
     except:
-        return HTTPBadRequest()
+        lst = return_error_head(pid)
+        rsp = Response()
+        rsp.status = 404
+        rsp.headerlist = lst
+        return rsp
+
+
+    is_uuid = is_valid_uuid(pid)
+    if not is_uuid:
+        lst = return_error_head(pid)
+        rsp = Response()
+        rsp.status = 404
+        rsp.headerlist = lst
+        return rsp
 
     #go check in the obsolete table
     obsolete = DBSession.query(DataoneObsolete).filter(DataoneObsolete.obsolete_uuid==pid).first()
     
     if not obsolete:
-        lst = [('Content-Type', 'text/xml'), 
-               ('DataONE-Exception-Name', 'NotFound'), 
-               ('DataONE-Exception-DetailCode', '1380'), 
-               ('DataONE-Exception-Description', 'The specified object does not exist on this node.'),
-               ('DataONE-Exception-PID', str(pid))]
+        lst = return_error_head(pid)
         rsp = Response()
         rsp.status = 404
         rsp.headerlist = lst
@@ -558,14 +619,16 @@ def head(request):
     lst.append(('DataONE-ObjectFormat', str(obj_format)))
     lst.append(('DataONE-Checksum', '%s,%s' % (str(file_hashtype), str(file_hash))))
     #TODO: change this to something
-    lst.append(('DataONE-SerialType', '1234'))
+    lst.append(('DataONE-SerialVersion', '1234'))
 
     rsp = Response()
     rsp.headerlist = lst
     return rsp
 
-@view_config(route_name='dataone_meta', renderer='dataone_metadata.mako', match_param='app=dataone')
-@view_config(route_name='dataone_meta_slash', renderer='dataone_metadata.mako', match_param='app=dataone')
+#@view_config(route_name='dataone_meta', renderer='dataone_metadata.mako', match_param='app=dataone')
+#@view_config(route_name='dataone_meta_slash', renderer='dataone_metadata.mako', match_param='app=dataone')
+@view_config(route_name='dataone_meta', renderer='dataone_metadata.mako')
+@view_config(route_name='dataone_meta_slash', renderer='dataone_metadata.mako')
 def metadata(request):
     '''
     <?xml version="1.0" encoding="UTF-8"?>
@@ -615,7 +678,12 @@ def metadata(request):
     try:
         pid = urllib2.unquote(urllib2.unquote(pid).decode('unicode_escape'))
     except:
-        return HTTPBadRequest()
+        return return_error('metadata', 1800, 404, '', pid)
+
+    #let's make sure it's a valid uuid before pinging the database
+    is_uuid = is_valid_uuid(pid)
+    if not is_uuid:
+        return return_error('object', 1800, 404)
     
     #go check in the obsolete table
     obsolete = DBSession.query(DataoneObsolete).filter(DataoneObsolete.obsolete_uuid==pid).first()
@@ -648,7 +716,7 @@ def metadata(request):
     obsoletedby = '' if obsoletedby == obsolete.obsolete_uuid else obsoletedby
 
     load_balancer = request.registry.settings['BALANCER_URL']
-    base_url = '%s/apps/dataone/v1/' % (load_balancer)
+    base_url = '%s/dataone/v1/' % (load_balancer)
 
     #dates should be from postgres, i.e. in utc
     rsp = {'pid': pid, 'dateadded': datetime_to_dataone(core_object.date_added), 'obj_format': obj_format, 'file_size': file_size, 
@@ -658,8 +726,10 @@ def metadata(request):
     request.response.content_type = 'text/xml; charset=UTF-8'
     return rsp
 
-@view_config(route_name='dataone_checksum', match_param='app=dataone')
-@view_config(route_name='dataone_checksum_slash', match_param='app=dataone')
+#@view_config(route_name='dataone_checksum', match_param='app=dataone')
+#@view_config(route_name='dataone_checksum_slash', match_param='app=dataone')
+@view_config(route_name='dataone_checksum')
+@view_config(route_name='dataone_checksum_slash')
 def checksum(request):
     '''
     <checksum algorithm="SHA-1">2e01e17467891f7c933dbaa00e1459d23db3fe4f</checksum>
@@ -668,19 +738,23 @@ def checksum(request):
     try:
         pid = urllib2.unquote(urllib2.unquote(pid).decode('unicode_escape'))
     except:
-        return HTTPBadRequest()
+        return return_error('object', 1800, 404)
+
+    is_uuid = is_valid_uuid(pid)
+    if not is_uuid:
+        return return_error('object', 1800, 404)
 
     url = request.path_qs
     good_encoding = is_valid_url(url)
     if good_encoding == False:
-        return HTTPBadRequest()
+        return return_error('object', 1504, 400)
 
     params = normalize_params(request.params)
     params = decode_params(params)
 
     algo = params.get('checksumalgorithm', '')
     if not algo:
-        return HTTPNotFound()
+        return return_error('object', 1800, 404)
 
     obsolete = DBSession.query(DataoneObsolete).filter(DataoneObsolete.obsolete_uuid==pid).first()
     if not obsolete:
@@ -696,16 +770,20 @@ def checksum(request):
     
     #TODO: double check output
     #TODO: double-check list of hash algorithm terms (plus - caps, no caps, what?)
-    return Response('<checksum algorithm="%s">%s</checksum>' % (algo, h), content_type='application/xml')
+    return Response('<?xml version="1.0" encoding="UTF-8"?><d1:checksum xmlns:d1="http://ns.dataone.org/service/types/v1" algorithm="%s">%s</d1:checksum>' % (algo, h), content_type='application/xml')
 
-@view_config(route_name='dataone_error', request_method='POST', match_param='app=dataone')
-@view_config(route_name='dataone_error_slash', request_method='POST', match_param='app=dataone')
+#@view_config(route_name='dataone_error', request_method='POST', match_param='app=dataone')
+#@view_config(route_name='dataone_error_slash', request_method='POST', match_param='app=dataone')
+@view_config(route_name='dataone_error', request_method='POST')
+@view_config(route_name='dataone_error_slash', request_method='POST')
 def error(request):
 
     #TODO: parse a multipart post (without examples) and log to mongo as an error
     #return HTTPServerError('', status=501)
-    return HTTPNotImplemented()
+    return return_error('object', 1001, 501)
 
+#@view_config(route_name='dataone_replica', match_param='app=dataone')
+#@view_config(route_name='dataone_replica_slash', match_param='app=dataone')
 @view_config(route_name='dataone_replica', match_param='app=dataone')
 @view_config(route_name='dataone_replica_slash', match_param='app=dataone')
 def replica(request):
@@ -714,10 +792,15 @@ def replica(request):
 
     return file
     '''
-    return HTTPNotImplemented()
+    return return_error('object', 1001, 501)
     
-    pid = request.matchdict['pid']
-    return Response('dataone replica')
+#    pid = request.matchdict['pid']
+
+#    is_uuid = is_valid_uuid(pid)
+#    if not is_uuid:
+#        return return_error('object', 1800, 404)
+#    
+#    return Response('dataone replica')
 
 
 '''
@@ -738,7 +821,8 @@ as dataone core objects using the object uuid and type. and then push the core o
 that means three posts per object right now. the basic object posts always return the object uuid to register, the object type
 and the utc datetime it was posted.
 '''
-@view_config(route_name='dataone_addcore', request_method='POST', match_param='app=dataone')
+#@view_config(route_name='dataone_addcore', request_method='POST', match_param='app=dataone')
+@view_config(route_name='dataone_addcore', request_method='POST')
 def add_dataone_core(request):
     '''
     {
@@ -779,7 +863,8 @@ def add_dataone_core(request):
     
     return Response(json.dumps({"core_uuid": core_obj.dataone_uuid, "date_added": core_obj.date_added.strftime('%Y-%m-%dT%H:%M:%S'), "object_uuid": core_obj.object_uuid, "object_type": core_obj.object_type}))
     
-@view_config(route_name='dataone_addmetadata', request_method='POST', match_param='app=dataone')
+#@view_config(route_name='dataone_addmetadata', request_method='POST', match_param='app=dataone')
+@view_config(route_name='dataone_addmetadata', request_method='POST')
 def add_dataone_metadata(request):
     '''
     {
@@ -825,7 +910,7 @@ def add_dataone_metadata(request):
     #TODO: UPDATE THIS FOR THE METADATA SCHEMA CHANGES SOMEDAY
     #TODO: change this so that the version is not hardcoded
     load_balancer = request.registry.settings['BALANCER_URL']
-    base_url = '%s/apps/dataone/v1/object' % load_balancer
+    base_url = '%s/dataone/v1/object' % load_balancer
 
     #get the xml and add the online linkages
     
@@ -856,7 +941,8 @@ def add_dataone_metadata(request):
 
     return Response(json.dumps({'object_uuid': meta_uuid, 'object_type': 'metadata', 'date_added': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}))
 
-@view_config(route_name='dataone_addvector', request_method='POST', match_param='app=dataone')
+#@view_config(route_name='dataone_addvector', request_method='POST', match_param='app=dataone')
+@view_config(route_name='dataone_addvector', request_method='POST')
 def add_dataone_vector(request):
     '''
     {
@@ -945,7 +1031,8 @@ def add_dataone_vector(request):
         return HTTPServerError(err)
     return Response(json.dumps({'object_uuid': vector.vector_uuid, 'object_type': 'vector', 'date_added': vector.date_added.strftime('%Y-%m-%dT%H:%M:%S')}))
 
-@view_config(route_name='dataone_addsource', request_method='POST', match_param='app=dataone')
+#@view_config(route_name='dataone_addsource', request_method='POST', match_param='app=dataone')
+@view_config(route_name='dataone_addsource', request_method='POST')
 def add_dataone_source(request):
     '''
     {
@@ -998,7 +1085,8 @@ def add_dataone_source(request):
 #TODO: modify this to create packages for 1+ datasets and 1 metadata (all versions of vector (shp, kml, csv, etc) use same metadata). 
 #      should just be a matter of magically finding all vector objects for a dataset uuid and doing that. but the build_package
 #      method will also have to be updated. and what to do about source objects? 
-@view_config(route_name='dataone_addpackage', request_method='POST', match_param='app=dataone')
+#@view_config(route_name='dataone_addpackage', request_method='POST', match_param='app=dataone')
+@view_config(route_name='dataone_addpackage', request_method='POST')
 def add_dataone_package(request):
     '''
     {
@@ -1077,7 +1165,7 @@ def add_dataone_package(request):
     #build the rdf
     LOAD_BALANCER = request.registry.settings['BALANCER_URL']
     DATAONE_PATH = request.registry.settings['DATAONE_PATH']
-    base_url = '%s/apps/dataone/v1' % LOAD_BALANCER
+    base_url = '%s/dataone/v1' % LOAD_BALANCER
     rdfpath = os.path.join(DATAONE_PATH, 'packages')
     success = package_obj.build_rdf(rdfpath, base_url)
     if success != 'success':
@@ -1085,7 +1173,8 @@ def add_dataone_package(request):
     
     return Response(json.dumps({'obsolete_uuid': obsolete.obsolete_uuid, 'core_uuid': core_obj.dataone_uuid, 'object_uuid': package_obj.package_uuid, 'object_type': 'package', 'date_added': package_obj.date_added.strftime('%Y-%m-%dT%H:%M:%S')}))
 
-@view_config(route_name='dataone_addobsolete', request_method='POST', match_param='app=dataone')
+#@view_config(route_name='dataone_addobsolete', request_method='POST', match_param='app=dataone')
+@view_config(route_name='dataone_addobsolete', request_method='POST')
 def add_dataone_obsolete(request):
     '''
     {
@@ -1115,7 +1204,8 @@ def add_dataone_obsolete(request):
      
     return Response(json.dumps({'obsolete_uuid': obsolete.obsolete_uuid, 'core_uuid': core_uuid, 'date_added': obsolete.date_changed.strftime('%Y-%m-%dT%H:%M:%S')}))
 
-@view_config(route_name='dataone_updatepackage', request_method='POST', match_param='app=dataone')
+#@view_config(route_name='dataone_updatepackage', request_method='POST', match_param='app=dataone')
+@view_config(route_name='dataone_updatepackage', request_method='POST')
 def update_dataone_package(request):
     '''
     {
@@ -1157,7 +1247,7 @@ def update_dataone_package(request):
 
     LOAD_BALANCER = request.registry.settings['BALANCER_URL']
     DATAONE_PATH = request.registry.settings['DATAONE_PATH']
-    base_url = '%s/apps/dataone/v1' % (LOAD_BALANCER)
+    base_url = '%s/dataone/v1' % (LOAD_BALANCER)
     rdfpath = os.path.join(DATAONE_PATH, 'packages')
 
     invalid_packages = []

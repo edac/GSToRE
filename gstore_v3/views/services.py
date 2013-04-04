@@ -399,7 +399,7 @@ def generateService(mapfile, params, mapname=''):
 
     #now check the service type: capabilities, map, mapfile (for internal use)
     try:
-        if request_type in ['getcapabilities', 'describecoverage', 'describelayer', 'getstyles', 'describefeature', 'getfeature']:
+        if request_type in ['getcapabilities', 'describecoverage', 'describelayer', 'getstyles', 'describefeaturetype', 'getfeature']:
             #all of the xml/text responses
             mapscript.msIO_installStdoutToBuffer()
             mapfile.OWSDispatch(req)
@@ -902,6 +902,12 @@ def tileindexes(request):
             #TODO: modify if we ever use vector tile indexes
             if tile.taxonomy == 'raster':   
                 layer.type = mapscript.MS_LAYER_RASTER
+            elif tile.taxonomy == 'point':
+                layer.type = mapscript.MS_LAYER_POINT
+            elif tile.taxonomy == 'line':
+                layer.type = mapscript.MS_LAYER_LINE
+            elif tile.taxonomy == 'polygon':
+                layer.type = mapscript.MS_LAYER_POLYGON
             else:
                 pass
 
@@ -927,7 +933,7 @@ def tileindexes(request):
             psql = urlparse(connstr)
             #also, this is written into the mapfiles so hooray for security. or something
             layer.connection = 'dbname=%s host=%s port=%s user=%s password=%s' % (psql.path[1:], psql.hostname, psql.port, psql.username, psql.password)
-            layer.data = 'the_geom from (select gid, st_transform(st_setsrid(geom, %s), %s) as the_geom, tile_id, description, location from gstoredata.get_tileindexes where tile_id = %s and orig_epsg = %s) as aview using unique gid using srid=%s' % (epsg, srid, tile.id, epsg, epsg)
+            layer.data = 'the_geom from (select st_transform(st_setsrid(geom, %s), %s) as the_geom, gid, tile_id, description, location from gstoredata.get_tileindexes where tile_id = %s and orig_epsg = %s) as aview using unique gid using srid=%s' % (epsg, srid, tile.id, epsg, epsg)
 
             m.insertLayer(layer)
 

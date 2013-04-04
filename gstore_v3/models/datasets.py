@@ -235,7 +235,7 @@ class Dataset(Base):
                 if not os.path.isdir(os.path.join(fmtpath, str(self.uuid))):
                     os.mkdir(os.path.join(fmtpath, str(self.uuid)))
                 os.mkdir(os.path.join(fmtpath, str(self.uuid), 'shp'))
-            success, message = self.build_vector('shp', os.path.join(fmtpath, str(self.uuid), 'shp'), mongo_uri, srid, metadata_info)
+            success, message = self.stream_vector('shp', os.path.join(fmtpath, str(self.uuid), 'shp'), mongo_uri, srid, metadata_info)
             if success != 0: 
                 return None, None
                 
@@ -270,9 +270,9 @@ class Dataset(Base):
             if self.taxonomy == 'geoimage':
                 #add the downloads by source
                 #TODO: maybe compare to the formats list?
-                dlds = [(s.set, s.extension) for s in srcs if not s.is_external]
+                dlds = [(s.set, s.extension) for s in srcs] # if not s.is_external]
 
-                links = [{s.extension: s.get_location()} for s in srcs if s.is_external]
+                #links = [{s.extension: s.get_location()} for s in srcs if s.is_external]
             elif self.taxonomy == 'vector':
                 #get the formats
                 #check for a source
@@ -291,10 +291,10 @@ class Dataset(Base):
                         #if it's not in there, that's a whole other problem (i.e. why is it listed in the first place?)
                         continue
                     sf = sf[0]
-                    if sf.is_external:
-                        links.append({f: sf.get_location()})
-                    else:
-                        dlds.append((sf.set, f))
+#                    if sf.is_external:
+#                        links.append({f: sf.get_location()})
+#                    else:
+                    dlds.append((sf.set, f))
             elif self.taxonomy == 'services':
                 #TODO: figure out what to put here
                 pass
@@ -782,7 +782,7 @@ class Dataset(Base):
                     result += delimiter
 
                 cnt += 1
-                yield result.encode(encode_as)
+                yield result #.encode(encode_as)
 
             yield folder_tail + tail
 
@@ -811,7 +811,10 @@ class Dataset(Base):
             #there's some wackiness with a unicode char and mongo (and also a bad char in the data, see fid 6284858)
             #convert atts to name, value tuples so we only have to deal with the wackiness once
 #            atts = [(a['name'], unicode(a['val']).encode('ascii', 'xmlcharrefreplace')) for a in atts]
-            atts =[(a['name'], (a['val'].encode('ascii', 'xmlcharrefreplace') if fmt in ['kml', 'gml', 'csv'] else a['val'].encode('utf-8')) if isinstance(a['val'], str) else a['val']) for a in atts]
+
+#            atts =[(a['name'], (a['val'].encode('ascii', 'xmlcharrefreplace') if fmt in ['kml', 'gml', 'csv'] else a['val'].encode('utf-8')) if isinstance(a['val'], str) else a['val']) for a in atts]
+
+            atts = [(a['name'], convert_by_ogrtype(a['val'], ogr.OFTString, format) if isinstance(a['val'], str) or isinstance(a['val'], unicode) else a['val']) for a in atts]
 
             #add the observed datetime for everything
             atts.append(('observed', obs))
@@ -832,7 +835,7 @@ class Dataset(Base):
                 #going to match the gml from the dataset downloader
                 #need a list of values as <ogr:{att name}>VAL</ogr:{att name}>
                 #vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0], re.sub(r'[^\x20-\x7E]', '', escape(str(a[1]))), a[0]) for a in atts])
-                vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0], a[1], a[0]) for a in atts])
+                vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0],  a[1], a[0]) for a in atts])
                 feature = """<gml:featureMember><ogr:g_%(basename)s><ogr:geometryProperty>%(geom)s</ogr:geometryProperty>%(values)s</ogr:g_%(basename)s></gml:featureMember>""" % {
                         'basename': self.basename, 'geom': geom_repr, 'values': vals} 
             elif fmt == 'geojson':
@@ -845,12 +848,14 @@ class Dataset(Base):
                     att = [a for a in atts if str(a[0]) == f.name]
                     #this is, quite possibly, the stupidest thing ever. but it 'solves' the unicode error
                     v = '%s' % att[0][1] if att else ""
-                    vals.append(v.encode('ascii', 'xmlcharrefreplace'))
+                    #and wrap in double quotes if there's a comma
+                    #v = '"%s"' % v if ',' in v else v
+                    vals.append('%s' % v)
                 vals += [str(fid), str(did), obs]
                 feature = ','.join(vals)
             elif fmt == 'json':
                 #no geometry, just attributes (good for timeseries requests)
-                vals = dict([(a[0], ('%s' % a[1]).encode('ascii', 'xmlcharrefreplace') if isinstance(a[1], str) else a[1]) for a in atts])
+                vals = dict([(a[0], a[1]) for a in atts])
                 feature = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals})
             else:
                 feature = ''
@@ -889,7 +894,7 @@ class Dataset(Base):
         #add a metadata file if there's any metadata to add
         om = [o for o in self.original_metadata if self.has_metadata_cache and o.original_xml_standard == metadata_info['standard']]
         if om:
-            metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), fmt)
+            metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
             written = om[0].write_xml_to_disk(metadata_file, metadata_info)
             if written:
                 files.append(metadata_file)

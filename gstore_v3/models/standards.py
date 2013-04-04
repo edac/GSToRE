@@ -109,7 +109,7 @@ class FGDC():
         distrib.append(cntinfo)
         
         etree.SubElement(distinfo, 'resdesc').text = 'Downloadable Data'
-        etree.SubElement(distinfo, 'distliab').text = 'The material on this site is made available as a apublic service. Maps and data are to be used for reference purposes only and the Earth Data Analysis Center (EDAC), %s and The University of New Mexico are not responsible for any inaccuracies herein contained. No responsibility is assumed for damages or other liabilities due to the accuracy, availability, use or misuse of the information herein provided. Unless otherwise indicated in the documentation (metadata) for individual data sets, information on this site is public domain and may be copied without permission; citation of the source is appreciated.' % self.appinfo.full_name
+        etree.SubElement(distinfo, 'distliab').text = 'The material on this site is made available as a public service. Maps and data are to be used for reference purposes only and the Earth Data Analysis Center (EDAC), %s and The University of New Mexico are not responsible for any inaccuracies herein contained. No responsibility is assumed for damages or other liabilities due to the accuracy, availability, use or misuse of the information herein provided. Unless otherwise indicated in the documentation (metadata) for individual data sets, information on this site is public domain and may be copied without permission; citation of the source is appreciated.' % self.appinfo.full_name
         
         format = None
         for p in preferred:
