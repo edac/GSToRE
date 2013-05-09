@@ -3,8 +3,9 @@ from pyramid.response import Response
 
 from pyramid.httpexceptions import HTTPNotFound
 
+import sqlalchemy
 from sqlalchemy import desc, asc, func
-from sqlalchemy.sql.expression import and_
+from sqlalchemy.sql.expression import and_, cast
 from sqlalchemy.sql import between
 
 import json
@@ -22,7 +23,7 @@ from ..models.features import Feature
 from ..models.vocabs import geolookups
 from ..lib.spatial import *
 from ..lib.mongo import *
-from ..lib.utils import normalize_params, convert_timestamp, get_single_date_clause, get_overlap_date_clause
+from ..lib.utils import normalize_params, convert_timestamp, get_single_date_clause, get_overlap_date_clause, match_pattern
 
 '''
 search
@@ -68,8 +69,6 @@ def search_categories(request):
     {"total": 0, "results": []}
     '''
 
-    #TODO: add total value or get rid of it
-
     if node and node != 'root':
         parts = node.split('__|__')
 
@@ -78,12 +77,12 @@ def search_categories(request):
         if len(parts) == 1:
             #clicked on theme so get the distinct subthemes
             #and use the any() for datasets to make sure that we don't pull any empty category sets (also with inactive check just in case 2003 color cir)
-            cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any(Dataset.inactive==False))).distinct(Category.subtheme).order_by(Category.subtheme.asc()) 
+            cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any(Dataset.is_embargoed==False), Category.datasets.any(Dataset.inactive==False))).distinct(Category.subtheme).order_by(Category.subtheme.asc()) 
 
             resp = {"total": cats.count(), "results": [{"text": c.subtheme, "leaf": False, "id": '%s__|__%s' % (c.theme, c.subtheme)} for c in cats]}
         elif len(parts) == 2:
             #clicked on the subtheme
-            cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any(Dataset.inactive==False))).filter(Category.subtheme==parts[1]).order_by(Category.groupname.asc()) 
+            cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any(Dataset.is_embargoed==False), Category.datasets.any(Dataset.inactive==False))).filter(Category.subtheme==parts[1]).order_by(Category.groupname.asc()) 
 
             resp = {"total": cats.count(), "results": [{"text": c.groupname, "leaf": True, "id": '%s__|__%s__|__%s' % (c.theme, c.subtheme, c.groupname), "cls": "folder"} for c in cats]}
         else:
@@ -94,7 +93,7 @@ def search_categories(request):
             
     else:
         #just pull all of the categories for the app
-        cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.datasets.any(Dataset.inactive==False))).distinct(Category.theme).order_by(Category.theme.asc()).order_by(Category.subtheme.asc()).order_by(Category.groupname.asc()) 
+        cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.datasets.any(Dataset.is_embargoed==False), Category.datasets.any(Dataset.inactive==False))).distinct(Category.theme).order_by(Category.theme.asc()).order_by(Category.subtheme.asc()).order_by(Category.groupname.asc()) 
         resp = {"total": cats.count(), "results": [{"text": c.theme, "leaf": False, "id": c.theme} for c in cats]}
 
     return resp
@@ -124,6 +123,8 @@ def search_datasets(request):
     taxonomy
     geomtype
 
+    uuid
+
 
     /search/datasets.json?query=property&offset=0&sort=lastupdate&dir=desc&limit=15&theme=Boundaries&subtheme=General&groupname=New+Mexico
     '''
@@ -147,6 +148,21 @@ def search_datasets(request):
     #check for valid utc datetime
     start_valid = params.get('valid_start') if 'valid_start' in params else ''
     end_valid = params.get('valid_end') if 'valid_end' in params else ''
+
+    #check for uuid (and append wildcard if not match to the regex)
+    search_uuid = params.get('uuid', '')
+    '''
+    select id, uuid, description, basename
+    from gstoredata.datasets
+    where uuid::text like 'ab4a%';
+
+
+    from gstore_v3.models import *
+    from sqlalchemy.sql.expression import cast
+    import sqlalchemy
+    ds = DBSession.query(datasets.Dataset).filter(cast(datasets.Dataset.uuid, sqlalchemy.String).like('ab4a%'))
+    ds.count()
+    '''
 
     #check for format
     format = params.get('format', '')
@@ -209,7 +225,7 @@ def search_datasets(request):
 
     #set up the basic dataset clauses
     #always exclude deactivated datasets and the app from the url
-    dataset_clauses = [Dataset.inactive==False, "apps_cache @> ARRAY['%s']" % (app)]
+    dataset_clauses = [Dataset.inactive==False, "apps_cache @> ARRAY['%s']" % (app), Dataset.is_embargoed==False]
     if format:
         #check that it's a supported format
         default_formats = request.registry.settings['DEFAULT_FORMATS'].split(',')
@@ -217,6 +233,12 @@ def search_datasets(request):
             return HTTPNotFound() 
         #add the filter
         dataset_clauses.append("not '%s' = ANY(excluded_formats)" % format)
+
+    if search_uuid:
+        pttn = '[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}'
+        if not match_pattern(pttn, search_uuid):
+            search_uuid += '%'
+        dataset_clauses.append(cast(Dataset.uuid, sqlalchemy.String).like(search_uuid))
 
     if taxonomy:
         dataset_clauses.append(Dataset.taxonomy==taxonomy)

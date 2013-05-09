@@ -63,6 +63,8 @@ class Dataset(Base):
         Column('excluded_formats', ARRAY(String)),
         Column('excluded_services', ARRAY(String)),
         Column('date_acquired', TIMESTAMP),
+        Column('is_embargoed', Boolean, default=False),
+        Column('embargo_release_date', TIMESTAMP),
         Column('uuid', UUID), # we aren't setting this in postgres anymore
         schema='gstoredata' #THIS IS KEY
     ) 
@@ -83,7 +85,7 @@ class Dataset(Base):
     #relate to relationships (meta)
 
     #relate to shapes
-    shapes = relationship('Feature')
+    shapes = relationship('Feature', backref='dataset')
 
     #relate to collections
     collections = relationship('Collection', 
@@ -377,6 +379,7 @@ class Dataset(Base):
     #TODO: add a vector cache directory check + mkdir method
 
 
+    #NOTE: don't use this (not updated for any of the encoding, escaping bugs)
     #build any vector format that comes from OGR (shp, kml, csv, gml, geojson)
     def build_vector(self, format, basepath, mongo_uri, epsg, metadata_info):
         '''
@@ -877,7 +880,12 @@ class Dataset(Base):
         if format == 'shp':
             #TODO: if we use this, change it back to the tmp folder and copy? 
             #convert it first
-            s = subprocess.Popen(['ogr2ogr', '-f', 'ESRI Shapefile', os.path.join(basepath, '%s.shp' % (self.basename)), tmp_file, '-lco', 'ENCODING=UTF-8'], shell=False)    
+
+            #shp_tmp_path = os.path.join(tmp_path, '%s.shp' % (self.basename))
+            #s = subprocess.Popen(['ogr2ogr', '-f', 'ESRI Shapefile', shp_tmp_path, tmp_file, '-lco', 'ENCODING=UTF-8'], shell=False)
+            
+            s = subprocess.Popen(['ogr2ogr', '-f', 'ESRI Shapefile', os.path.join(basepath, '%s.shp' % (self.basename)), tmp_file, '-lco', 'ENCODING=UTF-8'], shell=False) 
+               
             status = s.wait()
             #note: the prj file should be generated already
             #TODO: add a spatial index
@@ -886,6 +894,7 @@ class Dataset(Base):
             for e in exts:
                 if os.path.isfile(os.path.join(basepath, '%s.%s' % (self.basename, e))):
                     files.append(os.path.join(basepath, '%s.%s' % (self.basename, e)))
+
         else:
             files.append(os.path.join(tmp_path, '%s.%s' % (self.basename, format)))
 
@@ -898,14 +907,6 @@ class Dataset(Base):
             written = om[0].write_xml_to_disk(metadata_file, metadata_info)
             if written:
                 files.append(metadata_file)
-                        
-#        if self.original_metadata:
-#            orig_metadata = self.original_metadata[0]
-#            metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
-#            written = orig_metadata.write_xml_to_disk(metadata_file)
-#            if written:
-#                files.append(metadata_file)
-
         #create the zip file
         output = create_zip(filename, files)
 
@@ -916,6 +917,26 @@ class Dataset(Base):
                 shutil.copyfile(f, outfile)        
 
         return (0, 'success')
+
+
+    def move_vectors(self, to_mongo_uri, from_mongo_uri):
+        '''
+        move docs from one collection to the other (as defined by the mongo_uri collection)
+        for a dataset
+        '''
+
+        #get the vectors
+        from_gm = gMongo(from_mongo_uri)
+        from_data = from_gm.query({'d.id': self.id})
+
+        #insert into the other collection
+        to_gm = gMongo(to_mongo_uri)
+        
+        for f in from_data:
+            to_gm.insert(f)
+
+        #drop it from the first collection
+        removed = from_gm.remove({'d.id': self.id})
 
 '''
 gstoredata.categories and the join table

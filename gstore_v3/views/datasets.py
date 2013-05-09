@@ -88,6 +88,9 @@ def dataset(request):
     if d.is_available == False:
         return HTTPNotFound('Temporarily unavailable')
 
+    if d.is_embargoed:
+        return HTTPNotFound('This dataset is embargoed.')     
+
     if app not in d.apps_cache:
         return HTTPBadRequest()
 
@@ -237,7 +240,7 @@ def stream_dataset(request):
     if not d:
         return HTTPNotFound()
 
-    if d.taxonomy != 'vector' or d.inactive or not d.is_available or app not in d.apps_cache:
+    if d.taxonomy != 'vector' or d.inactive or not d.is_available or app not in d.apps_cache or d.is_embargoed:
         return HTTPBadRequest()
 
     connstr = request.registry.settings['mongo_uri']
@@ -412,6 +415,9 @@ def services(request):
     if not d:
         return HTTPNotFound()
 
+    if d.is_embargoed or d.inactive:
+        return HTTPNotFound()
+
 #can still show the basic info
 #    if d.is_available == False:
 #        return HTTPNotFound('Temporarily unavailable')
@@ -527,6 +533,10 @@ def add_dataset(request):
                 
             }
         ]
+        'embargo': {
+            'release_date': 
+            'embargoed': 
+        }
     }
 
     '''
@@ -566,6 +576,12 @@ def add_dataset(request):
 
     project = post_data['project'] if 'project' in post_data else ''
 
+    embargo = post_data['embargo']
+    #this is not good
+    embargoed = True if 'embargoed' in embargo else False
+    embargo_release = embargo['release_date'] if embargo else ''
+    
+
     #we may have instances where we have an external dataset (tri-state replices for example)
     #and we want to keep the uuid for that dataset so we can provide a uuid or make one here
     provided_uuid = post_data['uuid'] if 'uuid' in post_data else generate_uuid4()
@@ -580,6 +596,11 @@ def add_dataset(request):
         new_dataset.record_count = records
     new_dataset.orig_epsg = epsg
     new_dataset.inactive = False if active == 'true' else True
+
+    if embargoed == 'true':
+        #need to set is_embargoed and the release date so the dataset is unavailable through gstore
+        new_dataset.is_embargoed = True
+        new_dataset.embargo_release_date = embargo_release
 
     if not geom:
         #go make one
@@ -718,14 +739,66 @@ def update_dataset(request):
             active = post_data[key]
             if not active:
                 return HTTPBadRequest()
-            inactive = True if active == 'False' else False
+            inactive = True if active.lower() == 'false' else False
             d.inactive = inactive
+
+            #move the vector data from gstore.vectors to gstore.inactive if FALSE
+            #move from gstore.inactive to gstore.vectors if TRUE
+
+            if d.taxonomy in ['vector']:
+                connstr = request.registry.settings['mongo_uri']
+                live_collection = request.registry.settings['mongo_collection']
+                inactive_collection = request.registry.settings['mongo_inactive_collection']
+                
+                if inactive == False:
+                    # move from inactives to vectors
+                    to_mongo_uri = gMongoUri(connstr, live_collection)
+                    from_mongo_uri = gMongoUri(connstr, inactive_collection)
+                else:
+                    #move from vectors to inactives
+                    to_mongo_uri = gMongoUri(connstr, inactive_collection)
+                    from_mongo_uri = gMongoUri(connstr, live_collection)
+                
+                d.move_vectors(to_mongo_uri, from_mongo_uri)
+            
         elif key == 'available':
             available = post_data[key]
             if not available:
                 return HTTPBadRequest()
             available = True if available == 'True' else False
             d.is_available = available
+        elif key == 'embargo':
+            embargo = post_data[key]
+            if not embargo:
+                return HTTPBadRequest()
+
+            is_embargoed = embargo['embargoed']
+            embargo_date = embargo['release_date'] if 'release_date' in embargo else ''     
+
+            is_embargoed = True if is_embargoed.lower() == 'true' else False
+            d.is_embargoed = is_embargoed
+
+            if embargo_date:
+                #add it to the table, if one isn't supplied, it's embargoed indefinitely or we can add a date
+                d.embargo_release_date = embargo_date
+
+            if d.taxonomy in ['vector']:
+                #move the documents if it's a vector
+                connstr = request.registry.settings['mongo_uri']
+                live_collection = request.registry.settings['mongo_collection']
+                embargo_collection = request.registry.settings['mongo_embargo_collection']
+                
+                if is_embargoed == False:
+                    # move from inactives to vectors
+                    to_mongo_uri = gMongoUri(connstr, live_collection)
+                    from_mongo_uri = gMongoUri(connstr, embargo_collection)
+                else:
+                    #move from vectors to inactives
+                    to_mongo_uri = gMongoUri(connstr, embargo_collection)
+                    from_mongo_uri = gMongoUri(connstr, live_collection)
+                
+                d.move_vectors(to_mongo_uri, from_mongo_uri)
+        
         elif key == 'bbox':
             parts = post_data[key]
             if 'geom' not in parts and 'box' not in parts:
@@ -743,9 +816,88 @@ def update_dataset(request):
 
             d.box = box
             d.geom = geom
+        elif key == 'epsg':
+            epsg = post_data['epsg']
+            d.orig_epsg = epsg
         elif key == 'sources':
             new_sources = post_data[key]
-            #TODO: add the code to add a new source for a dataset
+
+            '''
+            'sources': [
+                {
+                    'set':
+                    'extension':
+                    'external':
+                    'mimetype':
+                    'identifier':
+                    'identifier_type':
+                    'files': [],
+                    'settings': {'basic': {'WCS-NODATA': 'some value'}, 'classes': {'class': {style stuff here}}}
+                    
+                }
+            ]
+            '''
+            for src in new_sources:
+                ext = src['extension']
+                srcset = src['set']
+                external = src['external']
+                external = True if external.upper() == 'TRUE' else False
+                mimetype = src['mimetype']
+                s = Source(srcset, ext)
+                s.file_mimetype = mimetype
+                s.is_external = external
+                s.active = True
+
+                settings = src['settings'] if 'settings' in src else {}
+
+                files = src['files']
+                for f in files:
+                    sf = SourceFile(f)
+                    s.src_files.append(sf)
+
+                #TODO: finish implementing the settings (classes, styles)
+                if settings and 'basic' in settings:
+                    new_settings = {}
+                    for key in settings['basic'].iterkeys():
+                        new_settings.update({str(key): str(settings['basic'][key])})
+                    new_settings = MapfileSetting(new_settings)
+                    s.map_settings.append(new_settings)
+
+                d.sources.append(s)
+
+        elif key == 'formats':
+            #list of formats to support
+            formats = post_data['formats']
+            excluded_formats = get_all_formats(request)
+            d.excluded_formats = [f for f in excluded_formats if f not in formats]
+
+        elif key == 'services':
+            services = post_data['services']
+            excluded_services = get_all_services(request)
+            d.excluded_services = [s for s in excluded_services if s not in services]
+
+        elif key == 'taxonomy':  
+            taxo = post_data['taxonomy']
+
+            taxonomy = taxo['taxonomy']
+            geomtype = taxo['geomtype']  
+
+            if taxonomy == 'vector' and not geomtype:
+                continue
+
+            d.taxonomy = taxonomy.lower()
+            if geomtype and taxonomy.lower() == 'vector':
+                d.geomtype = geomtype.upper()
+
+        elif key == 'records':
+            records = post_data['records']
+            if records > 0:
+                d.record_count = records
+
+        elif key == 'features':
+            features = post_data['features']
+            if features > 0:
+                d.feature_count = features
 
         elif key == 'mapfile':
             new_settings = post_data[key]

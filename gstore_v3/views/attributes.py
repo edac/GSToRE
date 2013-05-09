@@ -38,6 +38,9 @@ def attributes(request):
     if not d:
         return HTTPNotFound()
 
+    if d.is_embargoed or d.inactive:
+        return HTTPNotFound()
+
     fields = d.attributes
 
     if not fields:
@@ -79,6 +82,9 @@ def attribute(request):
     a = DBSession.query(Attribute).filter(Attribute.uuid==attribute_id).first()   
 
     if not a:
+        return HTTPNotFound()
+
+    if a.dataset.isembargoed or a.dataset.inactive:
         return HTTPNotFound()
 
     rsp = {'total': 1, 'dataset': {'id': a.dataset.id, 'uuid': a.dataset.uuid}}
@@ -137,7 +143,12 @@ def attribute_new(request):
         name = d['name']
         desc = d['description']
         orig_name = d['orig_name'] if 'orig_name' in d else ''
-        ogr_type = psql_to_ogr(d['ogr_type'])
+
+        #accept the integer enum or, if not int, get the enum based on the string, defaulting to string (4) if that fails
+        try :
+            ogr_type = int(d['ogr_type'])
+        except:
+            ogr_type = psql_to_ogr(d['ogr_type'])
 
         ogr_precision = d['ogr_precision'] if 'ogr_precision' in d else ''
         ogr_width = d['ogr_width'] if 'ogr_width' in d else ''

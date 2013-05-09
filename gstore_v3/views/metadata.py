@@ -5,7 +5,7 @@ from pyramid.httpexceptions import HTTPNotFound, HTTPFound
 
 from sqlalchemy.exc import DBAPIError
 
-import os
+import os, json
 from lxml import etree
 
 #from the models init script
@@ -29,8 +29,9 @@ standard return metadata as X for a dataset
 note: is_available doesn't apply - metadata still accessible
 '''
 
+#*****FOR THE CURRENT STRUCTURE 
 #TODO: think about doing the HTML/txt part of this with renderers instead? (when it's all db parts, then building dict is better than building fgdc xml and transforming)
-@view_config(route_name='metadata')
+@view_config(route_name='metadata_fgdc')
 @view_config(route_name='metadata_v2')
 def metadata(request):
     #/apps/{app}/datasets/{id}/metadata/{standard}.{ext}
@@ -46,7 +47,7 @@ def metadata(request):
     if standard not in ['fgdc']:
         return HTTPNotFound()
     if format not in ['html', 'xml']:
-        #removing (, 'txt') from list - transform is busted and it provides little that's different from teh html representation (as per karl 8/21/2012)
+        #removing (, 'txt') from list - transform is busted and it provides little that's different from the html representation (as per karl 8/21/2012)
         return HTTPNotFound() 
     
     #go get the dataset
@@ -58,6 +59,9 @@ def metadata(request):
     #TODO: replace this when the schema is complete & populated
     #and make sure there's metadata
     if d.has_metadata_cache == False:
+        return HTTPNotFound()
+
+    if d.is_embargoed or d.inactive:
         return HTTPNotFound()
 
     #this should only be valid xml (<?xml or <metadata)
@@ -76,6 +80,14 @@ def metadata(request):
 
     return Response(output, content_type=content_type)
 
+@view_config(route_name='metadata')
+def generate_metadata(request):
+    '''
+    the new routing for the gstore schema-based metadata structure
+    '''
+    return Response(json.dumps({"standard": request.matchdict['standard']}), content_type='application/json')
+
+
 @view_config(route_name='metadata_resolved')
 def metadata_resolver(request):
     '''
@@ -92,37 +104,15 @@ def metadata_resolver(request):
 def xlink(request):
     return Response('metadata = %s' % (request.matchdict['id']))
 
-'''
-metadata maintenance
-'''
-@view_config(route_name='add_metadata', request_method='POST')
-def add_metadata(request):
-    '''
-    so could be one of several different imports:
-
-    1) POST edac xml file (need schema that can be validated by metadata crew) that can be parsed here into table structure
-
-    2) POST valid fgdc/iso(?) plus some extra JSON elements that is stored in original_metadata but that could be parsed later using the extra JSON bits
-
-    3) POST text that isn't anything and is stored in original_metadata.original_text that we do next to nothing to
-    '''
-
-    return Response('metadata = %s' % (request.matchdict['id']))
-
-#i have no idea what would get updated though
-@view_config(route_name='add_metadata', request_method='PUT')
-def update_metadata(request):
-    return Response('metadata = %s' % (request.matchdict['id']))
-
 
 '''
 other
 '''
 #TODO: this is probably not necessary (see the metadata method instead) 
 # unless we just want something that ignores the dataset (why would we want that?)
-@view_config(route_name='get_metadata')
-def show(request):
-    return Response('metadata = %s' % (request.matchdict['id']))
+#@view_config(route_name='get_metadata')
+#def show(request):
+#    return Response('metadata = %s' % (request.matchdict['id']))
 
 #return a deprecation warning for v1 api requests
 @view_config(route_name='schema')

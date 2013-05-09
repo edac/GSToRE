@@ -25,12 +25,12 @@ from ..lib.database import get_dataset
 features
 '''
 
-#TODO: update some indexes for better performance in both queries
+#TODO: update some indexes for better performance in both queries (can't use the uuid as the index though.)
 @view_config(route_name='feature')
 def feature(request):
     '''
     get a feature
-    /apps/{app}/features/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}
+    /apps/{app}/features/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}
     /apps/rgis/features/e74a1e0d-3e75-44dd-bb4c-3328a2425856.json
 
 
@@ -43,15 +43,27 @@ def feature(request):
     if format not in ['json', 'geojson', 'kml', 'gml']:
         return HTTPNotFound()
 
-    feature = DBSession.query(Feature).filter(Feature.uuid==feature_id).first()
+    try:
+        i = int(feature_id)
+        clause = Feature.fid==i
+    except:
+        clause = Feature.uuid==feature_id
+
+    feature = DBSession.query(Feature).filter(clause).first()
     if not feature:
         return HTTPNotFound('Invalid feature request')
+
+    #TODO: get the dataset for the feature and make sure it's not embargoed or inactive
+    if feature.dataset.is_embargoed or feature.dataset.inactive or not feature.dataset.is_available:
+        return HTTPNotFound('Unavailable')
 
     #get the feature from mongo
     connstr = request.registry.settings['mongo_uri']
     collection = request.registry.settings['mongo_collection']
     mongo_uri = gMongoUri(connstr, collection)
     gm = gMongo(mongo_uri)
+
+    #TODO: update this? it returns multiple docs per feature id for time series data so this is probably not what we want (stripping off the first, anyway)
     vectors = gm.query({'f.id': feature.fid})
 
     if not vectors:
@@ -168,7 +180,7 @@ def features(request):
 
     parameter (or parameters + units + frequency)
 
-    dataset_id (as uuid)
+    datasets (as uuid)
 
     format (output format)
     geomtype !!! required
@@ -202,7 +214,7 @@ def features(request):
     #check for OUTPUT format
     #format = params.get('format', 'json').lower()
     if format not in ['json', 'kml', 'csv', 'gml', 'geojson']:
-        return HTTPNotFound()
+        return HTTPNotFound('Invalid format')
     
     #check for geomtype
     geomtype = params.get('geomtype', '').replace('+', ' ')
@@ -236,13 +248,13 @@ def features(request):
     #limit it to something?
 
     #set up the postgres checks
-    dataset_clauses = [Dataset.inactive==False, "'%s'=ANY(apps_cache)" % (app)]
+    dataset_clauses = [Dataset.inactive==False, "'%s'=ANY(apps_cache)" % (app), Dataset.is_embargoed==False, Dataset.is_available==True]
                                                                                               
     if geomtype and geomtype.upper() in ['POLYGON', 'POINT', 'LINESTRING', 'MULTIPOLYGON', '3D POLYGON', '3D LINESTRING']:
         dataset_clauses.append(Dataset.geomtype==geomtype.upper())
-    else:
-        #let's not mix-and-match geometry types
-        return HTTPNotFound()
+#    else:
+#        #let's not mix-and-match geometry types
+#        return HTTPNotFound('bad geomtype')
 
     #add the dateadded
     if start_added or end_added:
@@ -403,7 +415,7 @@ def features(request):
         delimiter = ',\n'
     else:
         #which it should have done by now anyway
-        return HTTPNotFound()
+        return HTTPNotFound('failure')
 
 
     #TODO: once the param search is added, have split tracks for the response
@@ -786,6 +798,15 @@ def add_attributes(request):
     if inserts:
         connstr = request.registry.settings['mongo_uri']
         collection = request.registry.settings['mongo_collection']
+
+        #put it in the right collection
+        if the_dataset.inactive:
+            collection = request.registry.settings['mongo_inactive_collection']
+
+        #embargo trumps all    
+        if the_dataset.is_embargoed:
+            collection = request.registry.settings['mongo_embargo_collection']
+        
         mongo_uri = gMongoUri(connstr, collection)
         gm = gMongo(mongo_uri)
 

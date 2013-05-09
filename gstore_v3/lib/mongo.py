@@ -77,7 +77,11 @@ class gMongo:
         except Exception as err:
             return err
         return ''
-        
+
+
+    def remove(self, querydict):
+        done = self.collection.remove(querydict)        
+        return done
 
     #TODO: add some insert doc validation?
     #      but now we have mutliple mongo deals running so maybe not here

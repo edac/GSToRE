@@ -330,6 +330,12 @@ def get_outputformat(fmt):
         of = mapscript.outputFormatObj('AGG/PNG', 'png')
         of.setExtension('png')
         of.setMimetype('image/png')
+        '''
+        doesn't change the purple:
+        -rgba to rgb
+        turning off gamma and/or transparency
+
+        '''
         of.imagemode = mapscript.MS_IMAGEMODE_RGBA
         of.transparent = mapscript.MS_TRUE
         of.setOption('GAMMA', '0.70')
@@ -510,7 +516,7 @@ def datasets(request):
     #go get the dataset
     d = get_dataset(dataset_id)   
 
-    if not d or d.inactive:
+    if not d or d.inactive or d.is_embargoed:
         return HTTPNotFound()
 
     if d.is_available == False:
@@ -995,6 +1001,9 @@ def mapper(request):
 
     if d.is_available == False:
         return HTTPNotFound('Temporarily unavailable')
+
+    if d.inactive or d.is_embargoed:
+        return HTTPNotFound()
 
     '''
     what do we need:
