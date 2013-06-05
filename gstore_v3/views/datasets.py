@@ -576,7 +576,7 @@ def add_dataset(request):
 
     project = post_data['project'] if 'project' in post_data else ''
 
-    embargo = post_data['embargo']
+    embargo = post_data['embargo'] if 'embargo' in post_data else {}
     #this is not good
     embargoed = True if 'embargoed' in embargo else False
     embargo_release = embargo['release_date'] if embargo else ''
