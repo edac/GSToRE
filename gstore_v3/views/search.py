@@ -96,7 +96,12 @@ def search_categories(request):
         cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.datasets.any(Dataset.is_embargoed==False), Category.datasets.any(Dataset.inactive==False))).distinct(Category.theme).order_by(Category.theme.asc()).order_by(Category.subtheme.asc()).order_by(Category.groupname.asc()) 
         resp = {"total": cats.count(), "results": [{"text": c.theme, "leaf": False, "id": c.theme} for c in cats]}
 
-    return resp
+    response = Response(json.dumps(resp))
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.content_type="application/json"    
+    return response
+
+#    return resp
 
 #return datasets
 #TODO: maybe not renderer - firefox open with?   
@@ -508,6 +513,7 @@ def search_datasets(request):
         return feature
 
     response = Response()
+    response.headers['Access-Control-Allow-Origin'] = '*'
     if ext == 'json':
         response.content_type = 'application/json'
         response.app_iter = yield_results()
