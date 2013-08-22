@@ -79,3 +79,18 @@ class DataoneLog(DataoneBase):
         return {'id': self.id, 'identifier': self.identifier, 'ip': self.ip_address, 'useragent': self.useragent, 'subject': self.subject, 'event': self.event, 'dateLogged': self.logged.strftime(fmt), 'node': self.node}
 
     #TODO: deal with session and user agent (not as string)
+
+
+class DataoneError(DataoneBase):
+    __table__ = Table('errors', DataoneBase.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('message', String(500)),
+        Column('received', TIMESTAMP, FetchedValue())
+    )
+
+    def __init__(self, message):
+        self.message = message
+    def __repr__(self):
+        return '<DataONE Error: %s, %s>' % (self.id, self.received)
+    
+    

@@ -55,6 +55,29 @@ _FILE_TYPES = [
     ('georss', 'GeoRSS', 'GeoRSS')
 ]
 
+#for metadata reference
+_FORMATS = {
+    "tif": "Tagged Image File Format (TIFF)",
+    "sid": "Multi-resolution Seamless Image Database (MrSID)",
+    "ecw": "ERDAS Compressed Wavelets (ecw)",
+    "img": "ERDAS Imagine (img)",
+    "zip": "ZIP",
+    "shp": "ESRI Shapefile (shp)",
+    "kml": "KML",
+    "gml": "GML",
+    "geojson": "GeoJSON",
+    "json": "JSON",
+    "csv": "Comma Separated Values (csv)",
+    "xls": "MS Excel format (xls)",
+    "xlsx": "MS Office Open XML Spreadsheet (xslx)",
+    "pdf": "PDF",
+    "doc": "MS Word format (doc)",
+    "docx": "MS Office Open XML Document (docx)",
+    "html": "HTML",
+    "txt": "Plain Text",
+    "dem": "USGS ASCII DEM (dem)"
+}
+
 #get the database type from the ogr type
 def ogr_to_psql(ogr_type):
     t = [g[1] for g in _FIELD_TYPES if g[0] == ogr_type]
@@ -78,6 +101,10 @@ def postgis_to_ogr(postgis):
     t = [g[1] for g in _GEOM_TYPES if g[0] == postgis]
     t = t[0] if t else ogr.wkbUnknown
     return t
+
+#get the metadata file format
+def format_to_definition(format):
+    return _FORMATS[format] if format in _FORMATS else 'Unknown'
 
 def ogr_to_postgis(ogrgeom):
     pass
@@ -129,6 +156,7 @@ def convert_by_ogrtype(value, ogr_type, fmt='', datefmt=''):
                 #return value
                 pass
     #it's just a string
+    #value = '%s' % value
     value = encode_as_ascii(value) if fmt in ['kml', 'gml', 'csv'] else value.encode('utf-8')
     
     #and do one last check for kml, gml & ampersands
@@ -147,6 +175,17 @@ def epsg_to_sr(epsg):
     sr = osr.SpatialReference()
     sr.ImportFromEPSG(epsg)
     return sr
+
+##get the rpojection information (for the metadata)
+#def get_srs_attribute(srs, attr):
+#    if attr == 'semiaxis':
+#        return srs.GetSemiMajor()
+#    elif attr == 'denflat':
+#        return srs.GetInvFlattening()
+#    elif attr == 'utmzone':
+#        return srs.GetUTMZone()
+#    else:
+#        return srs.GetProjParm(attr)
 
 #extent as string to float array
 #ASSUME: box = minx,miny,maxx,maxy

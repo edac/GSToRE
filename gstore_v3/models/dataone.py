@@ -76,6 +76,7 @@ class DataoneCore(Base):
     def get_obsoletes(self, test_uuid):
         #return a list of uuids for any obsolete_uuid in the set of obsolete_uuids for this object
         #THESE ARE THE OBSOLETES VALUES IN THE SYSTEM METADATA
+        #but sorted by 
         obs = [o.obsolete_uuid for o in self.obsoletes]
         prev = obs[:obs.index(test_uuid)]
         return prev
@@ -156,6 +157,7 @@ class DataonePackage(Base):
     not great
     '''
 
+
     def __init__(self, dataset_object, metadata_object):
         self.dataset_object = dataset_object
         self.metadata_object = metadata_object
@@ -164,59 +166,59 @@ class DataonePackage(Base):
         return '<DataONE Package (%s, %s, %s)>' % (self.package_uuid, self.dataset_object, self.metadata_object)
 
     def build_rdf(self, location, base_url):
+        #TODO: update to this RDF and run a template instead of foresite (empty format elements?)
         '''
         <?xml version="1.0" encoding="UTF-8"?>
-        <rdf:RDF
-           xmlns:cito="http://purl.org/spar/cito/"
-           xmlns:dc="http://purl.org/dc/elements/1.1/"
-           xmlns:dcterms="http://purl.org/dc/terms/"
-           xmlns:foaf="http://xmlns.com/foaf/0.1/"
-           xmlns:ore="http://www.openarchives.org/ore/terms/"
-           xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-           xmlns:rdfs1="http://www.w3.org/2001/01/rdf-schema#"
-        >
-          <rdf:Description rdf:about="http://foresite-toolkit.googlecode.com/#pythonAgent">
-            <foaf:mbox>foresite@googlegroups.com</foaf:mbox>
-            <foaf:name>Foresite Toolkit (Python)</foaf:name>
-          </rdf:Description>
-          <rdf:Description rdf:about="https://cn.dataone.org/cn/v1/resolve/scimeta_id">
-            <cito:documents rdf:resource="https://cn.dataone.org/cn/v1/resolve/scidata_id"/>
-            <dcterms:identifier>scimeta_id</dcterms:identifier>
-            <dcterms:description>A reference to a science metadata document using a DataONE identifier.</dcterms:description>
-          </rdf:Description>
-          <rdf:Description rdf:about="http://www.openarchives.org/ore/terms/ResourceMap">
-            <rdfs1:isDefinedBy rdf:resource="http://www.openarchives.org/ore/terms/"/>
-            <rdfs1:label>ResourceMap</rdfs1:label>
-          </rdf:Description>
-          <rdf:Description rdf:about="https://cn.dataone.org/cn/v1/resolve/resource_map_id">
-            <dcterms:identifier>resource_map_id</dcterms:identifier>
-            <dcterms:modified>2011-08-12T12:55:16Z</dcterms:modified>
-            <rdf:type rdf:resource="http://www.openarchives.org/ore/terms/ResourceMap"/>
-            <dc:format>application/rdf+xml</dc:format>
-            <ore:describes rdf:resource="aggregation_id"/>
-            <dcterms:created>2011-08-12T12:55:16Z</dcterms:created>
-            <dcterms:creator rdf:resource="http://foresite-toolkit.googlecode.com/#pythonAgent"/>
-          </rdf:Description>
-          <rdf:Description rdf:about="http://www.openarchives.org/ore/terms/Aggregation">
-            <rdfs1:isDefinedBy rdf:resource="http://www.openarchives.org/ore/terms/"/>
-            <rdfs1:label>Aggregation</rdfs1:label>
-          </rdf:Description>
-          <rdf:Description rdf:about="aggregation_id">
-            <rdf:type rdf:resource="http://www.openarchives.org/ore/terms/Aggregation"/>
-            <dcterms:title>Simple aggregation of science metadata and data</dcterms:title>
-            <ore:aggregates rdf:resource="https://cn.dataone.org/cn/v1/resolve/scidata_id"/>
-            <ore:aggregates rdf:resource="https://cn.dataone.org/cn/v1/resolve/scimeta_id"/>
-          </rdf:Description>
-          <rdf:Description rdf:about="https://cn.dataone.org/cn/v1/resolve/scidata_id">
-            <cito:isDocumentedBy rdf:resource="https://cn.dataone.org/cn/v1/resolve/scimeta_id"/>
-            <dcterms:identifier>scidata_id</dcterms:identifier>
-            <dcterms:description>A reference to a science data object using a DataONE identifier</dcterms:description>
-          </rdf:Description>
-        </rdf:RDF>
+<rdf:RDF
+   xmlns:cito="http://purl.org/spar/cito/"
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:dcterms="http://purl.org/dc/terms/"
+   xmlns:foaf="http://xmlns.com/foaf/0.1/"
+   xmlns:ore="http://www.openarchives.org/ore/terms/"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:rdfs1="http://www.w3.org/2001/01/rdf-schema#"
+>
+  <rdf:Description rdf:about="http://www.openarchives.org/ore/terms/ResourceMap">
+    <rdfs1:label>ResourceMap</rdfs1:label>
+    <rdfs1:isDefinedBy rdf:resource="http://www.openarchives.org/ore/terms/"/>
+  </rdf:Description>
+  <rdf:Description rdf:about="http://www.openarchives.org/ore/terms/Aggregation">
+    <rdfs1:label>Aggregation</rdfs1:label>
+    <rdfs1:isDefinedBy rdf:resource="http://www.openarchives.org/ore/terms/"/>
+  </rdf:Description>
+  <rdf:Description rdf:about="https://cn.dataone.org/cn/v1/resolve/test01_file_a.2.txt">
+    <cito:isDocumentedBy rdf:resource="https://cn.dataone.org/cn/v1/resolve/test01_file_a.1.txt"/>
+    <dcterms:identifier>test01_file_a.2.txt</dcterms:identifier>
+  </rdf:Description>
+  <rdf:Description rdf:about="https://cn.dataone.org/cn/v1/resolve/test01_file_a.1.txt">
+    <cito:documents rdf:resource="https://cn.dataone.org/cn/v1/resolve/test01_file_a.2.txt"/>
+    <dcterms:identifier>test01_file_a.1.txt</dcterms:identifier>
+  </rdf:Description>
+  <rdf:Description rdf:about="http://foresite-toolkit.googlecode.com/#pythonAgent">
+    <foaf:name>Foresite Toolkit (Python)</foaf:name>
+    <foaf:mbox>foresite@googlegroups.com</foaf:mbox>
+  </rdf:Description>
+  <rdf:Description rdf:about="https://cn.dataone.org/cn/v1/resolve/test01_file_a#aggregation">
+    <ore:aggregates rdf:resource="https://cn.dataone.org/cn/v1/resolve/test01_file_a.1.txt"/>
+    <ore:aggregates rdf:resource="https://cn.dataone.org/cn/v1/resolve/test01_file_a.2.txt"/>
+    <rdf:type rdf:resource="http://www.openarchives.org/ore/terms/Aggregation"/>
+  </rdf:Description>
+  <rdf:Description rdf:about="https://cn.dataone.org/cn/v1/resolve/test01_file_a">
+    <dc:format>application/rdf+xml</dc:format>
+    <dcterms:modified>2013-04-16T19:43:16Z</dcterms:modified>
+    <rdf:type rdf:resource="http://www.openarchives.org/ore/terms/ResourceMap"/>
+    <dcterms:created>2013-04-16T19:43:16Z</dcterms:created>
+    <dcterms:creator rdf:resource="http://foresite-toolkit.googlecode.com/#pythonAgent"/>
+    <dcterms:identifier>test01_file_a</dcterms:identifier>
+    <ore:describes rdf:resource="https://cn.dataone.org/cn/v1/resolve/test01_file_a#aggregation"/>
+  </rdf:Description>
+</rdf:RDF>
 
         using the rdf+xml type and build it with foresite/rdflib
         
         '''
+
+        CN_RESOLVER='https://cn.dataone.org/cn/v1/resolve'
 
         md_core = DBSession.query(DataoneCore).filter(DataoneCore.dataone_uuid==self.metadata_object).first()
         if not md_core:
@@ -238,18 +240,18 @@ class DataonePackage(Base):
     
         #get the metadata object
         #where the about ref is gstore/apps/dataone/object/uuid
-        md = AggregatedResource('%s/object/%s' % (base_url, md_current))
+        md = AggregatedResource('%s/%s' % (CN_RESOLVER, md_current))
         md.title = 'Metadata: %s' % (md_current)
         md._dcterms.identifier = str(md_current)
         md._dcterms.description = 'Science metadata object (%s) for Data object (%s)' % (md_current, d_current)
-        md._cito.documents = '%s/object/%s' % (base_url, d_current)
+        md._cito.documents = '%s/%s' % (CN_RESOLVER, d_current)
 
         #get the data object
-        d = AggregatedResource('%s/object/%s' % (base_url, d_current))
+        d = AggregatedResource('%s/%s' % (CN_RESOLVER, d_current))
         d.title = 'Dataset: %s' % (md_current)
         d._dcterms.identifier = str(d_current)
         d._dcterms.description = 'Data object (%s)' % (d_current)
-        d._cito.isDocumentedBy = '%s/object/%s' % (base_url, md_current)
+        d._cito.isDocumentedBy = '%s/%s' % (CN_RESOLVER, md_current)
 
         #build the aggregate
         aggregate = Aggregation('GStore-Aggregate')
@@ -257,9 +259,12 @@ class DataonePackage(Base):
         aggregate.add_resource(md)
 
         #build the rdf
-        rem = ResourceMap('%s/object/%s' % (base_url, pkg_current))
+        rem = ResourceMap('%s/%s' % (CN_RESOLVER, pkg_current))
         rem.set_aggregation(aggregate)
-        rem.format = 'http://www.w3.org/TR/rdf-syntax-grammar'
+
+        #TODO: figure out why this seems to trigger the creation of an extra, empty dc:format element
+        #rem.format = 'http://www.w3.org/TR/rdf-syntax-grammar'
+        #rem.format = 'application/rdf+xml'
 
         #use the rdf+xml format
         rdfxml = RdfLibSerializer('rdf')

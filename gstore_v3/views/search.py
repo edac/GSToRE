@@ -5,7 +5,7 @@ from pyramid.httpexceptions import HTTPNotFound
 
 import sqlalchemy
 from sqlalchemy import desc, asc, func
-from sqlalchemy.sql.expression import and_, cast
+from sqlalchemy.sql.expression import and_, or_, cast
 from sqlalchemy.sql import between
 
 import json
@@ -100,8 +100,7 @@ def search_categories(request):
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.content_type="application/json"    
     return response
-
-#    return resp
+    #return resp
 
 #return datasets
 #TODO: maybe not renderer - firefox open with?   
@@ -252,7 +251,11 @@ def search_datasets(request):
         dataset_clauses.append(Dataset.geomtype==geomtype.upper())
 
     if keyword:
-        dataset_clauses.append(Dataset.description.ilike('%' + keyword + '%'))     
+        #check the description field and the flattened alias field
+        #TODO: convert the string clause to some sqla structure (although i didn't find anything for the array_to_string fxn that worked)
+        keyword = '%' + keyword + '%'
+        dataset_clauses.append(or_(Dataset.description.ilike(keyword), "array_to_string(aliases, ',') like '%s'" % keyword))     
+
   
     #add the dateadded
     if start_added or end_added:
@@ -727,7 +730,8 @@ def search(request):
     epsg = request.params.get('epsg') if 'epsg' in request.params else ''
 
     #TODO: add the rest of the filtering
-    geos = DBSession.query(geolookups).filter(geolookups.c.what==geolookup).filter(geolookups.c.description.ilike('%'+keyword+'%'))
+    keyword = '%'+keyword+'%'
+    geos = DBSession.query(geolookups).filter(geolookups.c.what==geolookup).filter(or_(geolookups.c.description.ilike(keyword), "array_to_string(aliases, ',') like '%s'" % keyword))
 
     #dump the results
     #TODO: check for anything weird about the bbox (or deal with reprojection, etc)

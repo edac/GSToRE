@@ -18,12 +18,21 @@ from osgeo import ogr, osr
 import xlwt
 import json
 import pytz
+import math
 
 from ..lib.utils import get_all_formats, get_all_services, create_zip
 from ..lib.spatial import *
 from ..lib.mongo import gMongo
 
+from ..models.categories import Category
+from ..models.collections import Collection
+from ..models.relationships import DatasetRelationship
+from ..models.projects import Project
+from ..models.citations import Citation
 from ..models.features import Feature
+from ..models.metadata import MetadataStandards
+from ..models.apps import GstoreApp
+from ..models.licenses import License
 
 import os, tempfile, shutil
 import subprocess, re
@@ -51,7 +60,6 @@ class Dataset(Base):
         Column('basename', String(100)),
         Column('geom', String),
         Column('geomtype', String),
-        #Column('formats_cache', String), #TODO: drop this once we've decided to do something about the TOOLS (although the insert doesn't pay attention)
         Column('orig_epsg', Integer),
         Column('inactive', Boolean, default=False), #shuts it off completely
         Column('box', ARRAY(Numeric)),
@@ -62,9 +70,13 @@ class Dataset(Base):
         Column('has_metadata_cache', Boolean, default=True), 
         Column('excluded_formats', ARRAY(String)),
         Column('excluded_services', ARRAY(String)),
+        Column('excluded_standards', ARRAY(String)),
         Column('date_acquired', TIMESTAMP),
         Column('is_embargoed', Boolean, default=False),
         Column('embargo_release_date', TIMESTAMP),
+        Column('is_cacheable', Boolean, default=True),
+        Column('aliases', ARRAY(String)),
+        Column('license_id', Integer, ForeignKey('gstoredata.licenses.id')),
         Column('uuid', UUID), # we aren't setting this in postgres anymore
         schema='gstoredata' #THIS IS KEY
     ) 
@@ -75,14 +87,14 @@ class Dataset(Base):
                     secondary='gstoredata.categories_datasets',
                     backref='datasets')
 
-    #TODO: add a join condition where sources.active only (, primaryjoin='and_(Dataset.id==Source.dataset_id, Source.active==True)')
+    #TODO: add a join condition where sources.active only (, primaryjoin='and_(Dataset.id==Source.dataset_id, Source.active==True)') except for now, they're all basically active
     #relate to sources
     sources = relationship('Source', backref='datasets')
 
     #relate to attributes
     attributes = relationship('Attribute', backref='dataset')
 
-    #relate to relationships (meta)
+    #TODO: relate to relationships (meta)
 
     #relate to shapes
     shapes = relationship('Feature', backref='dataset')
@@ -96,8 +108,15 @@ class Dataset(Base):
     #relate to the metadata
     original_metadata = relationship('OriginalMetadata', backref='datasets')
 
+    #to the gstore (and main) metadata
+    gstore_metadata = relationship('DatasetMetadata', backref='datasets')
+
     #relate to projects
     projects = relationship('Project', secondary='gstoredata.projects_datasets', backref='datasets')
+
+    #relate to citations
+    citations = relationship('Citation', secondary='gstoredata.datasets_citations', backref='datasets')
+
       
     def __init__(self, description):
         self.description = description
@@ -152,7 +171,24 @@ class Dataset(Base):
         #get all from one not in the other
         svcs = [i for i in lst if i not in exc_lst]
         return svcs
-       
+
+    #get the list of supported metadata standards for the dataset
+    def get_standards(self, req=None):
+        if not self.is_available:
+            return []
+
+        if not req:
+            lst = get_current_registry().settings['DEFAULT_STANDARDS']
+        else:
+            lst = req.registry.settings['DEFAULT_STANDARDS']
+
+        if not lst:
+            return None
+        lst = lst.split(',')
+
+        exc_lst = self.excluded_standards
+        return [i for i in lst if i not in exc_lst]
+           
 
     #return a source by set & extension for this dataset
     #default to active sources only
@@ -261,6 +297,9 @@ class Dataset(Base):
                 'spatial': {'bbox': string_to_bbox(self.box), 'epsg': 4326}, 'lastupdate': self.dateadded.strftime('%Y%m%d'), 'name': self.basename, 'taxonomy': self.taxonomy,
                 'categories': [{'theme': t.theme, 'subtheme': t.subtheme, 'groupname': t.groupname} for t in self.categories]}
 
+        if self.begin_datetime and self.end_datetime:
+            results.update({"valid_dates": {"start": self.begin_datetime.strftime('%Y%m%d'), "end": self.end_datetime.strftime('%Y%m%d')}})
+
         if self.is_available:
             dlds = []
             links = []
@@ -302,9 +341,10 @@ class Dataset(Base):
                 pass
 
             #combine the links (don't change url) with downloads (build url)
-            dlds = [{s[1]: '%s/%s.%s.%s' % (base_url, self.basename, s[0], s[1]) for s in dlds}] if dlds else []
+            qp = '' if self.is_cacheable else '?ignore_cache=True'
+            dlds = [{s[1]: '%s/%s.%s.%s%s' % (base_url, self.basename, s[0], s[1], qp) for s in dlds}] if dlds else []
             dlds = links + dlds
-            
+
             #update the wxs services to have the more complete url (version, request, service)
             svc_list = []
             for s in svcs:
@@ -330,12 +370,40 @@ class Dataset(Base):
         else:
             results.update({'services': [], 'downloads': [], 'preview': '', 'availability': False})
 
-        #check on the metadata
-        #TODO: fix this to handle multiple standards based on the supported standards of the dataset
-        if self.has_metadata_cache:
-            standards = ['fgdc']
-            exts = ['html', 'xml'] 
-            #removing txt format as per karl (8/21/2012) - transform doesn't work properly and provides little benefit
+        if self.gstore_metadata:
+            supported_standards = self.get_standards(req)
+
+            #get the supported formats per standard
+            md_fmts = {}
+            for supported_standard in supported_standards:
+                std = DBSession.query(MetadataStandards).filter(MetadataStandards.alias==supported_standard).first()
+                if not std:
+                    continue
+
+                if '19119' in supported_standard:
+                    #need to add all of the supported services
+                    supported_services = self.get_services(req)
+                    for supported_service in supported_services:
+                        md_fmts['%s:%s' % (supported_standard, supported_service.upper())] = std.supported_formats
+                else:
+                    md_fmts[supported_standard] = std.supported_formats
+
+            mt = [{s: {e: '%s/metadata/%s.%s' % (base_url, s, e) for e in md_fmts[s]} for s in md_fmts}]
+
+            #TODO: add the date modified back in although it doesn't matter per standard (it's all gstore, so it's all the same date)
+            #     MAYBE ADD SOME KEY? all: date? to go with fgdc: date, iso: date if not gstore-ified?
+            utc = pytz.utc
+            if self.gstore_metadata[0].date_modified:
+                md = {"all": self.gstore_metadata[0].date_modified.astimezone(utc).strftime('%Y-%m-%dT%H:%M:%SZ')}
+            else:
+                md = {}
+            
+            
+        elif not self.gstore_metadata and self.original_metadata:
+            #TODO: change this to get the standard of the original_metadata if om & xml exists
+            #      where the format is ONLY xml
+        
+           
             '''
             as {fgdc: {ext: url}}
 
@@ -345,7 +413,14 @@ class Dataset(Base):
             this is not one of the keys under metadata['fgdc'] to avoid borking rgis/epscor
             '''
 
-            #get the date-modified by standard
+            #get any xml for the dataset (ignore those that only have some unknown text blob)
+            om = [o for o in self.original_metadata if o.original_xml]
+            md = {}
+            mt = []
+            for o in om:
+                mt.append({o.original_xml_standard: {"xml": '%s/metadata/%s.xml' % (base_url, o.original_xml_standard)}})
+
+#            #get the date-modified by standard
             utc = pytz.utc
             md = {}
             om = [o for o in self.original_metadata]
@@ -353,12 +428,12 @@ class Dataset(Base):
                 #get the standard and the date (2013-01-30 20:23:49.694577-07)
                 if o.date_modified and o.original_xml_standard:
                     md.update({o.original_xml_standard: o.date_modified.astimezone(utc).strftime('%Y-%m-%dT%H:%M:%SZ')})
-           
-            mt = [{s: {e: '%s/metadata/%s.%s' % (base_url, s, e) for e in exts} for s in standards}]
-
+#           
+#            mt = [{s: {e: '%s/metadata/%s.%s' % (base_url, s, e) for e in exts} for s in standards}]
         else:
             md = {}
             mt = []
+        
         
         results.update({'metadata': mt})
         
@@ -376,173 +451,198 @@ class Dataset(Base):
 
         return results
 
+
+    def get_onlinks(self, base_url):
+        '''
+        return a flattened list of online linkages
+
+        NOTE: not for dataone
+        '''
+        dct = self.get_full_service_dict(base_url, None)
+        
+        services = dct['services'] if dct['services'] else []
+        services = [link for values in services for link in values.itervalues()]
+        
+        downloads = dct['downloads'][0].values() if dct['downloads'] else []
+        downloads = [str(s) for s in downloads]
+
+        metadatas = dct['metadata'] if dct['metadata'] else []
+        metadatas = [link for keys in metadatas for key in keys.iterkeys() for link in keys[key].itervalues()]
+
+        #tada: online linkages
+        return services + downloads + metadatas
+
+    def get_distribution_links(self, base_url):
+        '''
+        return a dictionary of download links with file types and sizes
+        ordered by our preferred formats by taxonomy 
+
+        NOTE: not for dataone
+
+
+        - get the downloads for the dataset
+        - reorder the list based on the preferred list, where the canonical (i.e. first)
+          format is the first match in the preferred list found in the supported formats
+          so we have canonical and everything else
+        - pack the links up with type and size
+        
+        ''' 
+
+        #TODO: maybe cache this? or something
+        dct = self.get_full_service_dict(base_url, None)
+        #as {fmt: link}
+        downloads = dct['downloads'][0] if dct['downloads'] else {}
+
+        preferred = ['zip', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'html', 'txt']
+        if self.taxonomy == 'geoimage':
+            preferred = ['tif', 'img', 'sid', 'ecw', 'dem', 'zip']
+        elif self.taxonomy == 'vector':
+            preferred = ['zip', 'shp', 'kml', 'gml', 'geojson', 'json', 'csv', 'xls']
+
+        canonical_format = ''
+        for p in preferred:
+            if p in downloads:
+                canonical_format = p
+                break
+
+        reordered_downloads = []
+        if canonical_format: 
+            reordered_downloads.append((canonical_format, str(downloads[canonical_format])))
+        for k, v in downloads.iteritems():
+            if k == canonical_format:
+                continue
+            reordered_downloads.append((k, str(v)))
+
+        # pack it up as a list of dicts (type:, size:, link:)
+        distribution_links = []
+        for item in reordered_downloads:
+            fmt = format_to_definition(item[0])
+
+            #estimate the file size where it's the filesize on disk if there's a source
+            #or use the VERY BAD estimate if it's a schrodinger's vector
+            if item[0] != 'html':
+                name = item[1].split('/')[-1]
+                aset = 'original' if 'original.%s' % item[0] in name else 'derived'
+                source = self.get_source(aset, item[0], True)
+            else:
+                source = None
+
+            if not source and self.taxonomy == 'vector':
+                size = self.estimate_filesize(item[0])
+            elif not source:
+                size = -99
+            else:
+                #there's a source, get the actual filesize on disk and, in this case, we want an integer
+                size = int(source.get_filesize_mb())
+            
+            distribution_links.append({"type": fmt, "size": size, "link": item[1]})
+
+        return distribution_links
+        
+        
+    def estimate_filesize(self, format):
+        '''
+        VECTOR ONLY 
+        estimate the filesize based on geomtype, record/feature counts and number of attributes
+
+        THIS IS NOT REMOTELY ACCURATE - we'd need something like the average size of the geometry WKB and the length of the fields (i.e. text field that is 50chars 
+        vs 1000chars) to start to come close, but that might be very expensive. also those estimates will change based on the format where the kml could be 600mb
+        and the geojson 300mb for the same dataset.
+        '''           
+
+        if self.taxonomy != 'vector':
+            return -99
+
+        recs = self.record_count
+        geoms = self.feature_count
+        atts = len(self.attributes)
+
+        geomtype = self.geomtype.lower()
+
+        #seriously, these are not accurate estimates
+        if 'polygon' in geomtype:
+            multiplier = 0.0005
+        elif 'linestring' in geomtype:
+            multiplier = 0.0007
+        else:
+            multiplier = 0.0001
+        
+        if '3d' in geomtype:
+            multiplier += 0.002
+
+        multiplier += atts * 0.00001
+
+        #handle one-to-one geometry-to-record or one-to-many geometry-to-records
+        size = multiplier * recs if recs == geoms else multiplier * recs * geoms
+
+        #bin the size because they are horrible estimates
+        if size < 5:
+            size = 5
+        elif size >= 5 and size < 25:
+            size = 25
+        elif size >= 25 and size < 50:
+            size = 50
+        elif size >= 50 and size < 100:
+            size = 100
+        else:
+            #round to the nearest hundredth
+            size = int(math.ceil(size / 100)) * 100    
+
+        return size
+
+
+    def write_metadata(self, output_location, out_standard, out_format, metadata_info={}):
+        ''' 
+        park the metadata (based on the standard and format) on disk
+        if the standard isn't in the supported formats, or not original_metadata and no gstore format, bail
+        '''
+
+        supported_standards = self.get_standards()
+        if out_standard not in supported_standards:
+            return False
+
+        if self.gstore_metadata:
+            #need to transform to the requested standard & format
+            std = DBSession.query(MetadataStandards).filter(MetadataStandards.alias==out_standard).first()
+            if not std:
+                return False
+
+            supported_formats = std.supported_formats
+            if out_format.lower() not in supported_formats:
+                return False
+
+            #do the transformation
+            gm = self.gstore_metadata[0]
+
+            gstoreapp = DBSession.query(GstoreApp).filter(GstoreApp.route_key==metadata_info['app'] if 'app' in metadata_info else 'rgis').first()
+
+            metadata_info.update({"app-name": gstoreapp.full_name, "app-url": gstoreapp.url})
+
+            #TODO: figure out when we want to run the validation
+            text = gm.transform(out_standard, out_format, metadata_info['xslt_path'], metadata_info, metadata_info['validate'])
+            if not text:
+                return False
+            
+        elif not self.gstore_metadata and self.original_metadata and out_format == 'xml':
+            #just get the xml and put it in the file (if the standard matches)
+            om = [o for o in self.original_metadata if o.original_xml_standard == out_standard and o.original_xml]
+            if not om:
+                return False
+
+            text = om[0].original_xml            
+        else:
+            return False
+
+        with open(output_location, 'w') as f:
+            f.write(text)
+
+        #done
+        return True
+
+
+        
     #TODO: add a vector cache directory check + mkdir method
 
-
-    #NOTE: don't use this (not updated for any of the encoding, escaping bugs)
-    #build any vector format that comes from OGR (shp, kml, csv, gml, geojson)
-    def build_vector(self, format, basepath, mongo_uri, epsg, metadata_info):
-        '''
-        pull the data from mongo
-        get the attribute data
-        create an ogr dataset
-        populate
-
-        note: we shouldn't care about whether the vector has one geometry for the recordset or multiple geometries
-              for the recordset. the wkb is in each mongo document or the fid so we have the info we need 
-              based on the mongo query resultset.
-        '''
-        
-
-        #check the base location
-        if os.path.abspath(basepath) != basepath or not os.path.isdir(basepath):
-            return (1, 'invalid base path') #do something for a reasonable error
-
-        if format == 'xls':
-            #do something else
-            return self.build_excel(basepath, mongo_uri, metadata_info)
-
-        if format == 'json':
-            #this is just plain jane json with no geometry at all
-            return self.build_json(basepath, mongo_uri, metadata_info)
-
-        #get the data
-        gm = gMongo(mongo_uri)
-        vectors = gm.query({'d.id': self.id})
-
-        #for everything else, we can use the ogr file formats
-        driver = ogr.GetDriverByName(format_to_filetype(format))
-        if driver is None:
-            return (1, 'bad driver %s' % format)
-
-        #set up a temp location
-        tmp_path = tempfile.mkdtemp()
-#        if format == 'shp':
-#            tmp_file = tmp_path
-#        else:
-        tmp_file = os.path.join(tmp_path, '%s.%s' % (self.basename, format))
-
-        datasource = driver.CreateDataSource(str(tmp_file))
-
-        #get the default projection
-        sr = epsg_to_sr(epsg)
-        
-        #set up the layer
-        lyrtype = postgis_to_ogr(self.geomtype)
-        layer = datasource.CreateLayer(str(self.basename), sr, lyrtype)
-
-        layer.CreateField(ogr.FieldDefn('FID', ogr.OFTInteger))
-
-        #deal with the fields
-        #FID AND SHAPE are always set except for csv
-        flds = self.attributes
-        for fld in flds:
-            layer.CreateField(fld.att_to_fielddefn(format))
-
-        #TODO: change to a datetime field and fix the format is necessary
-        layer.CreateField(ogr.FieldDefn('Observed', ogr.OFTString))
-
-        lyrdef = layer.GetLayerDefn()
-
-        #now add data
-        for v in vectors:
-            feature = ogr.Feature(lyrdef)
-
-            fid = str(v['f']['id'])
-            feature.SetField('FID', int(fid))
-
-            if format not in ['csv']:
-                #add the geometry
-                #TODO: test this
-                if not 'geom' in v or ('geom' in v and not 'g' in v['geom']):
-                    #go get it
-                    shape = DBSession.query(Feature).filter(Feature.fid==int(fid)).first()
-                    if not shape:
-                        #there's no geometry!
-                        continue
-                    wkb = shape.geom
-                else:    
-                    wkb = v['geom']['g']
-                geom = wkb_to_geom(wkb, epsg)
-                feature.SetGeometry(geom)
-                geom.Destroy()
-            #TODO: think about GIDs but not very hard since we decided, what with the snotel, that they were not so meaningful
-
-            #get the attribute data from the mongo doc
-            atts = v['atts']
-            
-            #add the attribute data to the feature
-            for fld in flds:
-                att = [a for a in atts if a['name'] == fld.name]
-                #convert it to the right type based on the field with string (and encoded to utf-8) as default
-                value = convert_by_ogrtype(att[0]['val'], fld.ogr_type, format) if att else ""
-                feature.SetField(str(fld.name), value)
-
-            #TODO: check on the format (it's utc, but maybe we want a specific structure)   
-            obs = str(v['obs']) if 'obs' in v else ''
-            if obs:
-                feature.SetField('Observed', obs)
-
-            #add the feature to the layer
-            layer.CreateFeature(feature)
-            feature.Destroy()
-
-        #create a spatial index for the shapefile
-        if format == 'shp':
-            datasource.ExecuteSQL('CREATE SPATIAL INDEX ON %s' % (str(self.basename)))
-
-        datasource.Destroy()
-        layer = None
-
-        #now the metadata and the projection file
-        #just for shapes? or add metadata to all in the zip
-        if format == 'shp':
-            #write out the .prj file
-            prjfile = open('%s.prj' % (os.path.join(tmp_path, self.basename)), 'w')
-            sr.MorphToESRI()
-            prjfile.write(sr.ExportToWkt())
-            prjfile.close()
-
-        #and the metadata
-#        files = []
-#        if self.original_metadata:
-#            orig_metadata = self.original_metadata[0]
-#            metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
-#            written = orig_metadata.write_xml_to_disk(metadata_file)
-#            if written:
-#                files.append(metadata_file)
-
-        files = []
-        om = [o for o in self.original_metadata if self.has_metadata_cache and o.original_xml_standard == metadata_info['standard']]
-        if om:
-            metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
-            written = om[0].write_xml_to_disk(metadata_file, metadata_info)
-            if written:
-                files.append(metadata_file)
-                
-        #set up the formats directory WITHOUT BASENAMES
-        #NO - move this to the view so that we can build vector formats wherever we want
-
-        filename = os.path.join(basepath, '%s_%s.zip' % (self.basename, format))
-        #get the files for the zip
-        #and move them to the formats cache
-        if format=='shp':
-            exts = ['shp', 'shx', 'dbf', 'prj', 'shp.xml', 'sbn', 'sbx']
-            for e in exts:
-                if os.path.isfile(os.path.join(tmp_path, '%s.%s' % (self.basename, e))):
-                    files.append(os.path.join(tmp_path, '%s.%s' % (self.basename, e)))
-        else:
-            files.append(os.path.join(tmp_path, '%s.%s' % (self.basename, format)))
-     
-        output = create_zip(filename, files)
-
-        #and copy everything in files to the formats cache
-        for f in files:
-            outfile = f.replace(tmp_path, basepath)
-            shutil.copyfile(f, outfile)
-            
-        
-        return (0, 'success')
 
     #build an excel file for the data
     def build_excel(self, basepath, mongo_uri, metadata_info):
@@ -599,22 +699,23 @@ class Dataset(Base):
         workbook.save(filename)
         files = [filename]
 
-#        #just to be consistent with all of the other types
-#        #let's pack up a zip file
-#        if self.original_metadata:
-#            orig_metadata = self.original_metadata[0]
+#        om = [o for o in self.original_metadata if self.has_metadata_cache and o.original_xml_standard == metadata_info['standard']]
+#        if om:
 #            metadata_file = '%s.xls.xml' % (os.path.join(basepath, self.basename))
-#            written = orig_metadata.write_xml_to_disk(metadata_file)
+#            written = om[0].write_xml_to_disk(metadata_file, metadata_info)
 #            if written:
 #                files.append(metadata_file)
-            
-        om = [o for o in self.original_metadata if self.has_metadata_cache and o.original_xml_standard == metadata_info['standard']]
-        if om:
-            metadata_file = '%s.xls.xml' % (os.path.join(basepath, self.basename))
-            written = om[0].write_xml_to_disk(metadata_file, metadata_info)
-            if written:
-                files.append(metadata_file)
                 
+
+        #TODO: perhaps update this with other standards at some point?
+        #out_standard = 'FGDC-STD-012-2002' if self.taxonomy == 'geoimage' else 'FGDC-STD-001-1998'
+        out_standard = metadata_info['standard']
+        out_format = 'xml'
+        metadata_file = '%s.xls.xml' % (os.path.join(basepath, self.basename))
+        
+        written = self.write_metadata(metadata_file, out_standard, out_format, metadata_info)
+        if written:
+            files.append(metadata_file)
                     
         output = create_zip(os.path.join(basepath, '%s_xls.zip' % (self.basename)), files)
         
@@ -674,19 +775,14 @@ class Dataset(Base):
         files = [tmp_file]
         
 #        #add a metadata file if there's any metadata to add
-#        if self.original_metadata:
-#            orig_metadata = self.original_metadata[0]
-#            metadata_file = '%s.json.xml' % (os.path.join(tmp_path, self.basename))
-#            written = orig_metadata.write_xml_to_disk(metadata_file)
-#            if written:
-#                files.append(metadata_file)
+        #out_standard = 'FGDC-STD-012-2002' if self.taxonomy == 'geoimage' else 'FGDC-STD-001-1998'
+        out_standard = metadata_info['standard']
+        out_format = 'xml'
+        metadata_file = '%s.json.xml' % (os.path.join(basepath, self.basename))
         
-        om = [o for o in self.original_metadata if self.has_metadata_cache and o.original_xml_standard == metadata_info['standard']]
-        if om:
-            metadata_file = '%s.json.xml' % (os.path.join(tmp_path, self.basename))
-            written = om[0].write_xml_to_disk(metadata_file, metadata_info)
-            if written:
-                files.append(metadata_file)
+        written = self.write_metadata(metadata_file, out_standard, out_format, metadata_info)
+        if written:
+            files.append(metadata_file)
 
 
         #create the zip file
@@ -901,12 +997,15 @@ class Dataset(Base):
         #return (1, ','.join(files))
             
         #add a metadata file if there's any metadata to add
-        om = [o for o in self.original_metadata if self.has_metadata_cache and o.original_xml_standard == metadata_info['standard']]
-        if om:
-            metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
-            written = om[0].write_xml_to_disk(metadata_file, metadata_info)
-            if written:
-                files.append(metadata_file)
+        #out_standard = 'FGDC-STD-012-2002' if self.taxonomy == 'geoimage' else 'FGDC-STD-001-1998'
+        out_standard = metadata_info['standard']
+        out_format = 'xml'
+        metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
+        
+        written = self.write_metadata(metadata_file, out_standard, out_format, metadata_info)
+        if written:
+            files.append(metadata_file)    
+        
         #create the zip file
         output = create_zip(filename, files)
 
@@ -938,125 +1037,4 @@ class Dataset(Base):
         #drop it from the first collection
         removed = from_gm.remove({'d.id': self.id})
 
-'''
-gstoredata.categories and the join table
-'''
-categories_datasets = Table('categories_datasets', Base.metadata,
-    Column('category_id', Integer, ForeignKey('gstoredata.categories.id')),
-    Column('dataset_id', Integer, ForeignKey('gstoredata.datasets.id')),
-    schema='gstoredata'
-)
-
-class Category(Base):
-    __table__ = Table('categories', Base.metadata,
-        Column('id', Integer, primary_key=True),
-        Column('theme', String(150)),
-        Column('subtheme', String(150)),
-        Column('groupname', String(150)),
-        Column('apps', ARRAY(String)),
-        Column('uuid', UUID, FetchedValue()),
-        schema='gstoredata'
-    )
-    #relate to datasets handled in the datasets backref
-
-    def __init__(self, theme, subtheme, groupname, apps):
-        self.theme = theme
-        self.subtheme = subtheme
-        self.groupname = groupname
-        self.apps = apps
-
-    def __repr__(self):
-        return '<Category (%s, %s, %s, %s)>' % (self.id, self.theme, self.subtheme, self.groupname)
-
-'''
-gstoredata.collections and join table
-'''
-collections_datasets = Table('collections_datasets', Base.metadata,
-    Column('collection_id', Integer, ForeignKey('gstoredata.collections.id')),
-    Column('dataset_id', Integer, ForeignKey('gstoredata.datasets.id')),
-    schema='gstoredata'
-)
-
-class Collection(Base):
-    __table__ = Table('collections', Base.metadata,
-        Column('id', Integer, primary_key=True),
-        Column('name', String(50)),
-        Column('description', String(200)),
-        Column('apps', ARRAY(String)),
-        Column('uuid', UUID, FetchedValue()),
-        schema='gstoredata'
-    )
-
-    #relate with datasets (see Dataset)
-
-    #relate with categories with the backref
-    categories = relationship('Category',
-                    secondary='gstoredata.categories_collections',
-                    backref='collections')
-
-    def __init__(self, name, apps):  
-        self.name = name
-        self.apps = apps
-
-    def __repr__(self):
-        return '<Collection (%s, %s, %s)>' % (self.id, self.name, self.uuid)
-
-#and the collection-to-category join
-collections_categories = Table('categories_collections', Base.metadata,
-    Column('collection_id', Integer, ForeignKey('gstoredata.collections.id')),
-    Column('category_id', Integer, ForeignKey('gstoredata.categories.id')),
-    schema='gstoredata'
-)
-
-
-'''
-gstoredata.relationships
-'''
-
-class DatasetRelationship(Base):
-    __table__ = Table('relationships', Base.metadata,
-        Column('id', Integer, primary_key=True),
-        Column('base_dataset', Integer),
-        Column('related_dataset', Integer),
-        Column('relationship', String(100)),
-        Column('uuid', UUID, FetchedValue()),
-        schema='gstoredata'
-    )
-
-    def __init__(self, base_dataset, related_dataset, relationship):
-        self.base_dataset = base_dataset
-        self.related_dataset = related_dataset
-        self.relationship = relationship
-
-    def __repr__(self):
-        return '<Relationship (%s, %s, %s, %s)>' % (self.id, self.base_dataset, self.related_dataset, self.relationship)
-
-
-
-'''
-gstoredata.projects
-'''
-projects_datasets = Table('projects_datasets', Base.metadata,
-    Column('dataset_id', Integer, ForeignKey('gstoredata.datasets.id')),
-    Column('project_id', Integer, ForeignKey('gstoredata.projects.id')),
-    schema='gstoredata'    
-)
-
-class Project(Base):
-    __table__ = Table('projects', Base.metadata,
-        Column('id', Integer, primary_key=True),
-        Column('name', String(200)),
-        Column('description', String(1000)),
-        Column('acknowledgments', String(500)),
-        Column('funder', String(200)),
-        schema='gstoredata'
-    )
-
-    def __init__(self, name, description, funder):
-        self.name = name
-        self.description = description
-        self.funder = funder
-
-    def __repr__(self):
-        return '<Project (%s, %s, %s)>' % (self.id, self.name, self.funder)
 

@@ -1,9 +1,10 @@
 from pyramid.view import view_config
 from pyramid.response import Response
 
-from pyramid.httpexceptions import HTTPNotFound, HTTPFound
+from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError
 
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.sql.expression import and_
 
 import os, json
 from lxml import etree
@@ -15,13 +16,10 @@ from ..models.datasets import (
     Dataset,
     )
 
-from ..models.metadata import OriginalMetadata
+from ..models.metadata import OriginalMetadata, MetadataStandards
+from ..models.apps import GstoreApp
 
 from ..lib.database import *
-
-'''
-metadata
-'''
 
 '''
 standard return metadata as X for a dataset
@@ -29,63 +27,84 @@ standard return metadata as X for a dataset
 note: is_available doesn't apply - metadata still accessible
 '''
 
-#*****FOR THE CURRENT STRUCTURE 
-#TODO: think about doing the HTML/txt part of this with renderers instead? (when it's all db parts, then building dict is better than building fgdc xml and transforming)
-@view_config(route_name='metadata_fgdc')
-@view_config(route_name='metadata_v2')
-def metadata(request):
-    #/apps/{app}/datasets/{id}/metadata/{standard}.{ext}
-    '''
-    note: for iso, return data with xlinks to lineage, entity info/attributes, contacts, possibly also spatial ref
-    '''
 
+@view_config(route_name='metadata')
+def generate_metadata(request):
+    '''
+    either transform from gstore or just return an unmodified xml blob depending on what the dataset has
+    '''
+    
     app = request.matchdict['app'] #doesn't actually mean anything right now
     dataset_id = request.matchdict['id']
-    standard = request.matchdict.get('standard', 'fgdc') #for the v2 uri
+    standard = request.matchdict.get('standard') 
     format = request.matchdict['ext']
 
-    if standard not in ['fgdc']:
-        return HTTPNotFound()
-    if format not in ['html', 'xml']:
-        #removing (, 'txt') from list - transform is busted and it provides little that's different from the html representation (as per karl 8/21/2012)
-        return HTTPNotFound() 
-    
-    #go get the dataset
-    d = get_dataset(dataset_id)    
+    d = get_dataset(dataset_id) 
 
     if not d:
-        return HTTPNotFound()
-
-    #TODO: replace this when the schema is complete & populated
-    #and make sure there's metadata
-    if d.has_metadata_cache == False:
         return HTTPNotFound()
 
     if d.is_embargoed or d.inactive:
         return HTTPNotFound()
 
-    #this should only be valid xml (<?xml or <metadata)
-    #get the xml metadata
-    #TODO: the standard is a lie
+    #set up the transformation
     xslt_path = request.registry.settings['XSLT_PATH']
-    base_url = '%s/apps/%s/datasets/' % (request.registry.settings['BALANCER_URL'], app) if standard == 'fgdc' else ''
-    
-    om = [o for o in d.original_metadata if o.original_xml_standard == standard]
-    if not om:
-        return HTTPNotFound()
-    
-    output, content_type = om[0].transform(format, xslt_path, {'app': app, 'standard': standard, 'base_url': base_url}) 
-    if not output:
-        return HTTPBadRequest()
+    base_url = '%s/apps/%s/datasets/' % (request.registry.settings['BALANCER_URL'], app)
 
-    return Response(output, content_type=content_type)
 
-@view_config(route_name='metadata')
-def generate_metadata(request):
-    '''
-    the new routing for the gstore schema-based metadata structure
-    '''
-    return Response(json.dumps({"standard": request.matchdict['standard']}), content_type='application/json')
+    #check for the kind of metadata: gstore (standard + format check) | original (standard & format == xml) | bail
+    if d.gstore_metadata:
+        #check the standard and format
+        
+        #check the requested standard against the default list - excluded_standards
+        supported_standards = d.get_standards(request)
+        if (standard not in supported_standards and '19119' not in standard) or ('19119' in standard and standard.split(':')[0] not in supported_standards):
+            return HTTPNotFound()
+
+        #and check the format of the requested standard
+        ms = DBSession.query(MetadataStandards).filter(and_(MetadataStandards.alias==standard, "'%s'=ANY(supported_formats)" % format.lower()))
+        if not ms:
+            return HTTPNotFound()
+
+        #transform and return
+        gstoreapp = DBSession.query(GstoreApp).filter(GstoreApp.route_key==app).first()
+        if not gstoreapp:
+            #default to rgis and fingers crossed i guess
+            gstoreapp = DBSession.query(GstoreApp).filter(GstoreApp.route_key=='rgis').first()
+
+        metadata_info = {"base_url": base_url, "app-name": gstoreapp.full_name, "app-url": gstoreapp.url, "app": app}
+
+        if '19119' in standard:
+            service = standard.split(':')[-1]
+            supported_services = d.get_services(request)
+            if service.lower() not in supported_services:
+                return HTTPNotFound()
+            metadata_info.update({"service": service})
+            standard = standard.split(':')[0]
+
+        gm = d.gstore_metadata[0]
+        output = gm.transform(standard, format, xslt_path + '/xslts', metadata_info, False)
+
+        if not output:
+            return HTTPServerError('Invalid output')
+        if output == 'No matching stylesheet':
+            #no xslt for the standard + format output
+            return HTTPNotFound()
+
+        content_type = 'text/html' if format == 'html' else 'application/xml'
+        
+        return Response(output, content_type=content_type)
+
+    elif not d.gstore_metadata and d.original_metadata and format.lower() == 'xml':
+        #check for some xml with that standard
+        om = [o for o in d.original_metadata if o.original_xml_standard == standard and o.original_xml]
+        if not om:
+            return HTTPNotFound()
+
+        return Response(om[0].original_xml, content_type='application/xml')
+
+    #otherwise, who knows, we got nothing.
+    return HTTPNotFound()
 
 
 @view_config(route_name='metadata_resolved')

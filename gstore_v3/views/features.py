@@ -37,6 +37,10 @@ def feature(request):
     now what did we forget? that uuids are not good indexes in mongo (too big)
     so ping shapes for the fid before pinging mongo (and then we already have our geom just in case)
     '''
+
+    #TODO: once the indexes are sorted - THIS ONLY WORKS FOR THE ONE-TO-ONE FEATURE/RECORD SITUATION. We need 
+    #      a different plan to return a RECORD for the timeseries data (one feature, multiple records)
+    
     feature_id = request.matchdict['id']
     format = request.matchdict['ext']
 

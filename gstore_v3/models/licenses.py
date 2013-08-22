@@ -8,31 +8,34 @@ from zope.sqlalchemy import ZopeTransactionExtension
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 
 '''
-apps model
+license model
 '''
 
-class GstoreApp(Base):
-    __table__ = Table('apps', Base.metadata,
+class License(Base):
+    __table__ = Table('licenses', Base.metadata,
         Column('id', Integer, primary_key = True),
-        Column('name', String(25)),
-        Column('full_name', String(250)),
-        Column('url', String(500)),
-        Column('route_key', String(15)),
         Column('uuid', UUID, FetchedValue()),
-        Column('preferred_metadata_standards', ARRAY(String)),
+        Column('name', String(250)),
+        Column('alias', String(50)),
+        Column('legal_code_uri', String(500)),
+        Column('image_url', String(500)),
         schema='gstoredata'
     )
 
     '''
-    just the metadata requirements right now (liability, etc)
+    dataset-level license assignment
     '''
 
-    def __repr__(self):
-        return '<App (%s, %s)>' % (self.id, self.name)
+    #relate to datasets
+    licenses = relationship('Dataset', backref='licenses')
 
-    def __init__(self, name, route_key):
+    def __repr__(self):
+        return '<License (%s, %s, %s)>' % (self.id, self.name, self.alias)
+
+    def __init__(self, name, alias, legal_code_uri):
         self.name = name
-        self.route_key = route_key
+        self.alias = alias
+        self.legal_code_uri = legal_code_uri
 
 
 

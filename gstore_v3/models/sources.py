@@ -70,15 +70,21 @@ class Source(Base):
             #we may have a problem with an nfs mount that can lead to empty zips
             #which will be cached. that's not great
             return ''
-            
-        metadata_file = os.path.join(outpath, outname.replace('.zip', '.xml'))
+
+        #TODO: the basename in the database DOES NOT MATCH the filename of the raster on disk 
+        #      so this is not necessarily going to match the dataset. 
+        parts = outname.replace('.zip', '').split('_') 
+        metaname = '.'.join(['_'.join(parts[:-1]), parts[-1], 'xml'])
+        metadata_file = os.path.join(outpath, metaname)
         
         #let's get the metadata obj
-        om = [o for o in self.datasets.original_metadata if self.datasets.has_metadata_cache and o.original_xml_standard == metadata_info['standard']]
-        if om:
-            written = om[0].write_xml_to_disk(metadata_file, metadata_info)
-            if written:
-                files.append(metadata_file)        
+        #out_standard = 'FGDC-STD-012-2002' if self.datasets.taxonomy == 'geoimage' else 'FGDC-STD-001-1998'
+        out_standard = metadata_info['standard']
+        out_format = 'xml'
+        
+        written = self.datasets.write_metadata(metadata_file, out_standard, out_format, metadata_info)
+        if written:
+            files.append(metadata_file)    
         
         output = create_zip(os.path.join(outpath, outname), files)
 

@@ -9,6 +9,8 @@ from datetime import datetime
 import uuid
 import urllib2
 
+import subprocess
+
 
 '''
 image mimetypes (mostly for mapserver)
@@ -40,6 +42,47 @@ def create_zip(fullname, files):
     #which is silly except as a success indicator
     #which is silly
     return fullname
+
+'''
+xslt/xml subprocess calls
+
+'''
+def transform_xml(xml, xslt_path, params):
+    '''
+    use saxonb-xslt for the transform (lxml only supports xslt 1, our xslts are in 2.0)
+
+    note: xml is the xml as string
+    '''
+    #where params is a dict {"key": "value"}
+    param_str = ' '.join(['%s=%s' % (p, params[p] if ' ' not in params[p] else '"%s"' % params[p]) for p in params])
+
+    #want the input xml to come from stdin (so -s:-)
+    cmd = 'saxonb-xslt -s:- -xsl:%s %s' % (xslt_path, param_str)
+    
+    #shell must be true for saxonb to handle stdout here (otherwise it's a file not found error)
+    s = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+    output = s.communicate(input=xml.encode('utf-8'))[0]
+    ret = s.wait()
+    return output
+
+def validate_xml(xml):
+    '''
+    use pparse (stdinparse, but same thing really) to validate xml
+    based on the schema defined in the xml (xsi:schemaLocation, etc)
+
+    using stdinparse because we don't want to write the input to disk first
+
+    note: can't provide an external (to the file) schema here
+    note: xml is the xml as string
+    '''
+    
+    cmd = 'StdInParse -v=always -n -s -f'
+    s = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    #we need stderr from pparse/stdinparse to actually catch the errors
+    stdout, stderr = s.communicate(input=xml)
+    ret = s.wait()
+    return stderr
+
 
 '''
 hashes
@@ -97,6 +140,14 @@ def get_all_services(req):
         return []
     return svcs.split(',')
 
+'''
+get default metadata standards
+'''
+def get_all_standards(req):
+    stds =  req.registry.settings['DEFAULT_STANDARDS']
+    if not stds:
+        return []
+    return stds.split(',')
 
 '''
 convert the multidict request parameters to lowercase keys
@@ -117,6 +168,7 @@ def decode_params(params):
     for k in params.keys():
         new_params[urllib2.unquote(urllib2.unquote(k.lower()).decode('unicode_escape'))] = urllib2.unquote(urllib2.unquote(params[k]).decode('unicode_escape')) 
     return new_params
+
 
 '''
 datetime utils

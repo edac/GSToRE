@@ -11,8 +11,9 @@ from ..models import DBSession
 from ..models.datasets import *
 from ..models.sources import Source, SourceFile, MapfileSetting
 from ..models.metadata import OriginalMetadata
+from ..models.apps import GstoreApp
 
-import os, json, re
+import os, json, re, tempfile
 from xml.sax.saxutils import escape
 
 from ..lib.utils import *
@@ -77,6 +78,9 @@ def dataset(request):
     datatype = request.matchdict['type'] #original vs. derived
     basename = request.matchdict['basename']
 
+    #limited to ignore-cache (T/F) for now
+    params = normalize_params(request.params)
+
     #go get the dataset
     d = get_dataset(dataset_id)
 
@@ -108,10 +112,39 @@ def dataset(request):
     if not sources && vector - check the cache
     if not sources && vector && no cache - generate cache file
     '''  
-    
-    #TODO: change this to handle the standard (if fgdc not supported, etc)
+
+    #ignore the cache on request or if the dataset is set to ignore cache (is_cacheable==False)
+    if not d.is_cacheable:
+        ignore_cache = True
+    else:
+        ignore_cache = params['ignore-cache'].lower() == 'true' if 'ignore-cache' in params else False
+
+    xslt_path = request.registry.settings['XSLT_PATH']
+    fmtpath = request.registry.settings['FORMATS_PATH']
+    tmppath = request.registry.settings['TEMP_PATH']
     base_url = '%s/apps/%s/datasets/' % (request.registry.settings['BALANCER_URL'], app)
-    metadata_info = {'app': app, 'base_url': base_url, 'standard': 'fgdc'}
+    
+    #check for a requested metadata standard
+    #if there isn't one, get the app preferred ordered list and go for the best match
+    #get the supported standard for fgdc for the given dataset (plain or rse)
+    supported_standards = d.get_standards(request)
+
+    std = ''    
+    if 'standard' in params:
+        std = params['standard']
+        std = std if std in supported_standards else ''
+        
+    if not std:
+        req_app = DBSession.query(GstoreApp).filter(GstoreApp.route_key==app.lower()).first()
+        if not req_app:
+            app_prefs = ['FGDC-STD-001-1998','FGDC-STD-012-2002','ISO-19115:2003']
+        else:
+            app_prefs = req_app.preferred_metadata_standards    
+        std = next(s for s in app_prefs if s in supported_standards)
+
+    #TODO: what happens if standard is null?
+    
+    metadata_info = {'app': app, 'base_url': base_url, 'standard': std, "xslt_path": xslt_path + '/xslts', 'validate': False}
     
     taxonomy = str(d.taxonomy)
     if taxonomy in ['services']:
@@ -138,9 +171,6 @@ def dataset(request):
         return HTTPFound(location=loc)
 
     mimetype = str(src.file_mimetype) if src else 'application/x-zip-compressed'
-    xslt_path = request.registry.settings['XSLT_PATH']
-    fmtpath = request.registry.settings['FORMATS_PATH']
-    tmppath = request.registry.settings['TEMP_PATH']
 
     #return things that shouldn't be zipped (pdfs, etc)
     if format != 'zip' and mimetype != 'application/x-zip-compressed':
@@ -159,18 +189,22 @@ def dataset(request):
     
     #check the cache for a zip
     output = os.path.join(fmtpath, str(d.uuid), format, '%s_%s.zip' % (str(d.basename), format))
-    if os.path.isfile(output):
+    if os.path.isfile(output) and not ignore_cache:
         return return_fileresponse(output, mimetype, output.split('/')[-1])
 
     #first check for the uuid + format subdirectories in the formats dir
-    cached_path = os.path.join(fmtpath, str(d.uuid), format)
-    if not os.path.isdir(cached_path):
-        if not os.path.isdir(os.path.join(fmtpath, str(d.uuid))):
-            os.mkdir(os.path.join(fmtpath, str(d.uuid)))
-        os.mkdir(cached_path)
+    if ignore_cache:
+        #create a tmp directory
+        output_path = tempfile.mkdtemp()
+    else:
+        output_path = os.path.join(fmtpath, str(d.uuid), format)
+        if not os.path.isdir(output_path):
+            if not os.path.isdir(os.path.join(fmtpath, str(d.uuid))):
+                os.mkdir(os.path.join(fmtpath, str(d.uuid)))
+            os.mkdir(output_path)
 
     outname = '%s_%s.zip' % (d.basename, format)
-    cached_file = os.path.join(cached_path, '%s_%s.zip' % (str(d.basename), format))
+    output_file = os.path.join(output_path, '%s_%s.zip' % (str(d.basename), format))
 
     #TODO: add some check for derived v original for the vector datasets
     #TODO: and also, what to do about that if there are in fact datasets with original shp and derived shp in clusterdata?
@@ -178,7 +212,7 @@ def dataset(request):
     #no zip. need to pack it up (raster/file) or generate it (vector)
     if taxonomy in ['geoimage', 'file']:
         #pack up the zip to the formats cache
-        output = src.pack_source(cached_path, outname, xslt_path, metadata_info)
+        output = src.pack_source(output_path, outname, xslt_path, metadata_info)
         
         return return_fileresponse(output, mimetype, outname)
     elif taxonomy in ['vector']:
@@ -199,14 +233,14 @@ def dataset(request):
         load_balancer = request.registry.settings['BALANCER_URL']
         base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
 #        TODO: don't forget the metadata_info HERE!
-        success = d.stream_vector(format, cached_path, mongo_uri, srid, metadata_info)
+        success = d.stream_vector(format, output_path, mongo_uri, srid, metadata_info)
 
         #check the response for failure
         if success[0] != 0:
             return HTTPServerError()    
 
         #TODO: the vectors are returning as uuid.format.zip instead of basename.format.zip
-        return return_fileresponse(cached_file, mimetype, outname)    
+        return return_fileresponse(output_file, mimetype, outname)    
 
     #if we're here something really bad is happening
     return HTTPNotFound()
@@ -398,6 +432,7 @@ def stream_dataset(request):
     return response
    
 
+#TODO: add params for including styles with output (so render from gstore for niceness or just deliver html structure for epscor/rgis, etc)
 #@view_config(route_name='dataset_services', renderer='json')
 @view_config(route_name='dataset_services', renderer='dataset.mako')
 def services(request):
@@ -735,6 +770,30 @@ def update_dataset(request):
             else:
                 #just update the xml field
                 d.original_metadata[0].original_xml = xml
+        elif key == "convert_metadata":
+            '''
+            get the list of standards to support
+
+            then go get the original_xml for the dataset
+            and run the converter
+            '''
+
+            supported_standards = post_data[key]['standards'] if 'standards' in post_data[key] else []
+
+            if supported_standards:
+                excluded_standards = get_all_standards(request)
+                d.excluded_standards = [f for f in excluded_standards if f not in supported_standards and f != 'GSTORE']
+
+                om = d.original_metadata[0] if d.original_metadata else None
+
+                if om:
+                    xslt_path = request.registry.settings['XSLT_PATH'] + '/xslts'
+                    try:
+                        converted = om.convert_to_gstore_metadata(xslt_path)
+                    except Exception as e:
+                        raise
+                   
+            
         elif key == 'activate':
             active = post_data[key]
             if not active:
@@ -880,7 +939,7 @@ def update_dataset(request):
             taxo = post_data['taxonomy']
 
             taxonomy = taxo['taxonomy']
-            geomtype = taxo['geomtype']  
+            geomtype = taxo['geomtype'] if 'geomtype' in taxo else ''
 
             if taxonomy == 'vector' and not geomtype:
                 continue
@@ -904,6 +963,20 @@ def update_dataset(request):
 
         elif key == 'project':
             project = post_data[key]
+
+            #TODO: finish this one
+        elif key == 'citations':
+            '''
+            as:
+
+                "citations": ['citation a', 'citation b']
+
+            '''
+            citations = post_data[key]
+
+            for citation in citations:
+                c = Citation(citation)
+                d.citations.append(c)
        
     try:
         DBSession.commit()

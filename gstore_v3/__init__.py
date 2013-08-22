@@ -93,6 +93,7 @@ def main(global_config, **settings):
 
     config.add_static_view('static', 'static', cache_max_age=3600)
     config.add_static_view(name='xslts', path='gstore_v3:../resources/xslts')
+    config.add_static_view(name='samples', path='gstore_v3:../resources/samples')
     config.add_route('home', '/')    
 
 #    #TEST ROUTE
@@ -105,6 +106,9 @@ def main(global_config, **settings):
 #    config.add_route('test_bulkinsert', '/test/chunk/{id}/{amount}')
 
     #config.add_route('test_urlencoding', '/test/encoder/{test}')
+
+    #app routes (stats, etc)
+    config.add_route('app_stats', 'apps/{app}/statistics/{stat}.{ext}', custom_predicates=(applist,))
     
     #to the attributes
     config.add_route('attributes', '/apps/{app}/attributes/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
@@ -120,17 +124,11 @@ def main(global_config, **settings):
     config.add_route('features', '/apps/{app}/features.{ext}', custom_predicates=(applist,))
 
 #to the metadata
-    #the unresolved (iso) metadata
-    config.add_route('metadata_fgdc', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata/fgdc.{ext}', custom_predicates=(applist,))
+    
     config.add_route('metadata', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata/{standard}.{ext}', custom_predicates=(applist,))
     #the resolved, no xlink version. maybe this only applies to the iso? or return transform of whatever but it will be the same as the file from above
     config.add_route('metadata_resolved', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata/resolved/{standard}.{ext}', custom_predicates=(applist,standardslist,))
     
-    #route to maintain the v2 urls
-    config.add_route('metadata_v2', '/apps/{app}/datasets/{id:\d+}/metadata/{did:\d+}.{ext}', custom_predicates=(applist,))
-    #config.add_route('add_metadata', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata', custom_predicates=(applist,))
-    #TODO: have a think about this route and what it needs to do (i.e. probably not necessary)
-    #config.add_route('get_metadata', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata/{mid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
     config.add_route('xlink_metadata', '/apps/{app}/metadata/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
 
 #to the search

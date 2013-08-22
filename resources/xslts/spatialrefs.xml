@@ -1,0 +1,448 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sprefs>
+    <spref>
+        <code>EPSG:26711</code>
+        <name>UTM 11, NAD27</name>
+        <def>
+            <gridsys>
+                <gridsysn>Universal Transverse Mercator</gridsysn>
+                <utm>
+                    <utmzone>11</utmzone>
+                    <transmer>
+                        <sfctrmer>.09996</sfctrmer>
+                        <longcm>123.00</longcm>
+                        <latprjo>0.0</latprjo>
+                        <feast>200180.598000</feast>
+                        <fnorth>299913.010000</fnorth>
+                    </transmer>
+                </utm>
+            </gridsys>
+            <geodetic>
+                <horizdn>North American Datum of 1927</horizdn>
+                <ellips>Clarke 1866</ellips>
+                <semiaxis>6378206.400000</semiaxis>
+                <denflat>294.978698</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:26911</code>
+        <name>UTM 11, NAD83</name>
+        <def>
+            <gridsys>
+                <gridsysn>Universal Transverse Mercator</gridsysn>
+                <utm>
+                    <utmzone>11</utmzone>
+                    <transmer>
+                        <sfctrmer>.09996</sfctrmer>
+                        <longcm>123.00</longcm>
+                        <latprjo>0.0</latprjo>
+                        <feast>200180.598000</feast>
+                        <fnorth>299913.010000</fnorth>
+                    </transmer>
+                </utm>
+            </gridsys>
+            <geodetic>
+                <horizdn>North American Datum of 1983</horizdn>
+                <ellips>Geodetic Reference System 80</ellips>
+                <semiaxis>6378137.000000</semiaxis>
+                <denflat>298.257222</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:26712</code>
+        <name>UTM 12, NAD27</name>
+        <def>
+            <gridsys>
+                <gridsysn>Universal Transverse Mercator</gridsysn>
+                <utm>
+                    <utmzone>12</utmzone>
+                    <transmer>
+                        <sfctrmer>0.999600</sfctrmer>
+                        <longcm>-111.000000</longcm>
+                        <latprjo>0.000000</latprjo>
+                        <feast>500000.000000</feast>
+                        <fnorth>0.000000</fnorth>
+                    </transmer>
+                </utm>
+            </gridsys>
+            <geodetic>
+                <horizdn>North American Datum of 1927</horizdn>
+                <ellips>Clarke 1866</ellips>
+                <semiaxis>6378206.400000</semiaxis>
+                <denflat>294.978698</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:26912</code>
+        <name>UTM 12, NAD83</name>
+        <def>
+            <gridsys>
+                <gridsysn>Universal Transverse Mercator</gridsysn>
+                <utm>
+                    <utmzone>12</utmzone>
+                    <transmer>
+                        <sfctrmer>0.999600</sfctrmer>
+                        <longcm>-111.000000</longcm>
+                        <latprjo>0.000000</latprjo>
+                        <feast>500000.000000</feast>
+                        <fnorth>0.000000</fnorth>
+                    </transmer>
+                </utm>
+            </gridsys>
+            <geodetic>
+                <horizdn>North American Datum of 1983</horizdn>
+                <ellips>Geodetic Reference System 80</ellips>
+                <semiaxis>6378137.000000</semiaxis>
+                <denflat>298.257222</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:26713</code>
+        <name>UTM 13, NAD27</name>
+        <def>
+            <gridsys>
+                <gridsysn>Universal Transverse Mercator</gridsysn>
+                <utm>
+                    <utmzone>13</utmzone>
+                    <transmer>
+                        <sfctrmer>0.999600</sfctrmer>
+                        <longcm>-105.000000</longcm>
+                        <latprjo>0.000000</latprjo>
+                        <feast>500000.000000</feast>
+                        <fnorth>0.000000</fnorth>
+                    </transmer>
+                </utm>
+            </gridsys>
+            <geodetic>
+                <horizdn>North American Datum of 1927</horizdn>
+                <ellips>Clarke 1866</ellips>
+                <semiaxis>6378206.400000</semiaxis>
+                <denflat>294.978698</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:26913</code>
+        <name>UTM 13, NAD83</name>
+        <def>
+            <gridsys>
+                <gridsysn>Universal Transverse Mercator</gridsysn>
+                <utm>
+                    <utmzone>13</utmzone>
+                    <transmer>
+                        <sfctrmer>0.999600</sfctrmer>
+                        <longcm>-105.000000</longcm>
+                        <latprjo>0.000000</latprjo>
+                        <feast>500000.000000</feast>
+                        <fnorth>0.000000</fnorth>
+                    </transmer>
+                </utm>
+            </gridsys>
+            <geodetic>
+                <horizdn>North American Datum of 1983</horizdn>
+                <ellips>Geodetic Reference System 80</ellips>
+                <semiaxis>6378137.000000</semiaxis>
+                <denflat>298.257222</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:26715</code>
+        <name>UTM 15, NAD27</name>
+        <def>
+            <gridsys>
+                <gridsysn>Universal Transverse Mercator</gridsysn>
+                <utm>
+                    <utmzone>15</utmzone>
+                    <transmer>
+                        <sfctrmer>.09996</sfctrmer>
+                        <longcm>123.00</longcm>
+                        <latprjo>0.0</latprjo>
+                        <feast>200180.598000</feast>
+                        <fnorth>299913.010000</fnorth>
+                    </transmer>
+                </utm>
+            </gridsys>
+            <geodetic>
+                <horizdn>North American Datum of 1927</horizdn>
+                <ellips>Clarke 1866</ellips>
+                <semiaxis>6378206.400000</semiaxis>
+                <denflat>294.978698</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:26915</code>
+        <name>UTM 15, NAD83</name>
+        <def>
+            <gridsys>
+                <gridsysn>Universal Transverse Mercator</gridsysn>
+                <utm>
+                    <utmzone>15</utmzone>
+                    <transmer>
+                        <sfctrmer>.09996</sfctrmer>
+                        <longcm>123.00</longcm>
+                        <latprjo>0.0</latprjo>
+                        <feast>200180.598000</feast>
+                        <fnorth>299913.010000</fnorth>
+                    </transmer>
+                </utm>
+            </gridsys>
+            <geodetic>
+                <horizdn>North American Datum of 1983</horizdn>
+                <ellips>Geodetic Reference System 80</ellips>
+                <semiaxis>6378137.000000</semiaxis>
+                <denflat>298.257222</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>ESRI:102713</code>
+        <name>NAD_1983_StatePlane_New_Mexico_Central_FIPS_3002_Feet</name>
+        <def>
+            <gridsys>
+                <gridsysn>State Plane Coordinate System 1983</gridsysn>
+                <spcs>
+                    <spcszone>3002</spcszone>
+                    <transmer>
+                        <sfctrmer>0.999900</sfctrmer>
+                        <longcm>-106.250000</longcm>
+                        <latprjo>31.000000</latprjo>
+                        <feast>500000.000000</feast>
+                        <fnorth>0.000000</fnorth>
+                    </transmer>
+                </spcs>
+            </gridsys>
+            <geodetic>
+                <horizdn>North American Datum of 1983</horizdn>
+                <ellips>Geodetic Reference System 80</ellips>
+                <semiaxis>6378137.000000</semiaxis>
+                <denflat>298.257222</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>ESRI:102714</code>
+        <name>NAD_1983_StatePlane_New_Mexico_West_FIPS_3003_Feet</name>
+        <def>
+            <gridsys>
+                <gridsysn>State Plane Coordinate System 1983</gridsysn>
+                <spcs>
+                    <spcszone>3003</spcszone>
+                    <transmer>
+                        <sfctrmer>0.999917</sfctrmer>
+                        <longcm>-107.833333</longcm>
+                        <latprjo>31.000000</latprjo>
+                        <feast>2723091.666667</feast>
+                        <fnorth>0.000000</fnorth>
+                    </transmer>
+                </spcs>
+            </gridsys>
+            <geodetic>
+                <horizdn>North American Datum of 1983</horizdn>
+                <ellips>Geodetic Reference System 80</ellips>
+                <semiaxis>6378137.000000</semiaxis>
+                <denflat>298.257222</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:32613</code>
+        <name>UTM 13, WGS84</name>
+        <def>
+            <gridsys>
+                <gridsysn>Universal Transverse Mercator</gridsysn>
+                <utm>
+                    <utmzone>13</utmzone>
+                    <transmer>
+                        <sfctrmer>0.999600</sfctrmer>
+                        <longcm>-105.000000</longcm>
+                        <latprjo>0.000000</latprjo>
+                        <feast>500000.000000</feast>
+                        <fnorth>0.000000</fnorth>
+                    </transmer>
+                </utm>
+            </gridsys>
+            <geodetic>
+                <horizdn>D_WGS_1984</horizdn>
+                <ellips>WGS_1984</ellips>
+                <semiaxis>6378137.000000</semiaxis>
+                <denflat>298.257224</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:32612</code>
+        <name>UTM 12, WGS84</name>
+        <def>
+            <gridsys>
+                <gridsysn>Universal Transverse Mercator</gridsysn>
+                <utm>
+                    <utmzone>12</utmzone>
+                    <transmer>
+                        <sfctrmer>0.999600</sfctrmer>
+                        <longcm>-111.000000</longcm>
+                        <latprjo>0.000000</latprjo>
+                        <feast>500000.000000</feast>
+                        <fnorth>0.000000</fnorth>
+                    </transmer>
+                </utm>
+            </gridsys>
+            <geodetic>
+                <horizdn>D_WGS_1984</horizdn>
+                <ellips>WGS_1984</ellips>
+                <semiaxis>6378137.000000</semiaxis>
+                <denflat>298.257224</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:2903</code>
+        <name>D_North_American_1983_HARN</name>
+        <def>
+            <geodetic>
+                <horizdn>D_North_American_1983_HARN</horizdn>
+                <ellips>Geodetic Reference System 80</ellips>
+                <semiaxis>6378137.000000</semiaxis>
+                <denflat>298.257222</denflat>
+            </geodetic>
+            
+        </def>
+    </spref>
+    <spref>
+        <code>ESRI:102003</code>
+        <name>Lambert Conformal Conic, NAD83</name>
+        <def>
+            <mapproj>
+                <mapprojn>Lambert Conformal Conic</mapprojn>
+                <lambertc>
+                    <stdparll>32.000000</stdparll>
+                    <stdparll>36.000000</stdparll>
+                    <longcm>-108.000000</longcm>
+                    <latprjo>0.000000</latprjo>
+                    <feast>0.000000</feast>
+                    <fnorth>0.000000</fnorth>
+                </lambertc>
+            </mapproj>
+            <geodetic>
+                <horizdn>North American Datum of 1983</horizdn>
+                <ellips>Geodetic Reference System 80</ellips>
+                <semiaxis>6378137.000000</semiaxis>
+                <denflat>298.257222</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:2163</code>
+        <name>Lambert Azimuthal Equal Area, D_Sphere_Clarke_1866_Authalic</name>
+        <def>
+            <mapproj>
+                <mapprojn>Lambert Azimuthal Equal Area</mapprojn>
+                <lamberta>
+                    <longpc>-100.000000</longpc>
+                    <latprjc>45.000000</latprjc>
+                    <feast>0.000000</feast>
+                    <fnorth>0.000000</fnorth>
+                </lamberta>
+            </mapproj>
+            <geodetic>
+                <horizdn>D_Sphere_Clarke_1866_Authalic</horizdn>
+                <ellips>Sphere_Clarke_1866_Authalic</ellips>
+                <semiaxis>6370997.000000</semiaxis>
+                <denflat>99999.9</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:4269</code>
+        <name>NAD83</name>
+        <def>
+            <geodetic>
+                <horizdn>North American Datum of 1983</horizdn>
+                <ellips>Geodetic Reference System 80</ellips>
+                <semiaxis>6378137.000000</semiaxis>
+                <denflat>298.257222</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:4267</code>
+        <name>NAD27</name>
+        <def>
+            <geodetic>
+                <horizdn>North American Datum of 1927</horizdn>
+                <ellips>Clarke 1866</ellips>
+                <semiaxis>6378206.400000</semiaxis>
+                <denflat>294.978698</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:7008</code>
+        <name>D_Clarke_1866</name>
+        <def>
+            <geodetic>
+                <horizdn>D_Clarke_1866</horizdn>
+                <ellips>Clarke 1866</ellips>
+                <semiaxis>6378206.400000</semiaxis>
+                <denflat>294.978698</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:7052</code>
+        <name>D_Sphere_Clarke_1866_Authalic</name>
+        <def>
+            <geodetic>
+                <horizdn>D_Sphere_Clarke_1866_Authalic</horizdn>
+                <ellips>Sphere_Clarke_1866_Authalic</ellips>
+                <semiaxis>6370997.000000</semiaxis>
+                <denflat>99999.9</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:4326</code>
+        <name>D_WGS_1984</name>
+        <def>
+            <geodetic>
+                <horizdn>D_WGS_1984</horizdn>
+                <ellips>WGS_1984</ellips>
+                <semiaxis>6378137.000000</semiaxis>
+                <denflat>298.257224</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:6152</code>
+        <name>D_North_American_1983_HARN</name>
+        <def>
+            <geodetic>
+                <horizdn>D_North_American_1983_HARN</horizdn>
+                <ellips>Geodetic Reference System 80</ellips>
+                <semiaxis>6378137.000000</semiaxis>
+                <denflat>298.257222</denflat>
+            </geodetic>
+        </def>
+    </spref>
+    <spref>
+        <code>EPSG:7019</code>
+        <name>GRS80</name>
+        <def>
+            <geodetic>
+                
+                <ellips>Geodetic Reference System 80</ellips>
+                <semiaxis>6378137.000000</semiaxis>
+                <denflat>298.257222</denflat>
+            </geodetic>
+        </def>
+    </spref>
+</sprefs>
+
+
+
+

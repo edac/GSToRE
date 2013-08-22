@@ -103,6 +103,7 @@ geolookups = Table('geolookups', Base.metadata,
     Column('what', String),
     Column('box', ARRAY(Numeric)),
     Column('app_ids', ARRAY(String)),
+    Column('aliases', ARRAY(String)),
     schema='gstoredata'
 )   
 

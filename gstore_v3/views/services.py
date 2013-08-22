@@ -22,6 +22,7 @@ from ..models.datasets import (
     Dataset,
     )
 from ..models.sources import MapfileStyle
+from ..models.apps import GstoreApp
 
 from ..lib.database import *
 #from ..lib.spatial import tilecache_service
@@ -439,7 +440,13 @@ def generateService(mapfile, params, mapname=''):
             #and make sure there isn't one first (chuck it if there is)
             mapfile.save(mapname)
             #TODO: make this some meaningful response (even though it isn't for public consumption)
-            return Response('map generated')
+
+            output = 'map generated'
+            if 'show' in params:
+                with open(mapname, 'r') as f:
+                    output = f.read()
+                
+            return Response(output)
         elif request_type in ['getcoverage']:
             mapscript.msIO_installStdoutToBuffer()
             mapfile.OWSDispatch(req)
@@ -530,9 +537,18 @@ def datasets(request):
     mappath = request.registry.settings['MAPS_PATH']
     tmppath = request.registry.settings['TEMP_PATH']
     srid = request.registry.settings['SRID']
-    
+    xslt_path = request.registry.settings['XSLT_PATH']
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = load_balancer
+
+    supported_standards = d.get_standards(request)
+
+    req_app = DBSession.query(GstoreApp).filter(GstoreApp.route_key==app.lower()).first()
+    if not req_app:
+        app_prefs = ['FGDC-STD-001-1998','FGDC-STD-012-2002','ISO-19115:2003']
+    else:
+        app_prefs = req_app.preferred_metadata_standards    
+    std = next(s for s in app_prefs if s in supported_standards)
 
     #need to identify the data source file
     #so a tif, sid, ecw for a geoimage
@@ -544,7 +560,7 @@ def datasets(request):
         mcoll = request.registry.settings['mongo_collection']
         mongo_uri = gMongoUri(mconn, mcoll)
 
-        metadata_info = {'app': app, 'base_url': base_url, 'standard': 'fgdc'}
+        metadata_info = {'app': app, 'base_url': '%s/apps/%s/datasets/' % (load_balancer, app), 'standard': std, "xslt_path": xslt_path + '/xslts', 'validate': False}
     else:
         fmtpath = ''
         mongo_uri = None
@@ -754,10 +770,14 @@ def datasets(request):
         #NOTE: the scalebar is added by mapscript default
         
         #add the layer (with the reprj bbox)
-        #TODO: update this for ISO vs FGDC, etc
         laod_balancer = request.registry.settings['BALANCER_URL']
         base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
-        metadata_description = {'service': service, 'standard': 'FGDC', 'mimetype': 'application/xml', 'url': '%s%s/metadata/fgdc.xml' % (base_url, d.uuid)}
+
+        if not std:
+            metadata_description = {}
+        else:
+            #now figure out the path for the xml for the chosen standard
+            metadata_description = {'service': service, 'standard': std, 'mimetype': 'text/xml', 'url': '%s%s/metadata/%s.xml' % (base_url, d.uuid, std)}
         layer = getLayer(d, mapsrc, srcloc, bbox, metadata_description)
 
         #what the. i don't even. why is it adding an invalid tileitem?
@@ -798,10 +818,15 @@ def tileindexes(request):
 
     if service_type.lower() != 'ogc':
         return HTTPNotFound()
+
+    if not tile.is_active:
+        return HTTPNotFound()
         
     mappath = request.registry.settings['MAPS_PATH']
     tmppath = request.registry.settings['TEMP_PATH']
     srid = request.registry.settings['SRID']
+
+    data_path = request.registry.settings['BASE_DATA_PATH'] + '/tileindexes/%s' % tile.uuid
 
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = load_balancer
@@ -902,7 +927,8 @@ def tileindexes(request):
             layer.metadata.set('wms_title', tilename)
             layer.metadata.set('imageformat', 'image/png')
 
-            layer.tileindex = '%s_index' % (tilename)
+            #layer.tileindex = '%s_%s_index' % (tile.basename, epsg)
+            layer.tileindex = data_path + '/tile_%s.shp' % epsg
             layer.tileitem = 'location'
 
             #TODO: modify if we ever use vector tile indexes
@@ -919,29 +945,23 @@ def tileindexes(request):
 
             m.insertLayer(layer)
 
-            #and the index layer
-            layer = mapscript.layerObj()
-            layer.name = '%s_%s_index' % (tile.basename, epsg)
-            layer.setProjection('init=epsg:%s' % (epsg))
-            layer.setExtent(prj_bbox[0], prj_bbox[1], prj_bbox[2], prj_bbox[3])
-            layer.metadata.set('layer_title', '%s_index' % tilename)
-            layer.metadata.set('base_layer', 'no')
-            layer.metadata.set('wms_encoding', 'UTF-8')
-            layer.metadata.set('wms_title', '%s_index' % tilename)
-            layer.metadata.set('imageformat', 'image/png')
+##            #and the index layer
+#            layer = mapscript.layerObj()
+#            layer.name = '%s_%s_index' % (tile.basename, epsg)
+#            layer.setProjection('init=epsg:%s' % (epsg))
+#            layer.setExtent(prj_bbox[0], prj_bbox[1], prj_bbox[2], prj_bbox[3])
+#            layer.metadata.set('layer_title', '%s_index' % tilename)
+#            layer.metadata.set('base_layer', 'no')
+#            layer.metadata.set('wms_encoding', 'UTF-8')
+#            layer.metadata.set('wms_title', '%s_index' % tilename)
+#            layer.metadata.set('imageformat', 'image/png')
 
-            layer.type = mapscript.MS_LAYER_TILEINDEX
-            layer.connectiontype = mapscript.MS_POSTGIS
-            layer.setProcessing('CLOSE_CONNECTION=DEFER')
+#            layer.type = mapscript.MS_LAYER_TILEINDEX
+#            layer.setProcessing('CLOSE_CONNECTION=DEFER')
 
-            #get the postgres connection
-            connstr = request.registry.settings['sqlalchemy.url']
-            psql = urlparse(connstr)
-            #also, this is written into the mapfiles so hooray for security. or something
-            layer.connection = 'dbname=%s host=%s port=%s user=%s password=%s' % (psql.path[1:], psql.hostname, psql.port, psql.username, psql.password)
-            layer.data = 'the_geom from (select st_transform(st_setsrid(geom, %s), %s) as the_geom, gid, tile_id, description, location from gstoredata.get_tileindexes where tile_id = %s and orig_epsg = %s) as aview using unique gid using srid=%s' % (epsg, srid, tile.id, epsg, epsg)
-
-            m.insertLayer(layer)
+#            layer.data = data_path + '/tile_%s.shp' % epsg
+#            
+#            m.insertLayer(layer)
 
     
     return generateService(m, params, mapname)
