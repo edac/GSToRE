@@ -298,7 +298,10 @@ class Dataset(Base):
                 'categories': [{'theme': t.theme, 'subtheme': t.subtheme, 'groupname': t.groupname} for t in self.categories]}
 
         if self.begin_datetime and self.end_datetime:
-            results.update({"valid_dates": {"start": self.begin_datetime.strftime('%Y%m%d'), "end": self.end_datetime.strftime('%Y%m%d')}})
+            if self.begin_datetime.year >= 1900 and self.end_datetime.year >= 1900:
+                results.update({"valid_dates": {"start": self.begin_datetime.strftime('%Y%m%d'), "end": self.end_datetime.strftime('%Y%m%d')}})
+            else:
+                results.update({"valid_dates": {"start": '%s%02d%02d' % (self.begin_datetime.year, self.begin_datetime.month, self.begin_datetime.day), "end": '%s%02d%02d' % (self.end_datetime.year, self.end_datetime.month, self.end_datetime.day)}})
 
         if self.is_available:
             dlds = []

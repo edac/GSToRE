@@ -93,7 +93,7 @@ def main(global_config, **settings):
 
     config.add_static_view('static', 'static', cache_max_age=3600)
     config.add_static_view(name='xslts', path='gstore_v3:../resources/xslts')
-    config.add_static_view(name='samples', path='gstore_v3:../resources/samples')
+    #config.add_static_view(name='samples', path='gstore_v3:../resources/samples')
     config.add_route('home', '/')    
 
 #    #TEST ROUTE

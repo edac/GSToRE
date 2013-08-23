@@ -44,7 +44,7 @@ class OdmSites(Base):
         Column('vertical_datum', String(50)),
         Column('state', String(50)),
         Column('county', String(100)),
-        Column('dateadded', TIMESTAMP),
+        #Column('dateadded', TIMESTAMP),
         schema='gstoredata'
     )
 
