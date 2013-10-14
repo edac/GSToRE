@@ -90,7 +90,7 @@ class OriginalMetadata(Base):
             return None
 
 
-    def convert_to_gstore_metadata(self, xslt_path):
+    def convert_to_gstore_metadata(self, xslt_path, commit=True):
         '''
         take the original xml and convert it to the gstore schema
         if valid, store in the datasetmetadata table
@@ -106,14 +106,17 @@ class OriginalMetadata(Base):
 
             gstore_xml = transform_xml(etree.tostring(xml, encoding=unicode), os.path.join(xslt_path, xslt_fn), {})
 
-            #create a new metadata obj if one doesn't exist for the dataset_id
-            if self.migrated_metadata:
-                self.migrated_metadata[0].gstore_xml = gstore_xml
+            if commit:
+                #create a new metadata obj if one doesn't exist for the dataset_id
+                if self.migrated_metadata:
+                    self.migrated_metadata[0].gstore_xml = gstore_xml
+                else:
+                    #create a new one
+                    gm = DatasetMetadata(dataset_id=self.dataset_id, gstore_xml=gstore_xml)
+                    DBSession.add(gm)
+                DBSession.commit()
             else:
-                #create a new one
-                gm = DatasetMetadata(dataset_id=self.dataset_id, gstore_xml=gstore_xml)
-                DBSession.add(gm)
-            DBSession.commit()
+                return gstore_xml
         except Exception as e:
             raise e
 
@@ -192,8 +195,9 @@ class DatasetMetadata(Base):
 
         #strip in all of the extra bits: onlinks, distribution links, distributor, metadata pubdate, metadata contact, spref info (if fgdc), publication citations
 
-        onlinks = d.get_onlinks(metadata_info['base_url'])
-        distribution_links = d.get_distribution_links(metadata_info['base_url'])
+        onlinks = metadata_info['onlinks'] if 'onlinks' in metadata_info else d.get_onlinks(metadata_info['base_url'])
+        distribution_links = metadata_info['distribution_links'] if 'distribution_links' in metadata_info else d.get_distribution_links(metadata_info['base_url'])
+            
 
         #get the rest of the distribution info (liability, etc)
         #TODO: revise this and the method (ordering v instructions - something is whacky)
@@ -207,8 +211,10 @@ class DatasetMetadata(Base):
             "prereqs": "Adequate computer capability is the only technical prerequisite for viewing data in digital form.",
             "description": "Downloadable Data"
         }
+
+        identifier = metadata_info['identifier'] if 'identifier' in metadata_info else str(d.uuid)
         
-        elements_to_update = {"identifier": str(d.uuid), "title": d.description, "onlinks": onlinks, "base_url": metadata_info['base_url'], "distribution": distribution_info, "publications": d.citations} 
+        elements_to_update = {"identifier": identifier, "title": d.description, "onlinks": onlinks, "base_url": metadata_info['base_url'], "distribution": distribution_info, "publications": d.citations} 
         xml = self.get_as_xml()
         
         gm = GstoreMetadata(xml)
@@ -247,6 +253,17 @@ class DatasetMetadata(Base):
                 return None
 
         return output
+
+    #TODO: these are silly, do something else to get the elements
+    def get_abstract(self):
+        xml = self.get_as_xml()
+        gm = GstoreMetadata(xml)
+        return gm.get_abstract()
+
+    def get_isotopic(self):
+        xml = self.get_as_xml()
+        gm = GstoreMetadata(xml)
+        return gm.get_isotopic()
         
     def write_to_disk(self, output_location, out_standard, out_format, xslt_path, metadata_info, validate=True):
         '''
@@ -283,6 +300,8 @@ class MetadataStandards(Base):
     >>> ms = DBSession.query(metadata.MetadataStandards).filter(and_(metadata.MetadataStandards.alias=='FGDC-STD-001-1998',fmt)).first()
 
     '''
+
+    scimeta_objects = relationship('DataoneScienceMetadataObject', backref='standards')
 
     def __repr__(self):
         return '<MetadataStandard %s (%s)>' % (self.alias, ','.join(self.supported_formats))

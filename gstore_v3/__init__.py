@@ -93,7 +93,10 @@ def main(global_config, **settings):
 
     config.add_static_view('static', 'static', cache_max_age=3600)
     config.add_static_view(name='xslts', path='gstore_v3:../resources/xslts')
+
+    #TODO: comment this out for production (or don't copy the stuff that's in the sandbox dir)
     #config.add_static_view(name='samples', path='gstore_v3:../resources/samples')
+
     config.add_route('home', '/')    
 
 #    #TEST ROUTE
@@ -107,10 +110,10 @@ def main(global_config, **settings):
 
     #config.add_route('test_urlencoding', '/test/encoder/{test}')
 
-    #app routes (stats, etc)
+#app routes (stats, etc)
     config.add_route('app_stats', 'apps/{app}/statistics/{stat}.{ext}', custom_predicates=(applist,))
     
-    #to the attributes
+#to the attributes
     config.add_route('attributes', '/apps/{app}/attributes/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
     config.add_route('dataset_attributes', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/attributes.{ext}', custom_predicates=(applist,))
     config.add_route('add_attributes', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/attributes', custom_predicates=(applist,)) #POST
@@ -133,6 +136,7 @@ def main(global_config, **settings):
 
 #to the search
     config.add_route('search_datasets', '/apps/{app}/search/datasets.{ext}', custom_predicates=(applist,))
+    config.add_route('search_facets', '/apps/{app}/search/facets/{facet}.{ext}', custom_predicates=(applist,)) #TODO: is this what is needs to be? need some route, though.
     config.add_route('search_features', '/apps/{app}/search/features.json', custom_predicates=(applist,))
     config.add_route('search_geolookups', '/apps/{app}/search/{geolookup}.json', custom_predicates=(applist,geolookuplist,))
     config.add_route('search_categories', '/apps/{app}/search/categories.json', custom_predicates=(applist,))
@@ -169,8 +173,6 @@ def main(global_config, **settings):
 
     config.add_route('dataone_object', '/dataone/v1/object/{pid:.*}')
     config.add_route('dataone_object_slash', '/dataone/v1/object/{pid:.*}/')
-#    config.add_route('dataone_object', '/apps/{app}/v1/object/{pid}', custom_predicates=(applist,))
-#    config.add_route('dataone_object_slash', '/apps/{app}/v1/object/{pid}/', custom_predicates=(applist,))
     config.add_route('dataone_meta', '/dataone/v1/meta/{pid:.*}')
     config.add_route('dataone_meta_slash', '/dataone/v1/meta/{pid:.*}/')
     config.add_route('dataone_checksum', '/dataone/v1/checksum/{pid:.*}')
@@ -182,19 +184,20 @@ def main(global_config, **settings):
     config.add_route('dataone_error_slash', '/dataone/v1/error/') 
 
     #maintenance routes
-    config.add_route('dataone_addcore', '/dataone/v1/core/add')
-    config.add_route('dataone_addmetadata', '/dataone/v1/metadata/add')
-    config.add_route('dataone_addvector', '/dataone/v1/vector/add')
-    config.add_route('dataone_addsource', '/dataone/v1/source/add')
-    config.add_route('dataone_addpackage', '/dataone/v1/package/add')
-    config.add_route('dataone_addobsolete', '/dataone/v1/obsolete/add')
-    config.add_route('dataone_updatepackage', '/dataone/v1/package/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/update')
+#    config.add_route('dataone_addcore', '/dataone/v1/core/add')
+#    config.add_route('dataone_addmetadata', '/dataone/v1/metadata/add')
+#    config.add_route('dataone_addvector', '/dataone/v1/vector/add')
+#    config.add_route('dataone_addsource', '/dataone/v1/source/add')
+#    config.add_route('dataone_addpackage', '/dataone/v1/package/add')
+#    config.add_route('dataone_addobsolete', '/dataone/v1/obsolete/add')
+#    config.add_route('dataone_updatepackage', '/dataone/v1/package/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/update')
+
+    config.add_route('dataone_add', '/dataone/v1/{object}/add')
+    config.add_route('dataone_update', '/dataone/v1/{object}/update')
 
 #to the dataset
     #use the integer dataset_id or the uuid
     config.add_route('dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}', custom_predicates=(applist, typelist,))
-    #removed: moving this type of functionality to the interface side of things (i.e. use the services.json request)
-    #config.add_route('html_dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.html', custom_predicates=(applist,))
     config.add_route('zip_dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}.zip', custom_predicates=(applist, typelist,))
     config.add_route('add_dataset', '/apps/{app}/datasets', custom_predicates=(applist,)) #POST
     config.add_route('update_dataset', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,)) #PUT
@@ -202,6 +205,9 @@ def main(global_config, **settings):
 
     config.add_route('dataset_streaming', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/dataset.{ext}', custom_predicates=(applist,))
     config.add_route('dataset_statistics', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/statistics.{ext}', custom_predicates=(applist,))
+
+    #elasticsearch builder
+    config.add_route('dataset_indexer', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/index.json', custom_predicates=(applist,))
 
 #to hydroserver
     #services (MODIFY FOR WSDL VS REST)

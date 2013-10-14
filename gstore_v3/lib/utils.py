@@ -141,6 +141,16 @@ def get_all_services(req):
     return svcs.split(',')
 
 '''
+get the default standards
+except gstore 
+'''
+def get_all_standards(req):
+    stds = req.registry.settings['DEFAULT_STANDARDS']
+    if not stds:
+        return []
+    return [s for s in stds.split(',') if s != 'GSTORE']
+
+'''
 get default metadata standards
 '''
 def get_all_standards(req):
@@ -188,6 +198,7 @@ def convert_timestamp(in_timestamp):
         return out_timestamp
     except:
         return None
+        
 #to compare a date (single column) with a search range
 def get_single_date_clause(column, start_range, end_range):
     start_range = convert_timestamp(start_range)

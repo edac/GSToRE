@@ -1,7 +1,7 @@
 from pyramid.view import view_config
 from pyramid.response import Response
 
-from pyramid.httpexceptions import HTTPNotFound
+from pyramid.httpexceptions import HTTPNotFound, HTTPServerError
 
 import sqlalchemy
 from sqlalchemy import desc, asc, func
@@ -24,6 +24,12 @@ from ..models.vocabs import geolookups
 from ..lib.spatial import *
 from ..lib.mongo import *
 from ..lib.utils import normalize_params, convert_timestamp, get_single_date_clause, get_overlap_date_clause, match_pattern
+from ..lib.database import get_dataset
+
+#starting with requests instead - unclear if you can concat query + query_raw to handle the dot field name concats
+#from elasticutils import S, F
+
+import requests
 
 '''
 search
@@ -69,38 +75,165 @@ def search_categories(request):
     {"total": 0, "results": []}
     '''
 
+    #set up the elasticsearch connection
+    es_connection = request.registry.settings['es_root']
+    es_index = request.registry.settings['es_dataset_index']
+    #TODO: change this to the combined search options
+    es_type = 'dataset'
+    es_user = request.registry.settings['es_user'].split(':')[0]
+    es_password = request.registry.settings['es_user'].split(':')[-1]
+
+    es_url = es_connection + es_index + '/' + es_type +'/_search'
+
+    #set up the basic query with embargo/active flags at the dataset level BUT not the app here 
+    #because the categories could be different for the apps (i.e. 'climate' for epscor and 'nrcs' for rgis (don't do that, though))
+    query = {
+        "size": 0,
+        "query": {
+            "filtered": {
+                "filter": {
+                    "and": [
+                        {"term": {"embargo": False}},
+                        {"term": {"active": True}}
+                    ]
+                }
+            }
+        }
+    }
+
+    #running with es
+    #TODO: add the checks for embargoed, inactive for this (BUT ADD THEM TO THE STUPID INDEX FIRST)
+    level = 0
+    parts = []
     if node and node != 'root':
         parts = node.split('__|__')
-
-        #TODO: deal with any html encoding (%, etc)
-        
         if len(parts) == 1:
-            #clicked on theme so get the distinct subthemes
-            #and use the any() for datasets to make sure that we don't pull any empty category sets (also with inactive check just in case 2003 color cir)
-            cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any(Dataset.is_embargoed==False), Category.datasets.any(Dataset.inactive==False))).distinct(Category.subtheme).order_by(Category.subtheme.asc()) 
-
-            resp = {"total": cats.count(), "results": [{"text": c.subtheme, "leaf": False, "id": '%s__|__%s' % (c.theme, c.subtheme)} for c in cats]}
-        elif len(parts) == 2:
-            #clicked on the subtheme
-            cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.theme==parts[0], Category.datasets.any(Dataset.is_embargoed==False), Category.datasets.any(Dataset.inactive==False))).filter(Category.subtheme==parts[1]).order_by(Category.groupname.asc()) 
-
-            resp = {"total": cats.count(), "results": [{"text": c.groupname, "leaf": True, "id": '%s__|__%s__|__%s' % (c.theme, c.subtheme, c.groupname), "cls": "folder"} for c in cats]}
-        else:
-            #clicked on the groupname or something
-            #return nothing right now, it isn't meaningful
-            #and apparently not called from rgis
-            resp = {'total': 0, 'results': []}
+            #get subthemes
+            facets = {
+                "categories": {"terms": {"field": "subtheme", "size": 100, "order": "term"},
+                    "nested": "category_facets",
+                    "facet_filter": {
+                        "query": {
+                            "filtered": {
+                                "query": {"match_all": {}},
+                                "filter": {
+                                    "and": [
+                                        {"term": {"apps": app.lower()}},
+                                        {"term": {"theme": parts[0]}}
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             
+            query.update({"facets": facets})
+
+            level = 1
+        elif len(parts) == 2:
+            #get groupnames
+            facets = {
+                "categories": {"terms": {"field": "groupname", "size": 100, "order": "term"},
+                    "nested": "category_facets",
+                    "facet_filter": {
+                        "query": {
+                            "filtered": {
+                                "query": {"match_all": {}},
+                                "filter": {
+                                    "and": [
+                                        {"term": {"apps": app.lower()}},
+                                        {"term": {"theme": parts[0]}},
+                                        {"term": {"subtheme": parts[1]}}
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            query.update({"facets": facets})
+
+            level = 2
+        else:
+            resp = {'total': 0, 'results': []}
+
+            level = 3
     else:
-        #just pull all of the categories for the app
-        cats = DBSession.query(Category).filter(and_("'%s'=ANY(apps)" % (app), Category.datasets.any(Dataset.is_embargoed==False), Category.datasets.any(Dataset.inactive==False))).distinct(Category.theme).order_by(Category.theme.asc()).order_by(Category.subtheme.asc()).order_by(Category.groupname.asc()) 
-        resp = {"total": cats.count(), "results": [{"text": c.theme, "leaf": False, "id": c.theme} for c in cats]}
+        #get themes with datasets in the app
+        '''
+        {
+	        "size": 0,
+            "query": {
+            	    "match_all": {}
+            },
+            "facets": {
+                "categories": {
+                    "terms": {"field": "theme", "size": 600, "order": "term"},
+                    "nested": "category_facets",
+                    "facet_filter": {
+                    	"query": {
+                        	"filtered": {
+                            	"query": {
+                                	"match_all": {}
+                                },
+                                "filter": {
+                                	    "and": [
+                                    	    {"term": {"apps": "epscor"}}
+                                    ]
+                                }
+                            }
+                        }
+                    	}
+                }
+            }
+        }
+        '''
+        #the field of the nested set, the size (for now) is larger than the set, and order by the term alphabetically
+        facets = {
+            "categories": {"terms": {"field": "theme", "size": 700, "order": "term"},
+                "nested": "category_facets",
+                "facet_filter": {
+                    "query": {
+                        "filtered": {
+                            "query": {"match_all": {}},
+                            "filter": {
+                                "and": [
+                                    {"term": {"apps": app.lower()}}
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        query.update({"facets": facets})
+
+    if 'check' in params:
+        #for testing - get the elasticsearch json request
+        return query
+
+    results = requests.post(es_url, data=json.dumps(query), auth=(es_user, es_password))
+    
+    data = results.json()
+    if 'facets' not in data:
+        resp = {'total': 0, 'results': []} 
+    else:
+        facets = data['facets']['categories']['terms']
+        resp = {"total": len(facets)}
+        rslts = []
+        if level == 0:
+            rslts = [{"text": facet['term'], "leaf": False, "id": facet['term']} for facet in facets]
+        elif level == 1:
+            rslts = [{"text": facet['term'], "leaf": False, "id": '%s__|__%s' % (parts[0], facet['term'])} for facet in facets]
+        elif level == 2:
+            rslts = [{"text": facet['term'], "True": False, "cls": "folder", "id": '%s__|__%s__|__%s' % (parts[0], parts[1], facet['term'])} for facet in facets]
+        resp.update({"results": rslts})
 
     response = Response(json.dumps(resp))
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.content_type="application/json"    
     return response
-    #return resp
 
 #return datasets
 #TODO: maybe not renderer - firefox open with?   
@@ -132,19 +265,27 @@ def search_datasets(request):
 
     /search/datasets.json?query=property&offset=0&sort=lastupdate&dir=desc&limit=15&theme=Boundaries&subtheme=General&groupname=New+Mexico
     '''
-
     ext = request.matchdict['ext']
     app = request.matchdict['app']
 
     params = normalize_params(request.params)
 
     #pagination
-    limit = int(params.get('limit')) if 'limit' in params else 25
+    limit = int(params.get('limit')) if 'limit' in params else 15
     offset = int(params.get('offset')) if 'offset' in params else 0
 
     #get version 
     version = int(params.get('version')) if 'version' in params else 2
 
+    #category params
+    theme = params.get('theme') if 'theme' in params else ''
+    subtheme = params.get('subtheme') if 'subtheme' in params else ''
+    groupname = params.get('groupname') if 'groupname' in params else ''
+
+    theme = theme.replace('+', ' ')
+    subtheme = subtheme.replace('+', ' ' )
+    groupname = groupname.replace('+', ' ' )
+    
     #check for valid utc datetime
     start_added = params.get('start_time') if 'start_time' in params else ''
     end_added = params.get('end_time') if 'end_time' in params else ''
@@ -153,213 +294,208 @@ def search_datasets(request):
     start_valid = params.get('valid_start') if 'valid_start' in params else ''
     end_valid = params.get('valid_end') if 'valid_end' in params else ''
 
+    #TODO: add the uuid back in (but as a prefix? search)
     #check for uuid (and append wildcard if not match to the regex)
     search_uuid = params.get('uuid', '')
-    '''
-    select id, uuid, description, basename
-    from gstoredata.datasets
-    where uuid::text like 'ab4a%';
 
 
-    from gstore_v3.models import *
-    from sqlalchemy.sql.expression import cast
-    import sqlalchemy
-    ds = DBSession.query(datasets.Dataset).filter(cast(datasets.Dataset.uuid, sqlalchemy.String).like('ab4a%'))
-    ds.count()
-    '''
-
-    #check for format
     format = params.get('format', '')
-
-    #check for taxonomy
     taxonomy = params.get('taxonomy', '')
-    
-    #check for geomtype
     geomtype = params.get('geomtype', '').replace('+', ' ')
-
-    #TODO: add some explicit service field for this
-    #check for avail services
     service = params.get('service', '')
 
-    #sort parameter
+
     sort = params.get('sort') if 'sort' in params else 'lastupdate'
-    #if sort not in ['lastupdate', 'text', 'theme', 'subtheme', 'groupname']:
-    #this includes geo-relevance even though it is not used (it is part of the request from rgis though)
     if sort not in ['lastupdate', 'description', 'geo_relevance']:
         return HTTPNotFound()
-    #TODO: make this less bad
-    sort = 'dateadded' if sort == 'lastupdate' else sort
-    sort = 'description' if sort == 'description' else sort
 
-    #sort direction
+    sort = 'date_added' if sort == 'lastupdate' else sort
+    sort = 'title' if sort == 'description' else sort
+
     sortdir = params.get('dir').upper() if 'dir' in params else 'DESC'
-    #TODO: check on the sort direction (maybe backwards?)
-    direction = 0 if sortdir == 'DESC' else 1
+    order = 'desc' if sortdir == 'DESC' else 'asc'
 
-    #keyword search
+    #TODO: needs a better query param structure (also +, -, etc, for es)
     keyword = params.get('query') if 'query' in params else ''
-    keyword = keyword.replace(' ', '%').replace('+', '%')
+    keyword = keyword.replace('+', ' ')
 
-    #sort geometry
+
     box = params.get('box') if 'box' in params else ''
     epsg = params.get('epsg') if 'epsg' in params else ''
 
-    #category params
-    theme = params.get('theme') if 'theme' in params else ''
-    subtheme = params.get('subtheme') if 'subtheme' in params else ''
-    groupname = params.get('groupname') if 'groupname' in params else ''
+    #set up the elasticsearch connection
+    es_connection = request.registry.settings['es_root']
+    es_index = request.registry.settings['es_dataset_index']
+    #TODO: modify this to run multiple doctypes (like dataset and collections)
+    es_type = 'dataset'
+    es_user = request.registry.settings['es_user'].split(':')[0]
+    es_password = request.registry.settings['es_user'].split(':')[-1]
 
-    '''
-    #from pshell
-    from gstore_v3.models import *
-    from sqlalchemy.sql.expression import and_
-    #get the initial dataset filters
-    query = DBSession.query(datasets.Dataset).filter(and_(datasets.Dataset.inactive==False, datasets.Dataset.is_available==True))
-    #build up a list of filters
-    clauses = [datasets.Category.theme=='Boundaries', datasets.Category.subtheme=='General', datasets.Category.groupname=='New Mexico']
-    #join and filter again
-    query2 = query.join(datasets.Dataset.categories).filter(and_(*clauses))
+    es_url = es_connection + es_index + '/' + es_type + '/_search'
 
-    #except for the formats (not_ func.any generates bad sql or what sqlalchemy thinks is bad sql)
-    #this works
-    query = DBSession.query(datasets.Dataset).filter("not 'pdf'= ANY(excluded_formats)")
-    #if we want to have some set (arrays overlap)
-    use this - not '{zip,kml}' && excluded_formats
-    '''
+    #set up the json for the request
+    #where we only want the _ids (uuids) back
+    query_request = {"size": limit, "from": offset, "fields": ["_id"]}   
 
-    #set up the basic dataset clauses
-    #always exclude deactivated datasets and the app from the url
-    dataset_clauses = [Dataset.inactive==False, "apps_cache @> ARRAY['%s']" % (app), Dataset.is_embargoed==False]
+    #TODO: this should probably be revised to not have two sets of filtered
+    #filtered = {"query": {"term": {"applications": app.lower()}}}
+    filtered = {}
+
+    #set up the filters, with the mandatory app part
+    #currently everything is AND
+    f_and = [{"term": {"applications": app.lower()}}, {"term": {"embargo": False}}, {"term": {"active": True}}]
+    
+    #add some category stuff
+    if theme:
+        f_and.append({"query": {"match": {"category.theme": {"query": theme, "operator": "and"}}}})
+    if subtheme:
+        f_and.append({"query": {"match": {"category.subtheme": {"query": subtheme, "operator": "and"}}}})
+    if groupname:
+        f_and.append({"query": {"match": {"category.groupname": {"query": groupname, "operator": "and"}}}})
+
     if format:
-        #check that it's a supported format
-        default_formats = request.registry.settings['DEFAULT_FORMATS'].split(',')
-        if format not in default_formats:
-            return HTTPNotFound() 
-        #add the filter
-        dataset_clauses.append("not '%s' = ANY(excluded_formats)" % format)
+        f_and.append({"query": {"term": {"formats": format.lower()}}})
 
-    if search_uuid:
-        pttn = '[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}'
-        if not match_pattern(pttn, search_uuid):
-            search_uuid += '%'
-        dataset_clauses.append(cast(Dataset.uuid, sqlalchemy.String).like(search_uuid))
+    if service:
+        f_and.append({"query": {"term": {"services": service.lower()}}})
 
     if taxonomy:
-        dataset_clauses.append(Dataset.taxonomy==taxonomy)
+        f_and.append({"query": {"term": {"taxonomy": taxonomy.lower()}}})
 
-    if geomtype and geomtype.upper() in ['POLYGON', 'POINT', 'LINESTRING', 'MULTIPOLYGON', '3D POLYGON', '3D LINESTRING']:
-        dataset_clauses.append(Dataset.geomtype==geomtype.upper())
+        #NOTE: geomtype is not currently in the indexed docs
+        if geomtype and geomtype.upper() in ['POLYGON', 'POINT', 'LINESTRING', 'MULTIPOLYGON', '3D POLYGON', '3D LINESTRING']:
+            f_and.append({"query": {"term": {"geomtype": geomtype.lower()}}})
 
     if keyword:
-        #check the description field and the flattened alias field
-        #TODO: convert the string clause to some sqla structure (although i didn't find anything for the array_to_string fxn that worked)
-        keyword = '%' + keyword + '%'
-        dataset_clauses.append(or_(Dataset.description.ilike(keyword), "array_to_string(aliases, ',') like '%s'" % keyword))     
+        #TODO: this may be a little extreme
+#        f_and.append({"query": {"match": {"title": {"query": keyword, "operator": "and"}}}})
+#        f_and.append({"query": {"match": {"aliases": }}})
+        key_search = {
+            "query": {
+                
+                    "filtered": {
+                        "filter": {
+                            "or": [
+                                {"query": {"match": {"title": {"query": keyword, "operator": "and"}}}},
+                                {"query": {"match": {"aliases": {"query": keyword, "operator": "and"}}}}
+                            ]
+                        }
+                    }
+                }
+        }
+        f_and.append(key_search)
 
-  
-    #add the dateadded
+    #fun with dates
+    dfmt = '%Y-%m-%d'
     if start_added or end_added:
-        c = get_single_date_clause(Dataset.dateadded, start_added, end_added)
-        if c is not None:
-            dataset_clauses.append(c)
+        range_request = {}
+        started = convert_timestamp(start_added)
+        ended = convert_timestamp(end_added)
+        if started and not ended:
+            range_request.update({"gte": started.strftime(dfmt)})
+        if not started and ended:
+            range_request.update({"lte": ended.strftime(dfmt)})
+        if started and ended:
+            range_request.update({"gte": started.strftime(dfmt), "lte": ended.strftime(dfmt)})
+        f_and.append({"range": {"date_added": range_request}})
 
-    #and the valid data range
-    if start_valid or end_valid:
-        c = get_overlap_date_clause(Dataset.begin_datetime, Dataset.end_datetime, start_valid, end_valid)
-        if c is not None:
-            dataset_clauses.append(c)
-            #and add a check for non-null values or we get the world
-            
+    #TODO: this is not actually in the indexes
+#    if start_valid or end_valid:    
+#        range_request = {}
+#        if start_valid and not end_valid:
+#            range_request.update({"gte": convert_timestamp(start_valid).strftime(dfmt)})
+#        if not start_valid and end_valid:
+#            range_request.update({"lte": convert_timestamp(start_valid).strftime(dfmt)})
+#        if start_valid and end_valid:
+#            range_request.update({"from": convert_timestamp(start_valid).strftime(dfmt), "to": convert_timestamp(start_valid).strftime(dfmt)})
+#        f_and.append({"range": {"date_valid": range_request}})
 
-    '''
-    all the spatial query bits
-    '''
-    #TODO: move this somewhere more general for feature and feature streamer search
-    #can't check for existence of binary expression widget apparently so add a flag
-    georel_column = None
-    has_georel = False
+
+    #set up the initial sort
+    sort_arr = [{"dataset." + sort : {"order": order.lower()}}]
+    if sort != 'title':
+        sort_arr.append({"dataset.title": {"order": "asc"}})
+    s = {"sort": sort_arr}
+
+    
+    search_area = 0.  #ha, this is so bad (div by zero later)
+    spatial_search = False
+    #Like nailing jelly to kittens
     if box:
+        #build the query for the bbox search
         srid = int(request.registry.settings['SRID'])
-        #make sure we have a valid epsg
         epsg = int(epsg) if epsg else srid
-        
-        #convert the box to a bbox
+
+        #TODO: could probably do this with a to_geojson ogr method. (the output polygon array, i mean)
         bbox = string_to_bbox(box)
-
-        #and to a geom
         bbox_geom = bbox_to_geom(bbox, epsg)
-
-        #and reproject to the srid if the epsg doesn't match the srid
         if epsg != srid:
             reproject_geom(bbox_geom, epsg, srid)
 
-        if bbox_geom:
-            #TODO: look into pulling some of geoalchemy over or something
-            #setsrid may not matter? but probably should
-            bbox_wkt = geom_to_wkt(bbox_geom, srid)
-            dataset_clauses.append(func.st_intersects(func.st_setsrid(Dataset.geom, srid), func.st_geometryfromtext(bbox_wkt)))
+        search_area = bbox_geom.Area()
 
-            georel_column = func.st_area(func.st_setsrid(Dataset.geom, srid)) / func.st_area(func.st_geometryfromtext(bbox_wkt))
-            has_georel = True
+        coords = [[[bbox[0], bbox[1]],[bbox[0],bbox[3]],[bbox[2],bbox[3]],[bbox[2],bbox[1]],[bbox[0],bbox[1]]]]
+        
+        geo_shape = {
+            "location.bbox" : {
+                "shape": {
+                    "type": "Polygon",
+                    "coordinates": coords
+                }
+            }
+        }
 
+        f_and.append({"geo_shape": geo_shape})
 
-    #set up the dataset query
-    query = DBSession.query(Dataset).filter(and_(*dataset_clauses))
+        #add the sort by georelevance
+        s = {"sort": [{"_score": order.lower()}]}
+        spatial_search = True
 
-    #TODO: levels + categories? don't get it yet
-    #category search
-    category_clauses = []
-    if theme:
-        category_clauses.append(Category.theme.ilike(theme))
-    if subtheme:
-        category_clauses.append(Category.subtheme.ilike(subtheme))
-    if groupname:
-        category_clauses.append(Category.groupname.ilike(groupname))
+    #finish building the POST data
+    if f_and:
+        #don't include an empty AND array (returns no results)
+        filtered.update({"filter": {"and": f_and}})
+        
+    if spatial_search:
+        #need to wrap the one query in a custom_score query widget instead
+        i_query = {
+            "custom_score": {
+                "query": {"filtered": filtered},
+                "params": {
+                    "search_area": search_area
+                },
+                "script": "_source.dataset.area / search_area"
+            } 
+        }
 
-    #join to categories if we need to
-    if category_clauses:
-        query = query.join(Dataset.categories).filter(and_(*category_clauses))
+        query_request.update({"query": i_query})
+    else:
+        query_request.update({"query": {"filtered": filtered}})
 
-    #TODO : figure out why the app filter also returns objects where app == null    
-    #TODO: revise output format for is_available T/F (if F no downloads, no services)
+    #add the sort
+    query_request.update(s)
+    
 
-    total = query.count()
+    if 'check' in params:
+        #for testing - get the elasticsearch json request
+        return Response(json.dumps({"search": query_request, "url": es_url}), content_type = 'application/json')
+
+    results = requests.post(es_url, data=json.dumps(query_request), auth=(es_user, es_password))
+
+    if results.status_code != 200:
+        #return HTTPServerError('%s, %s' % (results.status_code, results.text))
+        return Response(json.dumps({"total": 0, "results": []}), content_type = 'application/json')
+    
+    total = results.json()['hits']['total'] if 'hits' in results.json() else 0
+
     if total < 1:
+        #TODO: add the cors to this
         return Response(json.dumps({"total": 0, "results": []}), content_type = 'application/json')
 
-    #add the georelevance bit to the results so we don't calculate it for everything we don't need
-    if has_georel:
-        #so add geom area / search area to create a dataset tuple of goodness
-        query = query.add_columns(georel_column)
+    #TODO: figure out what to do if, horrifically, the es uuid count does not match the dataset count
+    dataset_ids = [i['_id'] for i in results.json()['hits']['hits']]
 
-    #set up the sorting
-    #TODO: theme, subtheme, groupname sorting? (or was that just for the category tree?)
-    if sort:
-        if sort == 'description':
-            sort_clause = Dataset.description
-        else:
-            #run with dateadded
-            sort_clause = Dataset.dateadded
-        if direction == 0:
-            sort_clause = sort_clause.desc()
-        else:
-            sort_clause = sort_clause.asc()
-    else:
-        #it's the descending dateadded
-        sort_clause = Dataset.dateadded.desc()
-    sort_clauses = [sort_clause]
-    
-    if has_georel:
-        #add the georelevance
-        sort_clauses.insert(0, georel_column.asc())
-
-    #and run the limit/offset/sort
-    datas = query.order_by(*sort_clauses).limit(limit).offset(offset)
-
-#    #get the host url
-#    host = request.host_url
-#    g_app = request.script_name[1:]
-#    base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
+    has_georel = False
 
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
@@ -367,7 +503,6 @@ def search_datasets(request):
     #NOTE: calls to get_current_registry during the app_iter yield part returns NONE so there's an error and we can't get what we need
     head = """{"total": %s, "results": [""" % (total)
     tail = ']}'
-    
 
     if ext=='kml':
         head = """<?xml version="1.0" encoding="UTF-8"?>
@@ -378,16 +513,19 @@ def search_datasets(request):
         folder_tail = "</Folder>"
         field_set = """<Schema name="searchFields"><SimpleField type="string" name="DatasetUUID"><displayName>Dataset UUID</displayName></SimpleField><SimpleField type="string" name="DatasetName"><displayName>Dataset Name</displayName></SimpleField><SimpleField type="string" name="Category"><displayName>Category</displayName></SimpleField><SimpleField type="string" name="DatasetServices"><displayName>Dataset Information</displayName></SimpleField></Schema>"""
 
-    subtotal = datas.count()
+    subtotal = len(dataset_ids)
     if subtotal < 1:
-        if format == 'json':
+        if ext == 'json':
             return {"total": 0, "results": []}
         else:
             #TODO: return empty kml set
             return Response()
     limit = subtotal if subtotal < limit else limit
-    
+
     def yield_results():
+        #query for the datasets
+        datasets = DBSession.query(Dataset).filter(Dataset.uuid.in_(dataset_ids))
+    
     
         #note: georelevance is added not as an extra field but as the second element in a tuple. the first element is the dataset object. hence the wonkiness.
         if version == 2:
@@ -396,12 +534,14 @@ def search_datasets(request):
             ''' 
 
             cnt = 0
-            for ds in datas:
+            for d in datasets:
+                #d = get_dataset(ds)
+#                if not d:
+#                    continue
+                    
                 if has_georel:
-                    d = ds[0]
                     gr = ds[1]
                 else:
-                    d = ds
                     gr = 0.0
 
                 services = d.get_services(request)
@@ -442,13 +582,18 @@ def search_datasets(request):
             new format
             '''
             cnt = 0
-            for ds in datas:
+            
+#            for ds in dataset_ids:
+#                d = get_dataset(ds)
+#                if not d:
+#                    continue
+            for d in datasets:
+                    
                 if has_georel:
-                    d = ds[0]
                     gr = ds[1]
                 else:
-                    d = ds
                     gr = 0.0
+                    
                 rst = d.get_full_service_dict(base_url, request)
                 rst.update({'gr': gr})
                 rst = json.dumps(rst)
@@ -514,6 +659,8 @@ def search_datasets(request):
                     </Placemark>""" % (d.id, d.description.replace('&', '&amp;') if '&amp;' not in d.description else d.description, d.dateadded.strftime('%Y-%m-%d'), geom_repr, flds)
                     
         return feature
+
+    
 
     response = Response()
     response.headers['Access-Control-Allow-Origin'] = '*'
@@ -699,6 +846,7 @@ def search_features(request):
     return {'total': len(fids), 'features': fids[s:e]}
 
 
+#TODO: replace this with FACET search route thing
 #NOTE: we chucked the geolookups structure completely to just keep a cleaner url moving forward.
 whats = ["nm_counties", "nm_gnis", "nm_quads"]
 #return geolookup data

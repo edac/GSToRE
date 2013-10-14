@@ -16,9 +16,7 @@
     <replicationPolicy replicationAllowed="false"></replicationPolicy>
     
     % if obsoletes:
-        % for obs in obsoletes:
-            <obsoletes>${obs}</obsoletes>
-        %endfor
+        <obsoletes>${obsoletes}</obsoletes>
     % endif
 
     % if obsoletedby:

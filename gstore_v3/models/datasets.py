@@ -1,6 +1,7 @@
 from gstore_v3.models import Base, DBSession
 from sqlalchemy import MetaData, Table, ForeignKey
 from sqlalchemy import Column, String, Integer, Boolean, FetchedValue, TIMESTAMP, Numeric
+from sqlalchemy import func
 from sqlalchemy.orm import relationship, backref
 
 from sqlalchemy.ext.declarative import declarative_base
@@ -81,8 +82,7 @@ class Dataset(Base):
         schema='gstoredata' #THIS IS KEY
     ) 
 
-    #category join
-    #note: the table name should be the metadata tablename which i guess includes the schema
+    #categories
     categories = relationship('Category', 
                     secondary='gstoredata.categories_datasets',
                     backref='datasets')
@@ -117,6 +117,10 @@ class Dataset(Base):
     #relate to citations
     citations = relationship('Citation', secondary='gstoredata.datasets_citations', backref='datasets')
 
+
+    #relates to the d1 stuff
+    scimeta_objects = relationship('DataoneScienceMetadataObject', backref='datasets')
+    data_objects = relationship('DataoneDataObject', backref='datasets')
       
     def __init__(self, description):
         self.description = description
@@ -455,6 +459,77 @@ class Dataset(Base):
         return results
 
 
+    def get_index_doc(self, req=None):
+        '''
+        return the json for the elasticsearch index
+
+        '''
+
+        fmts = self.get_formats(req)
+        svcs = self.get_services(req)
+
+        bbox = string_to_bbox(self.box)
+
+        isotopic = ''
+        abstract = ''
+        if self.gstore_metadata:
+            #get the abstract and other bits
+            isotopic = self.gstore_metadata[0].get_isotopic()
+            abstract = self.gstore_metadata[0].get_abstract()
+
+        geom = wkb_to_geom(self.geom, 4326)
+        area = geom.GetArea()
+        
+
+#        quads = DBSession.query(func.gstoredata.intersect_geolookup(self.id, 'nm_quads')).first()
+#        quads = quads[0] if quads else []
+
+#        counties = DBSession.query(func.gstoredata.intersect_geolookup(self.id, 'nm_counties')).first()
+#        counties = counties[0] if counties else []
+
+        categories = self.categories
+
+        facets = []
+        for cat in categories:
+            facets.append({"theme": str(cat.theme), "subtheme": str(cat.subtheme), "groupname": str(cat.groupname), "apps": self.apps_cache})
+
+        #if bbox[0] == bbox[2] and bbox[1] == bbox[3]:
+        if area == 0:
+            loc = {"type": "Point", "coordinates": [bbox[0], bbox[1]]}
+        else:
+            loc = {
+                    "type": "Polygon",
+                    "coordinates": [[[bbox[0], bbox[1]], [bbox[2], bbox[1]], [bbox[2], bbox[3]], [bbox[0], bbox[3]], [bbox[0], bbox[1]]]]
+                }
+
+
+        es = {
+            "taxonomy": self.taxonomy,
+            "title": str(self.description),
+            "formats": fmts,
+            "services": svcs,
+            "date_added": self.dateadded.strftime('%Y-%m-%d'),
+            "applications": self.apps_cache,
+            "location": {
+                "bbox": loc
+            },
+            "isotopic": isotopic,
+            "abstract": abstract,
+            "aliases": self.aliases if self.aliases else [],
+            "active": not self.inactive,
+            "embargo": self.is_embargoed,
+            "available": self.is_available,
+            "category": {"theme": categories[0].theme, "subtheme": categories[0].subtheme, "groupname": categories[0].groupname, "apps": self.apps_cache},
+            "category_facets": facets, 
+            "area": area
+        }
+
+        if self.taxonomy == 'vector':
+            es.update({"geomtype": self.geomtype.lower()})
+
+        return es
+        
+
     def get_onlinks(self, base_url):
         '''
         return a flattened list of online linkages
@@ -617,12 +692,17 @@ class Dataset(Base):
             #do the transformation
             gm = self.gstore_metadata[0]
 
-            gstoreapp = DBSession.query(GstoreApp).filter(GstoreApp.route_key==metadata_info['app'] if 'app' in metadata_info else 'rgis').first()
-
+            if 'app' in metadata_info:
+                app = metadata_info['app'].lower()
+            else:
+                app = 'rgis'
+            gstoreapp = DBSession.query(GstoreApp).filter(GstoreApp.route_key==app).first()
+    
             metadata_info.update({"app-name": gstoreapp.full_name, "app-url": gstoreapp.url})
 
             #TODO: figure out when we want to run the validation
-            text = gm.transform(out_standard, out_format, metadata_info['xslt_path'], metadata_info, metadata_info['validate'])
+            validate = metadata_info['validate'] if 'validate' in metadata_info else False
+            text = gm.transform(out_standard, out_format, metadata_info['xslt_path'], metadata_info, validate)
             if not text:
                 return False
             
@@ -702,16 +782,6 @@ class Dataset(Base):
         workbook.save(filename)
         files = [filename]
 
-#        om = [o for o in self.original_metadata if self.has_metadata_cache and o.original_xml_standard == metadata_info['standard']]
-#        if om:
-#            metadata_file = '%s.xls.xml' % (os.path.join(basepath, self.basename))
-#            written = om[0].write_xml_to_disk(metadata_file, metadata_info)
-#            if written:
-#                files.append(metadata_file)
-                
-
-        #TODO: perhaps update this with other standards at some point?
-        #out_standard = 'FGDC-STD-012-2002' if self.taxonomy == 'geoimage' else 'FGDC-STD-001-1998'
         out_standard = metadata_info['standard']
         out_format = 'xml'
         metadata_file = '%s.xls.xml' % (os.path.join(basepath, self.basename))
@@ -724,81 +794,13 @@ class Dataset(Base):
         
         return (0, 'success')
 
-    #build the plain json (ogr generates geojson) without the geometry
-    #it is effectively streaming the results
-    def build_json(self, basepath, mongo_uri, metadata_info):
-        #get the data
-        gm = gMongo(mongo_uri)
-
-        #only request as many as excel can handle
-        vectors = gm.query({'d.id': self.id})
-        total = vectors.count()
-
-        fields = self.attributes
-        encode_as = 'utf-8'
-
-        def generate_stream():
-            head = """{"features": ["""
-            tail = "]}"
-            delimiter = ',\n'
-
-            yield head
-
-            cnt = 0
-            for vector in vectors:
-                fid = int(vector['f']['id'])
-                obs = vector['obs'] if 'obs' in vector else ''
-                obs = obs.strftime('%Y-%m-%dT%H:%M:%S+00') if obs else ''
-
-                #there's some wackiness with a unicode char and mongo (and also a bad char in the data, see fid 6284858)
-                #convert atts to name, value tuples so we only have to deal with the wackiness once
-                atts = [(a['name'], unicode(a['val']).encode('ascii', 'xmlcharrefreplace')) for a in vector['atts']]
-                
-                #just dump atts out
-                vals = dict([(a[0], str(a[1])) for a in atts])
-                result = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals, 'observed': obs})
-                
-                if cnt < total - 1 and total > 0:
-                    result += delimiter
-
-                cnt +=1
-                yield result.encode(encode_as)
-                
-            yield tail
-
-        #stream to a file    
-        tmp_path = tempfile.mkdtemp()
-        tmp_file = os.path.join(tmp_path, '%s.json' % (self.basename))
-        for g in generate_stream():
-            #append a tmp file
-            with open(tmp_file, 'a') as f:
-                f.write(g)  
-                
-        filename = os.path.join(basepath, '%s_json.zip' % (self.basename))
-        files = [tmp_file]
-        
-#        #add a metadata file if there's any metadata to add
-        #out_standard = 'FGDC-STD-012-2002' if self.taxonomy == 'geoimage' else 'FGDC-STD-001-1998'
-        out_standard = metadata_info['standard']
-        out_format = 'xml'
-        metadata_file = '%s.json.xml' % (os.path.join(basepath, self.basename))
-        
-        written = self.write_metadata(metadata_file, out_standard, out_format, metadata_info)
-        if written:
-            files.append(metadata_file)
 
 
-        #create the zip file
-        output = create_zip(filename, files)
-
-        for f in files:
-            outfile = f.replace(tmp_path, basepath)
-            shutil.copyfile(f, outfile) 
-
-        return (0, 'success')
-
+    #TODO: refactor for the two streams (stream_vector & stream_text)
     def stream_vector(self, format, basepath, mongo_uri, epsg, metadata_info):
         '''
+        THIS IS THE COMPRESSED FILE GENERATOR - output is a zip file with data file(s) and metadata file
+        
         optimization to speed up the file generation, especially for large vector datasets  
 
         if the request is for gml, json, csv, or kml -> stream those
@@ -823,8 +825,64 @@ class Dataset(Base):
         #convert from the geojson to avoid the encoding issues (ignored chars, etc)
         fmt = 'geojson' if format == 'shp' else format
 
-        #gml generator
-        #TODO: update kml/gml (+shp) to include observed field + values
+        
+        #build the text format
+        tmp_file = self.stream_text(fmt, metadata_info['base_url'], mongo_uri, epsg)
+        if not tmp_file or not os.path.isfile(tmp_file):
+            raise Exception()
+
+        tmp_path, tmp_name = os.path.split(tmp_file)
+                      
+        #pack up the results, with metadata, as a zip
+        filename = os.path.join(basepath, '%s_%s.zip' % (self.basename, format))
+        files = []
+        if format == 'shp':
+            #TODO: if we use this, change it back to the tmp folder and copy? 
+            #convert it first          
+            s = subprocess.Popen(['ogr2ogr', '-f', 'ESRI Shapefile', os.path.join(basepath, '%s.shp' % (self.basename)), tmp_file, '-lco', 'ENCODING=UTF-8'], shell=False) 
+               
+            status = s.wait()
+            #note: the prj file should be generated already
+            #TODO: add a spatial index
+        
+            exts = ['shp', 'shx', 'dbf', 'prj', 'shp.xml', 'sbn', 'sbx']
+            for e in exts:
+                if os.path.isfile(os.path.join(basepath, '%s.%s' % (self.basename, e))):
+                    files.append(os.path.join(basepath, '%s.%s' % (self.basename, e)))
+
+        else:
+            files.append(os.path.join(tmp_path, '%s.%s' % (self.basename, format)))
+            
+        #add a metadata file if there's any metadata to add
+        out_standard = metadata_info['standard']
+        out_format = 'xml'
+        metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
+        
+        written = self.write_metadata(metadata_file, out_standard, out_format, metadata_info)
+        if written:
+            files.append(metadata_file)    
+        
+        #create the zip file
+        output = create_zip(filename, files)
+
+        #copy to the formats cache
+        if format != 'shp':
+            for f in files:
+                outfile = f.replace(tmp_path, basepath)
+                shutil.copyfile(f, outfile)        
+
+        return (0, 'success')
+
+    def stream_text(self, fmt, base_url, mongo_uri, epsg):
+        '''
+        THIS IS THE PLAIN, UNCOMPRESSED, UNDOCUMENTED TEXT DATA STREAM
+        csv, json, geojson, kml, gml
+
+        '''
+
+        fields = self.attributes
+        encode_as = 'utf-8'
+
         def generate_stream():
             #set up the head, tail, folder info, etc
             folder_head = ''
@@ -844,7 +902,7 @@ class Dataset(Base):
                 folder_head = "<Folder><name>%s</name>" % (self.description)
                 folder_tail = "</Folder>"
 
-                schema_url = metadata_info['base_url'] + '%s/attributes.kml' % (self.uuid)
+                schema_url = base_url + '%s/attributes.kml' % (self.uuid)
 
                 kml_flds = [{'type': ogr_to_kml_fieldtype(f.ogr_type), 'name': f.name} for f in fields]
                 kml_flds.append({'type': 'string', 'name': 'observed'})
@@ -884,7 +942,7 @@ class Dataset(Base):
                     result += delimiter
 
                 cnt += 1
-                yield result #.encode(encode_as)
+                yield result 
 
             yield folder_tail + tail
 
@@ -912,11 +970,7 @@ class Dataset(Base):
             atts = vector['atts']
             #there's some wackiness with a unicode char and mongo (and also a bad char in the data, see fid 6284858)
             #convert atts to name, value tuples so we only have to deal with the wackiness once
-#            atts = [(a['name'], unicode(a['val']).encode('ascii', 'xmlcharrefreplace')) for a in atts]
-
-#            atts =[(a['name'], (a['val'].encode('ascii', 'xmlcharrefreplace') if fmt in ['kml', 'gml', 'csv'] else a['val'].encode('utf-8')) if isinstance(a['val'], str) else a['val']) for a in atts]
-
-            atts = [(a['name'], convert_by_ogrtype(a['val'], ogr.OFTString, format) if isinstance(a['val'], str) or isinstance(a['val'], unicode) else a['val']) for a in atts]
+            atts = [(a['name'], convert_by_ogrtype(a['val'], ogr.OFTString, fmt) if isinstance(a['val'], str) or isinstance(a['val'], unicode) else a['val']) for a in atts]
 
             #add the observed datetime for everything
             atts.append(('observed', obs))
@@ -936,8 +990,7 @@ class Dataset(Base):
             elif fmt == 'gml':
                 #going to match the gml from the dataset downloader
                 #need a list of values as <ogr:{att name}>VAL</ogr:{att name}>
-                #vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0], re.sub(r'[^\x20-\x7E]', '', escape(str(a[1]))), a[0]) for a in atts])
-                vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0],  a[1], a[0]) for a in atts])
+                vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0], a[1], a[0]) for a in atts])
                 feature = """<gml:featureMember><ogr:g_%(basename)s><ogr:geometryProperty>%(geom)s</ogr:geometryProperty>%(values)s</ogr:g_%(basename)s></gml:featureMember>""" % {
                         'basename': self.basename, 'geom': geom_repr, 'values': vals} 
             elif fmt == 'geojson':
@@ -951,7 +1004,6 @@ class Dataset(Base):
                     #this is, quite possibly, the stupidest thing ever. but it 'solves' the unicode error
                     v = '%s' % att[0][1] if att else ""
                     #and wrap in double quotes if there's a comma
-                    #v = '"%s"' % v if ',' in v else v
                     vals.append('%s' % v)
                 vals += [str(fid), str(did), obs]
                 feature = ','.join(vals)
@@ -964,62 +1016,14 @@ class Dataset(Base):
                     
             return feature
 
-        #run the generator for the streaming
-        #set up the temporary location
+
         tmp_path = tempfile.mkdtemp()
         tmp_file = os.path.join(tmp_path, '%s.%s' % (self.basename, fmt))
         for g in generate_stream():
-            #append a tmp file
             with open(tmp_file, 'a') as f:
-                f.write(g)  
-                      
-        #pack up the results, with metadata, as a zip
-        filename = os.path.join(basepath, '%s_%s.zip' % (self.basename, format))
-        files = []
-        if format == 'shp':
-            #TODO: if we use this, change it back to the tmp folder and copy? 
-            #convert it first
+                f.write(g)
 
-            #shp_tmp_path = os.path.join(tmp_path, '%s.shp' % (self.basename))
-            #s = subprocess.Popen(['ogr2ogr', '-f', 'ESRI Shapefile', shp_tmp_path, tmp_file, '-lco', 'ENCODING=UTF-8'], shell=False)
-            
-            s = subprocess.Popen(['ogr2ogr', '-f', 'ESRI Shapefile', os.path.join(basepath, '%s.shp' % (self.basename)), tmp_file, '-lco', 'ENCODING=UTF-8'], shell=False) 
-               
-            status = s.wait()
-            #note: the prj file should be generated already
-            #TODO: add a spatial index
-        
-            exts = ['shp', 'shx', 'dbf', 'prj', 'shp.xml', 'sbn', 'sbx']
-            for e in exts:
-                if os.path.isfile(os.path.join(basepath, '%s.%s' % (self.basename, e))):
-                    files.append(os.path.join(basepath, '%s.%s' % (self.basename, e)))
-
-        else:
-            files.append(os.path.join(tmp_path, '%s.%s' % (self.basename, format)))
-
-        #return (1, ','.join(files))
-            
-        #add a metadata file if there's any metadata to add
-        #out_standard = 'FGDC-STD-012-2002' if self.taxonomy == 'geoimage' else 'FGDC-STD-001-1998'
-        out_standard = metadata_info['standard']
-        out_format = 'xml'
-        metadata_file = '%s.%s.xml' % (os.path.join(tmp_path, self.basename), format)
-        
-        written = self.write_metadata(metadata_file, out_standard, out_format, metadata_info)
-        if written:
-            files.append(metadata_file)    
-        
-        #create the zip file
-        output = create_zip(filename, files)
-
-        #copy to the formats cache
-        if format != 'shp':
-            for f in files:
-                outfile = f.replace(tmp_path, basepath)
-                shutil.copyfile(f, outfile)        
-
-        return (0, 'success')
-
+        return tmp_file
 
     def move_vectors(self, to_mongo_uri, from_mongo_uri):
         '''

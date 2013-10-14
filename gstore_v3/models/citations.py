@@ -26,7 +26,7 @@ class Citation(Base):
         schema = 'gstoredata'
     )
 
-    def __inti__(self, citation):
+    def __init__(self, citation):
         self.citation = citation
 
     def __repr__(self):

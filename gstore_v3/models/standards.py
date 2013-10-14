@@ -71,6 +71,8 @@ class GstoreMetadata():
 
         title = elements_to_update['title'] if 'title' in elements_to_update else ''
         if title:
+            #just deal with the ampersands
+            title = title.replace('&', '&amp;') if '&amp;' not in title and '&' in title else title
             self.update_title(title)
 
         identifier = elements_to_update['identifier'] if 'identifier' in elements_to_update else ''
@@ -357,6 +359,14 @@ class GstoreMetadata():
         #move the structure over from our file of prebuilt fgdc blobs
         representation.append(deepcopy(ref_def))
 
+    #TODO: these are silly, do something else to get the elements
+    def get_abstract(self):
+        abstract = self.xml.find('identification/abstract')
+        return '' if abstract is None else abstract.text
+
+    def get_isotopic(self):
+        isotopic = self.xml.find('identification/isotopic')
+        return '' if isotopic is None else isotopic.text
 
 #####################TO TEST
 '''
