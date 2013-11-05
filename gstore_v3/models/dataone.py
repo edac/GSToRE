@@ -132,7 +132,7 @@ class DataoneDataObject(Base):
         except Exception as ex:
             DBSession.rollback()
             raise ex
-        
+         
     def activate_object(self):
         '''
         activate core
@@ -442,7 +442,7 @@ class DataoneDataPackage(Base):
     <rdf:type rdf:resource="http://www.openarchives.org/ore/terms/ResourceMap"/>
     <dcterms:modified>${package_modified}</dcterms:modified>
     <dcterms:creator rdf:resource="http://foresite-toolkit.googlecode.com/#pythonAgent"/>
-    <dc:format>application/rdf+xml</dc:format>
+    <dc:format>http://www.opernarchives.org/ore/terms</dc:format>
     <ore:describes rdf:resource="https://cn.dataone.org/cn/v1/resolve/${package_obsolete_uuid}#aggregation"/>
     <dcterms:created>${package_created}</dcterms:created>
     <dcterms:identifier>${package_obsolete_uuid}</dcterms:identifier>

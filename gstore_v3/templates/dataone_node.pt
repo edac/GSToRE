@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<d1:node xmlns:d1="http://ns.dataone.org/service/types/v1" replicate="true" synchronize="true" type="mn" state="up">
+<d1:node xmlns:d1="http://ns.dataone.org/service/types/v1" replicate="false" synchronize="true" type="mn" state="up">
     <identifier>${node}</identifier>
     <name>${name}</name>
     <description>${description}</description>
@@ -10,10 +10,11 @@
     </services>
     <synchronization>
         <schedule hour="*" mday="*" min="0/3" mon="*" sec="10" wday="?" year="*"/>
-        <lastHarvested>2012-03-06T14:57:39.851+00:00</lastHarvested>
-        <lastCompleteHarvest>2012-03-06T14:57:39.851+00:00</lastCompleteHarvest>
     </synchronization>
     <ping success="true"/>
     <subject>${subject}</subject>
-    <contactSubject>${contactsubject}</contactSubject>
+    <contactSubject>CN=Dev Team A10142,O=Google,C=US,DC=cilogon,DC=org</contactSubject>
 </d1:node>
+
+
+

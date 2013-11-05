@@ -1,7 +1,7 @@
 from pyramid.view import view_config
 from pyramid.response import Response, FileResponse
 
-from pyramid.httpexceptions import HTTPNotFound, HTTPServerError, HTTPBadRequest, HTTPNotImplemented
+from pyramid.httpexceptions import HTTPNotFound, HTTPServerError, HTTPBadRequest, HTTPNotImplemented, HTTPServiceUnavailable
 
 from sqlalchemy import desc, asc, func
 from sqlalchemy.sql.expression import and_
@@ -44,12 +44,11 @@ some presets
 NODE = 'urn:node:EDACGSTORE'
 SUBJECT = 'CN=gstore.unm.edu,DC=dataone,DC=org'
 RIGHTSHOLDER = 'CN=gstore.unm.edu,DC=dataone,DC=org'
-CONTACTSUBJECT = 'CN=gstore.unm.edu,DC=dataone,DC=org'
+CONTACTSUBJECT = 'CN=gstore.unm.edu,O=Google,C=US,DC=cilogon,DC=org'
 NAME = ''
 DESCRIPTION = ''
 CN_RESOLVER='https://cn.dataone.org/cn/v1/resolve'
-O='The University of New Mexico'
-OU='Earth Data Analysis Center'
+
 
 
 #TODO: what else needs to be logged other than object/pid (read)?
@@ -177,7 +176,7 @@ def ping(request):
     #raise notimplemented
     #raise servicefailure
     #raise insufficientresources
-
+    
     #run a quick test to make sure the db connection is active
     try:
         d = get_dataset('61edaf94-2339-4096-9cc0-4bfb79a9c848')
@@ -226,6 +225,9 @@ def dataone(request):
 
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/dataone/v1/' % (load_balancer)
+
+    #this is annoying. and incorrect anywhere but production
+    base_url = base_url.replace('http:', 'https:')
 
     #set up the dict
     rsp = {
@@ -681,6 +683,9 @@ def metadata(request):
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/dataone/v1/' % (load_balancer)
 
+    #this is annoying. and incorrect anywhere but production
+    base_url = base_url.replace('http:', 'https:')
+
     #dates should be from postgres, i.e. in utc
     rsp = {'pid': pid, 'dateadded': datetime_to_dataone(obj.date_added), 'obj_format': str(mimetype), 'file_size': file_size, 
            'uid': 'EDACGSTORE', 'o': 'EDAC', 'dc': 'everything', 'org': 'EDAC', 'hash_type': algo,
@@ -1035,6 +1040,9 @@ def add_object(request):
         balancer_url = request.registry.settings['BALANCER_URL']
         xslt_path = request.registry.settings['XSLT_PATH'] + '/xslts'
         dataone_path = request.registry.settings['DATAONE_PATH']
+
+        #this is annoying. and incorrect anywhere but production
+        balancer_url = balancer_url.replace('http:', 'https:')
     
         if object_type == 'dataobject':
             mconn = request.registry.settings['mongo_uri']
@@ -1111,7 +1119,13 @@ def update_object(request):
     }
     '''
 
-    object_type = request.match_dict['object']
+    object_type = request.match_dict['object'].lower()
+
+    data = request.json_body
+
+    
+
+    
     
     return ''
 
