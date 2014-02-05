@@ -76,7 +76,7 @@
                  </h4>
                  
                  <dl>
-                     <dt>Title <span><xsl:value-of select="identification/title"/></span></dt>
+                     <dt>Title <span itemprop="name"><xsl:value-of select="identification/title"/></span></dt>
                      <dt>Date <span><xsl:value-of select="$identity-citation/citation/publication/pubdate/@date"/></span></dt>
                      <dt>Date Type <span>Publication</span></dt>
                  
@@ -388,7 +388,7 @@
                  </h4>
                  
                  <dl>
-                     <dt>File Identifier <span><xsl:value-of select="identification/@dataset"/></span></dt>
+                     <dt>File Identifier <span><xsl:value-of select="identification/@identifier"/></span></dt>
                      <dt>Metadata Language <span>English</span></dt>
                      <dt>Hierarchy Level <span>Dataset</span></dt>
                      <dt>Date Stamp <span><xsl:value-of select="metadata/pubdate/@date"/></span></dt>

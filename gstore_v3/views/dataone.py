@@ -56,7 +56,7 @@ CN_RESOLVER='https://cn.dataone.org/cn/v1/resolve'
 
 #convert to the d1 format
 def datetime_to_dataone(dt):
-    fmt = '%Y-%m-%dT%H:%M:%S.0Z'
+    fmt = '%Y-%m-%dT%H:%M:%S.%fZ'
     return dt.strftime(fmt)
     
 def datetime_to_http(dt):
@@ -224,7 +224,7 @@ def dataone(request):
 
 
     load_balancer = request.registry.settings['BALANCER_URL']
-    base_url = '%s/dataone/v1/' % (load_balancer)
+    base_url = '%s/dataone/' % (load_balancer)
 
     #this is annoying. and incorrect anywhere but production
     base_url = base_url.replace('http:', 'https:')
@@ -424,20 +424,23 @@ def search(request):
             fd = dataone_to_datetime(fromDate)
             if not fd:
                 return return_error('object', 1504, 400)
-            search_clauses.append(DataoneSearch.most_recent >= fd)
+            #search_clauses.append(DataoneSearch.most_recent >= fd)
+            search_clauses.append(DataoneSearch.object_changed >= fd)
         elif not fromDate and toDate:
             #less than to
             ed = dataone_to_datetime(toDate)
             if not ed:
                 return return_error('object', 1504, 400)
-            search_clauses.append(DataoneSearch.most_recent < ed)
+            #search_clauses.append(DataoneSearch.most_recent < ed)
+            search_clauses.append(DataoneSearch.object_changed < ed)
         else:
             #between
             fd = dataone_to_datetime(fromDate)
             ed = dataone_to_datetime(toDate)
             if not fd or not ed:
                 return return_error('object', 1504, 400)
-            search_clauses.append(between(DataoneSearch.most_recent, fd, ed))
+#            search_clauses.append(between(DataoneSearch.most_recent, fd, ed))
+            search_clauses.append(between(DataoneSearch.object_changed, fd, ed))
 
     if formatId:
         #formatId = urllib2.unquote(formatId)
@@ -480,7 +483,9 @@ def search(request):
         md5 = obsolete.get_hash(algo, cached_path)
         fsize = obsolete.get_size(cached_path)
 
-        docs.append({'identifier': obsolete_uuid, 'format': object_format, 'algo': algo, 'checksum': md5, 'date': datetime_to_dataone(search.most_recent), 'size': fsize})
+#        docs.append({'identifier': obsolete_uuid, 'format': object_format, 'algo': algo, 'checksum': md5, 'date': datetime_to_dataone(search.most_recent), 'size': fsize})
+
+        docs.append({'identifier': obsolete_uuid, 'format': object_format, 'algo': algo, 'checksum': md5, 'date': datetime_to_dataone(search.object_changed), 'size': fsize})
         
     return {'total': total, 'count': cnt, 'start': offset, 'docs': docs}
 	
@@ -689,7 +694,7 @@ def metadata(request):
     #dates should be from postgres, i.e. in utc
     rsp = {'pid': pid, 'dateadded': datetime_to_dataone(obj.date_added), 'obj_format': str(mimetype), 'file_size': file_size, 
            'uid': 'EDACGSTORE', 'o': 'EDAC', 'dc': 'everything', 'org': 'EDAC', 'hash_type': algo,
-           'hash': file_hash, 'metadata_modified': datetime_to_dataone(obsolete.date_changed), 'mn': base_url, 'obsoletes': obsoletes_uuid, 'obsoletedby': obsoleted_by_uuid}
+           'hash': file_hash, 'metadata_modified': datetime_to_dataone(obsolete.date_changed), 'mn': NODE, 'obsoletes': obsoletes_uuid, 'obsoletedby': obsoleted_by_uuid}
 
     request.response.content_type = 'text/xml; charset=UTF-8'
     return rsp

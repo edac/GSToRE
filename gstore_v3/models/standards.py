@@ -118,6 +118,7 @@ class GstoreMetadata():
 
 
     def update_onlinks(self, onlinks, base_url):
+        #TODO: we should have a better way of dealing with the gstore onlinks 
         #add to the identify citation
         id_citation_element = self.xml.xpath('identification/citation[@role="identify"]')
         if id_citation_element is None:
@@ -132,7 +133,7 @@ class GstoreMetadata():
         citation_element = citation_element[0]
         existing_onlinks = citation_element.findall('onlink')
         for existing_onlink in existing_onlinks:
-            if existing_onlink is None or (existing_onlink.text and (existing_onlink.text[0:4] != 'http' or base_url in existing_onlink.text)) or not existing_onlink.text:
+            if existing_onlink is None or (existing_onlink.text and (existing_onlink.text[0:4] != 'http' or base_url in existing_onlink.text or base_url.replace('https', 'http') in existing_onlink.text)) or not existing_onlink.text:
                 citation_element.remove(existing_onlink)
 
         #add the new ones

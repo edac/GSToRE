@@ -672,11 +672,11 @@ class DataoneObsolete(Base):
     def get_obsoleted_by(self):
         #figure out if this obsolete object had a previous version for the d1 object
         filters = [self.__table__.c.core_id==self.core_id, self.__table__.c.date_changed > self.date_changed, self.__table__.c.active==True]
-        obsoleted_by = DBSession.query(self.__table__).filter(and_(*filters)).order_by(self.__table__.c.date_changed.desc()).first()
+        obsoleted_by = DBSession.query(self.__table__).filter(and_(*filters)).order_by(self.__table__.c.date_changed.asc()).first()
         return obsoleted_by
 
     def get_obsoletes(self):
-        # get the last thing that this obsoletes if it's not the first
+        # get the previous obsolete if there is one
         filters = [self.__table__.c.core_id==self.core_id, self.__table__.c.date_changed < self.date_changed, self.__table__.c.active==True]
         obsoletes = DBSession.query(self.__table__).filter(and_(*filters)).order_by(self.__table__.c.date_changed.desc()).first()
         return obsoletes
@@ -699,18 +699,30 @@ class DataoneFormat(Base):
 
     
 class DataoneSearch(Base):
+#    __table__ = Table('search_dataone', Base.metadata,
+#        Column('object_uuid', UUID, primary_key=True),
+#        Column('object_type', String(50)),
+#        Column('object_format', String(50)),
+#        Column('object_ext', String(20)),
+#        Column('object_added', TIMESTAMP),
+#        Column('most_recent', TIMESTAMP),
+#        Column('core_id', Integer),
+#        Column('obsolete_uuid', UUID),
+#        schema='gstoredata'
+#    )
+
     __table__ = Table('search_dataone', Base.metadata,
         Column('object_uuid', UUID, primary_key=True),
         Column('object_type', String(50)),
         Column('object_format', String(50)),
         Column('object_ext', String(20)),
         Column('object_added', TIMESTAMP),
-        Column('most_recent', TIMESTAMP),
+        Column('object_changed', TIMESTAMP),
         Column('core_id', Integer),
         Column('obsolete_uuid', UUID),
         schema='gstoredata'
     )
-    
+    #note: object_added and object_changed are basically the same. we try very hard for dataone.
     '''
     view to help with the object search view (by date or format)
     '''
