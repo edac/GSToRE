@@ -8,12 +8,9 @@
     <submitter>uid=${uid},o=${o},dc=${dc},dc=${org}</submitter>
     <rightsHolder>uid=${uid},o=${o},dc=${dc},dc=${org}</rightsHolder>
     <accessPolicy>
-        <allow>
-            <subject>public</subject>
-            <permission>read</permission>
-        </allow>
+        ${access_policies|n}
     </accessPolicy>
-    <replicationPolicy replicationAllowed="false"></replicationPolicy>
+    <replicationPolicy replicationAllowed="${replication}"></replicationPolicy>
     
     % if obsoletes:
         <obsoletes>${obsoletes}</obsoletes>
@@ -21,6 +18,10 @@
 
     % if obsoletedby:
         <obsoletedBy>${obsoletedby}</obsoletedBy>
+    % endif
+
+    % if archived:
+        <archived>true</archived>
     % endif
     
     <dateUploaded>${dateadded}</dateUploaded>

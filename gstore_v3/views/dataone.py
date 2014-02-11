@@ -45,8 +45,8 @@ NODE = 'urn:node:EDACGSTORE'
 SUBJECT = 'CN=gstore.unm.edu,DC=dataone,DC=org'
 RIGHTSHOLDER = 'CN=gstore.unm.edu,DC=dataone,DC=org'
 CONTACTSUBJECT = 'CN=gstore.unm.edu,O=Google,C=US,DC=cilogon,DC=org'
-NAME = ''
-DESCRIPTION = ''
+NAME = 'EDAC Gstore Repository'
+DESCRIPTION = "Earth Data Analysis Center's (EDAC) Geographical Storage, Transformation and Retrieval Engine (GSTORE) platform archives data produced by various NM organizations, including NM EPSCoR and RGIS. GSTORE primarily houses GIS and other digital documents relevant to state agencies, local government, and scientific researchers. See RGIS and NM EPSCoR for more information on the scope of data. It currently uses the FGDC metadata standard to describe all of it's holdings."
 CN_RESOLVER='https://cn.dataone.org/cn/v1/resolve'
 
 
@@ -483,9 +483,12 @@ def search(request):
         md5 = obsolete.get_hash(algo, cached_path)
         fsize = obsolete.get_size(cached_path)
 
+        sysmeta = obsolete.system_metadatas[0]
+        sys_date = sysmeta.date_changed
+
 #        docs.append({'identifier': obsolete_uuid, 'format': object_format, 'algo': algo, 'checksum': md5, 'date': datetime_to_dataone(search.most_recent), 'size': fsize})
 
-        docs.append({'identifier': obsolete_uuid, 'format': object_format, 'algo': algo, 'checksum': md5, 'date': datetime_to_dataone(search.object_changed), 'size': fsize})
+        docs.append({'identifier': obsolete_uuid, 'format': object_format, 'algo': algo, 'checksum': md5, 'date': datetime_to_dataone(sys_date), 'size': fsize})
         
     return {'total': total, 'count': cnt, 'start': offset, 'docs': docs}
 	
@@ -685,16 +688,29 @@ def metadata(request):
     if not obj:
         return return_error('metadata', 1060, 404, '', pid)
 
+    sysmeta = obsolete.system_metadatas[0]
+    access_policies = sysmeta.access_policies
+    replication = sysmeta.replication_policy
+    sys_date = sysmeta.date_changed
+    
+
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/dataone/v1/' % (load_balancer)
 
     #this is annoying. and incorrect anywhere but production
     base_url = base_url.replace('http:', 'https:')
 
+    #TODO: what the hell will the modified date be? who knows?
+
+    #use the obsoletedby's date as the system modified date?
+
     #dates should be from postgres, i.e. in utc
     rsp = {'pid': pid, 'dateadded': datetime_to_dataone(obj.date_added), 'obj_format': str(mimetype), 'file_size': file_size, 
            'uid': 'EDACGSTORE', 'o': 'EDAC', 'dc': 'everything', 'org': 'EDAC', 'hash_type': algo,
-           'hash': file_hash, 'metadata_modified': datetime_to_dataone(obsolete.date_changed), 'mn': NODE, 'obsoletes': obsoletes_uuid, 'obsoletedby': obsoleted_by_uuid}
+           'hash': file_hash, 'metadata_modified': datetime_to_dataone(sys_date), 'mn': NODE, 'obsoletes': obsoletes_uuid, 'obsoletedby': obsoleted_by_uuid, 'replication': replication, 'access_policies': access_policies}
+
+    if obsoleted_by:
+        rsp.update({"archived": True})
 
     request.response.content_type = 'text/xml; charset=UTF-8'
     return rsp

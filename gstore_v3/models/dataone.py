@@ -656,6 +656,8 @@ class DataoneObsolete(Base):
         schema='gstoredata'
     )
 
+    system_metadatas = relationship('DataoneSystemMetadata', backref='obsoletes')
+
     def __init__(self, core_id, active=False):
         self.core_id = core_id
         self.active = active
@@ -697,20 +699,30 @@ class DataoneFormat(Base):
     def __repr__(self):
         return '<Dataone Format (%s, %s, %s, %s)>' % (self.id, self.format, self.name, self.type)
 
+class DataoneSystemMetadata(Base):
+    __table__ = Table('dataone_systemmetadata', Base.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('obsolete_id', Integer, ForeignKey('gstoredata.dataone_obsoletes.id')),
+        Column('replication_policy', Boolean),
+        Column('access_policies', String),
+        Column('date_changed', TIMESTAMP),
+        schema='gstoredata'
+    )
+
+    '''
+    basically just a placeholder for the date changed when an object is obsoleted. but we are 
+    trying to have it less wrong for when there may actually be a case for the other bits to change
+    independently of obsolescence. deep.
+    '''
+
+    def __init__(self, obsolete_id):
+        self.obsolete_id= obsolete_id
+
+    def __repr__(self):
+        return '<DataoneSystemMetadata (%s, %s, %s)>' % (self.id, self.obsolete_id, self.date_changed.strftime('%Y-%m-%dT%H:%M:%S.%f'))
+    
     
 class DataoneSearch(Base):
-#    __table__ = Table('search_dataone', Base.metadata,
-#        Column('object_uuid', UUID, primary_key=True),
-#        Column('object_type', String(50)),
-#        Column('object_format', String(50)),
-#        Column('object_ext', String(20)),
-#        Column('object_added', TIMESTAMP),
-#        Column('most_recent', TIMESTAMP),
-#        Column('core_id', Integer),
-#        Column('obsolete_uuid', UUID),
-#        schema='gstoredata'
-#    )
-
     __table__ = Table('search_dataone', Base.metadata,
         Column('object_uuid', UUID, primary_key=True),
         Column('object_type', String(50)),
