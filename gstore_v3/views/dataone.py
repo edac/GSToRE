@@ -49,7 +49,7 @@ NAME = 'EDAC Gstore Repository'
 DESCRIPTION = "Earth Data Analysis Center's (EDAC) Geographical Storage, Transformation and Retrieval Engine (GSTORE) platform archives data produced by various NM organizations, including NM EPSCoR and RGIS. GSTORE primarily houses GIS and other digital documents relevant to state agencies, local government, and scientific researchers. See RGIS and NM EPSCoR for more information on the scope of data. It currently uses the FGDC metadata standard to describe all of it's holdings."
 CN_RESOLVER='https://cn.dataone.org/cn/v1/resolve'
 
-
+#TODO: add the system metadata date modified trigger to obsoleting step and then add something for actually updating that model
 
 #TODO: what else needs to be logged other than object/pid (read)?
 
@@ -690,7 +690,7 @@ def metadata(request):
 
     sysmeta = obsolete.system_metadatas[0]
     access_policies = sysmeta.access_policies
-    replication = sysmeta.replication_policy
+    replication = "true" if sysmeta.replication_policy else "false"
     sys_date = sysmeta.date_changed
     
 
