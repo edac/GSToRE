@@ -78,7 +78,6 @@ class Source(Base):
         metadata_file = os.path.join(outpath, metaname)
         
         #let's get the metadata obj
-        #out_standard = 'FGDC-STD-012-2002' if self.datasets.taxonomy == 'geoimage' else 'FGDC-STD-001-1998'
         out_standard = metadata_info['standard']
         out_format = 'xml'
         

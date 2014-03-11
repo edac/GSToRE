@@ -1,7 +1,7 @@
 from pyramid.view import view_config
 from pyramid.response import Response
 
-from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPBadRequest
+from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPBadRequest, HTTPServerError
 
 import os 
 from email.parser import Parser 
@@ -48,6 +48,8 @@ ecw test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ef4c8cdc-bec4-43aa-8f
 
 '''
 #TODO: refactor the mapfile generation part (see the awkwardness of the point symbol)
+#TODO: REFACTOR LIKE ALL OF IT for "let's just keep bolting stuff on" reasons
+#TODO: enjoy
 
 '''
 wcs methods to deal with oddness out of mapserver getcoverage response
@@ -532,6 +534,8 @@ def datasets(request):
     if service_type != 'ogc':
         return HTTPNotFound()
 
+    if d.taxonomy in ['file', 'services', 'table']:
+        return HTTPNotFound('OGC Web Services not supported for this dataset')
 
     #get some config stuff
     mappath = request.registry.settings['MAPS_PATH']
@@ -576,11 +580,7 @@ def datasets(request):
 
     #NOTE: skipping tilecache and just running with wms services here
     #maybe it's for the tile cache
-    if service == 'wms_tiles':
-        #baseurl, dataset, app, params, is_basemap = False
-        #kargs = self._get_method_args()
-        #return tilecache_service(base_url, d, app, params, request, False)
-        service = 'wms'
+    service = 'wms' if service == 'wms_tiles' else service
 
     #get dataset BBOX from decimal
     bbox = [float(b) for b in d.box]
@@ -770,7 +770,7 @@ def datasets(request):
         #NOTE: the scalebar is added by mapscript default
         
         #add the layer (with the reprj bbox)
-        laod_balancer = request.registry.settings['BALANCER_URL']
+        load_balancer = request.registry.settings['BALANCER_URL']
         base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
 
         if not std:
@@ -793,14 +793,110 @@ def datasets(request):
     
     return generateService(m, params, mapname)
 
+@view_config(route_name='services', match_param=('type=tileindexes','service_type=gstore','service=clip'))
+def clip_tileindex(request):
+    '''
+    the magic of clip and zip
+
+    from the ecws
+
+    run a getcoverage (except just the tif part) wcs req 
+    and dump it in a zip with some metadata?
+
+    REQUIRED:
+        bbox
+        srs
+        width/height
+
+    TODO: time
+
+    we will just make some assumptions about the layer name (it's just the one)
+    
+    '''
+
+    tile_id = request.matchdict['id']
+    app = request.matchdict['app']
+    service_type = request.matchdict['service_type']
+    service = request.matchdict['service']
+
+    params = normalize_params(request.params)
+
+    #get the tile index by id/uuid
+    tile = get_tileindex(tile_id)
+
+    if not tile:
+        return HTTPNotFound()
+
+    if not tile.is_active:
+        return HTTPNotFound()
+        
+    mappath = request.registry.settings['MAPS_PATH']
+    tmppath = request.registry.settings['TEMP_PATH']
+    srid = request.registry.settings['SRID']
+
+    data_path = request.registry.settings['BASE_DATA_PATH'] + '/tileindexes/%s' % tile.uuid
+
+    load_balancer = request.registry.settings['BALANCER_URL']
+   
+    #build the map file
+    mapname = '%s/%s.tile.map' % (mappath, tile.uuid)
+
+    if os.path.isfile(mapname):
+        m = mapscript.mapObj(mapname)
+    else:
+        srid_list = request.registry.settings['OGC_SRS'].split(',')
+        
+        init_params = {
+            "srid": srid,
+            "mappath": mappath,
+            "tmppath": tmppath,
+            "datapath": data_path,
+            "base_url": load_balancer,
+            "app": app,
+            "srid_list": srid_list
+        }
+        m = build_tileindex_mapfile(tile, init_params, params)
+
+#> curl --globoff "http://129.24.63.109/gstore_v3/apps/rgis/datasets/0f3ca80c-2d50-4a33-8df8-c80ff9e94588/services/ogc/wcs?VERSION=1.1.2&SERVICE=WCS&REQUEST=GetCoverage&COVERAGE=mod10a1_a2002193.fractional_snow_cover&CRS=EPSG:4326&FORMAT=image/tiff&HEIGHT=500&WIDTH=500&BBOX=-107.930153271352,34.9674233731823,-104.994718803013,38.5334870384629" > wcs_ae
+
+#msWCSGetCoverageDomain(): WCS server error. RASTER Layer with no DATA statement and no WCS virtual dataset metadata. Tileindexed raster layers not supported for WCS without virtual dataset metadata (cm->extent, wcs_res, wcs_size).
+
+    #set up the wcs getcoverage (tiff part only)
+    params['request'] = 'GetTiffCoverage'
+    params['service'] = 'wcs'
+    params['version'] = '1.1.2'
+    params['coverage'] = ','.join([tile.basename + '_%s' % e for e in tile.epsgs])
+    params['format'] = 'image/tiff'
+
+    #return Response(json.dumps({'params': params}))
+
+    #get the response object
+    rsp =  generateService(m, params, mapname)
+
+#    #check that the mimetype is geotiff (or what we expect it to be)
+#    if rsp.content_type != 'image/tiff':
+#        return HTTPServerError(rsp.content_type)
+
+#    # get the tiff (as a string)
+#    tif = rsp.body
+
+
+    #build
+
+    return rsp
+
 
 #TODO: add apps to the tile indexes?
-@view_config(route_name='services', match_param='type=tileindexes')
+@view_config(route_name='services', match_param=('type=tileindexes', 'service_type=ogc'))
 def tileindexes(request):
     '''
     build a tile index wms service based on the tile index view
 
     if the tile index collection contains datasets with multiple spatial references, build a set of layers per spatial reference    
+
+
+http://129.24.63.115/apps/rgis/tileindexes/e305d3ed-9db2-4895-8a35-bde79150e272/services/ogc/wms?REQUEST=GetMap&SERVICE=WMS&VERSION=1.1.1&FORMAT=image/png&LAYERS=tile_mrcog_2006_2258&width=1000&height=1000&style=&SRS=epsg:2258&bbox=1462969,1371360,1467912,1376113
+http://129.24.63.115/apps/rgis/tileindexes/e305d3ed-9db2-4895-8a35-bde79150e272/services/ogc/wms?REQUEST=GetMap&SERVICE=WMS&VERSION=1.1.1&FORMAT=image/png&LAYERS=tile_mrcog_2006_2258&width=1000&height=1000&style=&SRS=epsg:4326&bbox=-106.8509,34.7537,-106.8337,34.7668
 
     '''
     tile_id = request.matchdict['id']
@@ -829,7 +925,6 @@ def tileindexes(request):
     data_path = request.registry.settings['BASE_DATA_PATH'] + '/tileindexes/%s' % tile.uuid
 
     load_balancer = request.registry.settings['BALANCER_URL']
-    base_url = load_balancer
     
    
     #build the map file
@@ -838,133 +933,172 @@ def tileindexes(request):
     if os.path.isfile(mapname):
         m = mapscript.mapObj(mapname)
     else:
-        m = mapscript.mapObj()
+        srid_list = request.registry.settings['OGC_SRS'].split(',')
         
-        init_proj = 'init=epsg:%s' % (srid)
-        bbox = [float(b) for b in tile.bbox]
-
-        tile_epsgs = [int(e) for e in tile.epsgs]
-
-        m.setExtent(bbox[0], bbox[1], bbox[2], bbox[3])
-        m.imagecolor.setRGB(255,255,255)
-        m.setImageType('png24')
-        m.setSize(600, 600)
-
-        if 'epsg:4326' in init_proj:
-            m.units = mapscript.MS_DD
-
-        m.name = '%s_TileIndex' % (app.upper())
-        m.setProjection(init_proj)
-
-        #add a bunch of metadata
-
-        #we need to make sure that all of the srs for the tile index are in the supported srs list (i guess)
-        check_list = request.registry.settings['OGC_SRS'].split(',')
-        for epsg in tile_epsgs:
-            supported_srs = build_supported_srs(epsg, check_list)
-            check_list = supported_srs.split(' ')
-        m.web.metadata.set('wms_srs', supported_srs)
-
-        #use "!*" for the wms_enable_request to hide the index layer from getcapabilities
-        m.web.metadata.set('wms_enable_request', '*')
-        #m.web.metadata.set('wms_enable_request', '!*')
-
-        m.web.metadata.set('wms_name', 'imagery_wms_%s' % (tile.id))
-        m.web.metadata.set('wms_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wms' % (base_url, app, tile.uuid))
-        m.web.metadata.set('wms_abstract', 'WMS Service for %s tile index %s' % (app, tile.name))
-
-        set_contact_metadata(m)
-
-        m.web.metadata.set('wms_formatlist', 'image/png,image/gif,image/jpeg')
-        m.web.metadata.set('wms_format', 'image/png')
-        m.web.metadata.set('ows_keywordlist', '%s, New Mexico' % (app))
-
+        init_params = {
+            "srid": srid,
+            "mappath": mappath,
+            "tmppath": tmppath,
+            "datapath": data_path,
+            "base_url": load_balancer,
+            "app": app,
+            "srid_list": srid_list
+        }
+        m = build_tileindex_mapfile(tile, init_params, params)
         
-        #TODO: check on this
-        m.web.metadata.set('wms_server_version', '1.3.0')
+    return generateService(m, params, mapname)
 
-        m.web.metadata.set('ows_title', '%s Tile Index (%s)' % (app, tile.uuid))
 
-        #set the paths
-        m.mappath = mappath
-        m.web.imageurl = tmppath
-        m.web.imagepath = tmppath
-        #TODO: set up real templates (this doesn't even exist)
-        m.web.template = tmppath + '/client.html'
+def build_tileindex_mapfile(tile, init_params, params):
+    '''
+    this is mildly stupid
+    see TODOs
+    shut up
 
-        #add the output formats
-        of = get_outputformat('png')
-        m.appendOutputFormat(of)
+    init_params = dict of paths from config, epsg, app
+    params = query params for request
+    '''
+    m = mapscript.mapObj()
 
-        #and the gif
-        of = get_outputformat('gif')
-        m.appendOutputFormat(of)
+    init_proj = 'init=epsg:%s' % init_params['srid']
+    app = init_params['app']
+    
+    bbox = [float(b) for b in tile.bbox]
 
-        #and the jpeg
-        of = get_outputformat('jpg')
-        m.appendOutputFormat(of)
+    tile_epsgs = [int(e) for e in tile.epsgs]
 
-        #now for the tile index layers (at least two)
-        for epsg in tile_epsgs:
-            #we need to add two layers per spatial reference
+    m.setExtent(bbox[0], bbox[1], bbox[2], bbox[3])
+    m.imagecolor.setRGB(255,255,255)
+    m.setImageType('png24')
+    m.setSize(600, 600)
 
-            #reproject the bbox to the layer epsg for the correct extent
-            box_geom = bbox_to_geom(bbox, int(srid))
-            #reproject to the layer epsg
-            reproject_geom(box_geom, int(srid), int(epsg))
-            prj_bbox = geom_to_bbox(box_geom)
-            
-            tilename = '%s_%s' % (tile.basename, epsg)
-            layer = mapscript.layerObj()
-            layer.name = tilename
-            layer.status = mapscript.MS_ON
-            layer.setExtent(prj_bbox[0], prj_bbox[1], prj_bbox[2], prj_bbox[3])
-            layer.setProjection('init=epsg:%s' % (epsg))
-            layer.setProcessing('DITHER=YES')
-            layer.metadata.set('layer_title', tilename)
-            layer.metadata.set('base_layer', 'no')
-            layer.metadata.set('wms_encoding', 'UTF-8')
-            layer.metadata.set('wms_title', tilename)
-            layer.metadata.set('imageformat', 'image/png')
+    if 'epsg:4326' in init_proj:
+        m.units = mapscript.MS_DD
 
-            #layer.tileindex = '%s_%s_index' % (tile.basename, epsg)
-            layer.tileindex = data_path + '/tile_%s.shp' % epsg
-            layer.tileitem = 'location'
+    m.name = '%s_TileIndex' % (app.upper())
+    m.setProjection(init_proj)
 
-            #TODO: modify if we ever use vector tile indexes
-            if tile.taxonomy == 'raster':   
-                layer.type = mapscript.MS_LAYER_RASTER
-            elif tile.taxonomy == 'point':
-                layer.type = mapscript.MS_LAYER_POINT
-            elif tile.taxonomy == 'line':
-                layer.type = mapscript.MS_LAYER_LINE
-            elif tile.taxonomy == 'polygon':
-                layer.type = mapscript.MS_LAYER_POLYGON
-            else:
-                pass
+    #add a bunch of metadata
 
-            m.insertLayer(layer)
+    #we need to make sure that all of the srs for the tile index are in the supported srs list (i guess)
+    check_list = init_params['srid_list']
+    for epsg in tile_epsgs:
+        supported_srs = build_supported_srs(epsg, check_list)
+        check_list = supported_srs.split(' ')
+    m.web.metadata.set('wms_srs', supported_srs)
 
-##            #and the index layer
-#            layer = mapscript.layerObj()
-#            layer.name = '%s_%s_index' % (tile.basename, epsg)
-#            layer.setProjection('init=epsg:%s' % (epsg))
-#            layer.setExtent(prj_bbox[0], prj_bbox[1], prj_bbox[2], prj_bbox[3])
-#            layer.metadata.set('layer_title', '%s_index' % tilename)
-#            layer.metadata.set('base_layer', 'no')
-#            layer.metadata.set('wms_encoding', 'UTF-8')
-#            layer.metadata.set('wms_title', '%s_index' % tilename)
-#            layer.metadata.set('imageformat', 'image/png')
+    #use "!*" for the wms_enable_request to hide the index layer from getcapabilities
+    m.web.metadata.set('ows_enable_request', '*')
+    m.web.metadata.set('wcs_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wcs' % (init_params['base_url'], init_params['app'], tile.uuid))
+    m.web.metadata.set('wcs_label', 'imagery_wcs_%s' % (tile.basename))
+    m.web.metadata.set('wcs_name', 'imagery_wcs_%s' % (tile.basename))
 
-#            layer.type = mapscript.MS_LAYER_TILEINDEX
-#            layer.setProcessing('CLOSE_CONNECTION=DEFER')
+    m.web.metadata.set('wms_name', 'imagery_wms_%s' % (tile.id))
+    m.web.metadata.set('wms_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wms' % (init_params['base_url'], app, tile.uuid))
+    m.web.metadata.set('wms_abstract', 'WMS Service for %s tile index %s' % (app, tile.name))
 
-#            layer.data = data_path + '/tile_%s.shp' % epsg
-#            
-#            m.insertLayer(layer)
+    set_contact_metadata(m)
+
+    m.web.metadata.set('wms_formatlist', 'image/png,image/gif,image/jpeg')
+    m.web.metadata.set('wms_format', 'image/png')
+    m.web.metadata.set('ows_keywordlist', '%s, New Mexico' % (app))
 
     
-    return generateService(m, params, mapname)
+    #TODO: check on this
+    m.web.metadata.set('wms_server_version', '1.3.0')
+
+    m.web.metadata.set('ows_title', '%s Tile Index (%s)' % (app, tile.uuid))
+
+    #set the paths
+    m.mappath = init_params['mappath']
+    m.web.imageurl = init_params['tmppath']
+    m.web.imagepath = init_params['tmppath']
+    #TODO: set up real templates (this doesn't even exist)
+    m.web.template = init_params['tmppath'] + '/client.html'
+
+    #add the output formats
+    of = get_outputformat('png')
+    m.appendOutputFormat(of)
+
+    #and the gif
+    of = get_outputformat('gif')
+    m.appendOutputFormat(of)
+
+    #and the jpeg
+    of = get_outputformat('jpg')
+    m.appendOutputFormat(of)
+
+    #now for the tile index layers (at least two)
+    for epsg in tile_epsgs:
+        #we need to add two layers per spatial reference
+
+        #reproject the bbox to the layer epsg for the correct extent
+        box_geom = bbox_to_geom(bbox, int(init_params['srid']))
+        #reproject to the layer epsg
+        reproject_geom(box_geom, int(init_params['srid']), int(epsg))
+        prj_bbox = geom_to_bbox(box_geom)
+        
+        tilename = '%s_%s' % (tile.basename, epsg)
+        layer = mapscript.layerObj()
+        layer.name = tilename
+        layer.status = mapscript.MS_ON
+        layer.setExtent(prj_bbox[0], prj_bbox[1], prj_bbox[2], prj_bbox[3])
+        layer.setProjection('init=epsg:%s' % (epsg))
+        layer.setProcessing('DITHER=YES')
+        layer.metadata.set('layer_title', tilename)
+        layer.metadata.set('base_layer', 'no')
+        layer.metadata.set('wms_encoding', 'UTF-8')
+        layer.metadata.set('wms_title', tilename)
+        layer.metadata.set('imageformat', 'image/png')
+        layer.metadata.set('wcs_extent', ' '.join([str(prj_bbox[0]), str(prj_bbox[1]), str(prj_bbox[2]), str(prj_bbox[3])]))
+
+        #TODO: figure out what these should really be if not defaults (i.e. the band count - always 3?)
+        layer.metadata.set('wcs_size', ' '.join([params['width'] if 'width' in init_params else '1000', params['height'] if 'height' in init_params else '1000']))
+        layer.metadata.set('wcs_formats', 'GTiff')
+        layer.metadata.set('wcs_bandcount', "3")
+
+        #layer.tileindex = '%s_%s_index' % (tile.basename, epsg)
+        layer.tileindex = init_params['datapath'] + '/tile_%s.shp' % epsg
+        layer.tileitem = 'location'
+
+        #TODO: modify if we ever use vector tile indexes
+        if tile.taxonomy == 'raster':   
+            layer.type = mapscript.MS_LAYER_RASTER
+        elif tile.taxonomy == 'point':
+            layer.type = mapscript.MS_LAYER_POINT
+        elif tile.taxonomy == 'line':
+            layer.type = mapscript.MS_LAYER_LINE
+        elif tile.taxonomy == 'polygon':
+            layer.type = mapscript.MS_LAYER_POLYGON
+        else:
+            pass
+
+        m.insertLayer(layer)
+
+    return m
+
+
+@view_config(route_name='services', match_param='type=collections')
+def collections(request):
+    '''
+    build a tile index wms service based on the spatial datasets in a collection   
+
+    '''
+    collection_id = request.matchdict['id']
+    app = request.matchdict['app']
+    service_type = request.matchdict['service_type']
+    service = request.matchdict['service']
+
+    params = normalize_params(request.params)
+
+    collection = get_collection(collection_id)
+    if not collection:
+        return HTTPNotFound()
+
+    if not collection.is_spatial:
+        return HTTPBadRequest()
+
+    return Response()
 
 
 #run the base layers for the mapper
@@ -1040,77 +1174,44 @@ def mapper(request):
     '''
 
     media_url = request.registry.settings['MEDIA_URL']
-    
-#    host = request.host_url
-#    g_app = request.script_name[1:]
-#    base_url = '%s/%s/apps/%s/datasets/%s' % (host, g_app, app, d.uuid)
 
-    load_balancer = request.registry.settings['BALANCER_URL']
-    base_url = '%s/apps/%s/datasets/%s' % (load_balancer, app, d.uuid)
+#    load_balancer = request.registry.settings['BALANCER_URL']
+#    base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
 
-    #TODO: add the load balancer url for the mapper and update the js (drop local_app_name and 
-    #      use the load_balancer value in the template)
-    #TODO: replace the integer ID with the UUID for future-proofing (if we're keeping this around)
-    c = {'MEDIA_URL': media_url, 'AppId': app}    
+    base_url = request.registry.settings['BALANCER_URL']
 
-    svcs = []
-    dlds = []
-    fmts = d.get_formats(request)
-    srcs = d.sources
-    srcs = [s for s in srcs if s.active]
-    
+    rsp = d.get_full_service_dict(base_url, request, app)
+
+    c = {"MEDIA_URL": media_url, "AppId": app, "description": d.description, "dateadded": d.dateadded}
+
     taxonomy = d.taxonomy
     if taxonomy == 'vector':
         taxonomy = 'Vector Dataset'
-        svcs =['wms', 'wfs']
-        for f in fmts:
-            sf = [s for s in srcs if s.extension == f]
-            st = sf[0].set if sf else 'derived'
-            dlds.append((st, f))
     elif taxonomy == 'geoimage':
-        taxonomy = 'Raster image'
-        svcs =['wms', 'wcs']
-
-        dlds = [(s.set, s.extension) for s in srcs]
-    elif taxonomy == 'services':
-        taxonomy = 'Web Service'
+        taxonomy == 'Raster Image'
     else:
+        #TODO: change this for the services, etc
         taxonomy = 'File'
-        for f in fmts:
-            sf = [s for s in srcs if s.extension == f]
-            if sf:
-                #if it's not in there, that's a whole other problem (i.e. why is it listed in the first place?)
-                dlds.append((sf[0], f))
-    
-    c.update({'description': d.description, 'dateadded': d.dateadded, 'taxonomy': taxonomy})
 
-    #lists need to be [{'title': '', 'text': url}, ..]
-    fmts = []
-    for ds in dlds:
-        key = ds[1]
-        key = 'kmz' if key == 'kml' else key
-        url = '%s/%s.%s.%s' % (base_url, d.basename, ds[0], ds[1])
-        fmts.append({'title': key, 'text': url})
+    c.update({"taxonomy": taxonomy})
 
-    c.update({'formats': fmts})
-        
-    services = []
-    for s in svcs:
-        services.append({'title': s.upper(), 'text': '%s/services/ogc/%s?SERVICE=%s&REQUEST=GetCapabilities&VERSION=1.1.1' % (base_url, s, s)})
-    c.update({'services': services})
+    downloads = [{"title": k, "text": v} for k, v in rsp['downloads'][0].iteritems()]
 
+    key = [m for m in rsp['metadata'][0] if 'FGDC' in m]
     metadatas = []
-    metadatas.append({'title': 'HTML', 'text': '%s/metadata/fgdc.html' % (base_url)})
-    #metadatas.append({'title': 'TXT', 'text': '%s/metadata/fgdc.txt' % (base_url)})
-    metadatas.append({'title': 'XML', 'text': '%s/metadata/fgdc.xml' % (base_url)})
-    c.update({'metadata': metadatas})
+    if key:
+        s = rsp['metadata'][0][key[0]]
+        metadatas = [{"title": k.upper(), "text": v} for k, v in s.iteritems()]
 
-    #add the layers
-    lyrs = [{'layer': d.basename, 'id': d.id, 'title': d.description, 'features_attributes': [], 'maxExtent': [float(b) for b in d.box]}]
-    c.update({'Layers': lyrs})
+    services = [{"title": k.upper(), "text": v} for svc in rsp['services'] for k, v in svc.iteritems()]
+    wms = [s for s in services if 'WMS' in s['title']]
+    wms = wms[0]['text'].replace('GetCapabilities', 'GetMap') if wms else ''
 
-    #and the description
-    dsc = {'what': 'dataset', 'title': d.description, 'id': d.id, 'singleTile': False, 'layers': [d.basename], 'services': services, 'formats': fmts, 'metadata': '', 'taxonomy': d.taxonomy, 'taxonomy_desc': taxonomy} 
+    lyrs = [{'layer': d.basename, 'id': str(d.uuid), 'title': d.description, 'features_attributes': [], 'maxExtent': [float(b) for b in d.box]}]
+    c.update({'Layers': lyrs, "metadata": metadatas, "services": services, "formats": downloads})
+
+    dsc = {'what': 'dataset', 'title': d.description, 'id': str(d.uuid), 'singleTile': False, 'layers': [d.basename], 'services': services, 'formats': downloads, 'metadata': '', 'taxonomy': d.taxonomy, 'taxonomy_desc': taxonomy, 'wms': wms}
+
     c.update({'Description': dsc})
     
     #and go render it

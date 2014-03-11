@@ -28,7 +28,7 @@ note: is_available doesn't apply - metadata still accessible
 '''
 
 
-@view_config(route_name='metadata')
+@view_config(route_name='metadata', match_param='datatype=datasets')
 def generate_metadata(request):
     '''
     either transform from gstore or just return an unmodified xml blob depending on what the dataset has
@@ -49,7 +49,9 @@ def generate_metadata(request):
 
     #set up the transformation
     xslt_path = request.registry.settings['XSLT_PATH']
-    base_url = '%s/apps/%s/datasets/' % (request.registry.settings['BALANCER_URL'], app)
+    #base_url = '%s/apps/%s/datasets/' % (request.registry.settings['BALANCER_URL'], app)
+
+    base_url = request.registry.settings['BALANCER_URL']
 
 
     #check for the kind of metadata: gstore (standard + format check) | original (standard & format == xml) | bail
@@ -72,7 +74,7 @@ def generate_metadata(request):
             #default to rgis and fingers crossed i guess
             gstoreapp = DBSession.query(GstoreApp).filter(GstoreApp.route_key=='rgis').first()
 
-        metadata_info = {"base_url": base_url, "app-name": gstoreapp.full_name, "app-url": gstoreapp.url, "app": app}
+        metadata_info = {"base_url": base_url, "app-name": gstoreapp.full_name, "app-url": gstoreapp.url, "app": app, "request": request}
 
         if '19119' in standard:
             service = standard.split(':')[-1]
@@ -93,7 +95,9 @@ def generate_metadata(request):
 
         content_type = 'text/html' if format == 'html' else 'application/xml'
         
-        return Response(output, content_type=content_type)
+        r = Response(output, content_type=content_type)
+        r.headers['X-Robots-Tag'] = 'nofollow'
+        return r
 
     elif not d.gstore_metadata and d.original_metadata and format.lower() == 'xml':
         #check for some xml with that standard
@@ -101,29 +105,100 @@ def generate_metadata(request):
         if not om:
             return HTTPNotFound()
 
-        return Response(om[0].original_xml, content_type='application/xml')
+        r = Response(om[0].original_xml, content_type='application/xml')
+        r.headers['X-Robots-Tag'] = 'nofollow'
+        return r
 
     #otherwise, who knows, we got nothing.
     return HTTPNotFound()
 
 
-@view_config(route_name='metadata_resolved')
-def metadata_resolver(request):
+
+##TODO: never run this. either make it static or check on the apache config option and chuck it
+#@view_config(route_name='metadata_sitemap', renderer='sitemap.mako')
+#def generate_metadata_sitemap(request):
+#    '''
+#    generate a sitemap of all the fgdc (for now) html metadata pages
+#    '''
+#    app = request.matchdict['app']
+
+#    base_url = '%s/apps/%s/datasets/' % (request.registry.settings['BALANCER_URL'], app)
+
+#    datasets = DBSession.query(Dataset).filter(and_(*[Dataset.inactive==False, "apps_cache @> ARRAY['%s']" % (app), Dataset.is_embargoed==False]))
+
+#    results = []
+#    for d in datasets:
+#        supported_standards = d.get_standards(request)
+
+#        fgdc_std = [f for f in supported_standards if 'fgdc' in f.lower()]
+
+#        if not fgdc_std:
+#            continue
+
+#        results.append({"link": base_url + str(d.uuid) + '/metadata/' + fgdc_std[0] + '.html', "description": str(d.description)})
+
+#    return {"app": app, "datasets": results}
+
+@view_config(route_name='metadata', match_param='datatype=collections')
+def generate_collection_metadata(request):
     '''
-    this really only matters for ISO right now
-    but, if, iso, return full version of metadata, no xlinks
-    if not iso, return same as basic metadata view
+    build the collection level metadata (iso ds, not great fgdc)
     '''
-    return Response()
+
+    app = request.matchdict['app'] #doesn't actually mean anything right now
+    collection_id = request.matchdict['id']
+    standard = request.matchdict.get('standard') 
+    format = request.matchdict['ext']
+
+    c = get_collection(collection_id) 
+
+    if not c:
+        return HTTPNotFound()
+
+    if c.is_embargoed or not c.is_active:
+        return HTTPNotFound()
+
+    #set up the transformation
+    xslt_path = request.registry.settings['XSLT_PATH']
+    base_url = request.registry.settings['BALANCER_URL']
+
+    if c.gstore_metadata:
+        #check the requested standard against the default list - excluded_standards
+        supported_standards = c.get_standards(request)
+        if (standard not in supported_standards and '19119' not in standard) or ('19119' in standard and standard.split(':')[0] not in supported_standards):
+            return HTTPNotFound()
+
+        #and check the format of the requested standard
+        ms = DBSession.query(MetadataStandards).filter(and_(MetadataStandards.alias==standard, "'%s'=ANY(supported_formats)" % format.lower()))
+        if not ms:
+            return HTTPNotFound()
+
+        #transform and return
+        gstoreapp = DBSession.query(GstoreApp).filter(GstoreApp.route_key==app).first()
+        if not gstoreapp:
+            #default to rgis and fingers crossed i guess
+            gstoreapp = DBSession.query(GstoreApp).filter(GstoreApp.route_key=='rgis').first()
+
+        metadata_info = {"base_url": base_url, "app-name": gstoreapp.full_name, "app-url": gstoreapp.url, "app": app, "request": request}
+
+        gm = c.gstore_metadata[0]
+        output = gm.transform(standard, format, xslt_path + '/xslts', metadata_info, False)
+
+        if not output:
+            return HTTPServerError('Invalid output')
+        if output == 'No matching stylesheet':
+            #no xslt for the standard + format output
+            return HTTPNotFound()
+
+        content_type = 'text/html' if format == 'html' else 'application/xml'
+
+        r = Response(output, content_type=content_type)
+        r.headers['X-Robots-Tag'] = 'nofollow'
+        return r
 
 
-#TODO: deal with this once we have linkable components in new schema
-#TODO: modify routes to have some {metadata object}/{uuid}.{ext} thing?
-@view_config(route_name='xlink_metadata')
-def xlink(request):
-    return Response('metadata = %s' % (request.matchdict['id']))
-
-
+    return HTTPNotFound()
+    
 '''
 other
 '''

@@ -1,10 +1,6 @@
 from osgeo import ogr, osr
 from datetime import datetime
 
-from TileCache.Service import Service, wsgiHandler
-from TileCache.Caches.Disk import Disk
-from TileCache.Layers import WMS as WMS
-
 from pyramid.wsgi import wsgiapp
 
 from xml.sax.saxutils import escape, unescape
@@ -127,7 +123,7 @@ def encode_as_ascii(s):
 #and convert to str before encoding in case it is nodata
 def convert_by_ogrtype(value, ogr_type, fmt='', datefmt=''):
     '''
-    TODO: maybe also  (u'Pe<n with a tilde>asco CCD').encode('iso-8859-1') but xml replace for kml/gml (any xml format)?
+    
     '''
     if not value:
         #do nothing
@@ -175,17 +171,6 @@ def epsg_to_sr(epsg):
     sr = osr.SpatialReference()
     sr.ImportFromEPSG(epsg)
     return sr
-
-##get the rpojection information (for the metadata)
-#def get_srs_attribute(srs, attr):
-#    if attr == 'semiaxis':
-#        return srs.GetSemiMajor()
-#    elif attr == 'denflat':
-#        return srs.GetInvFlattening()
-#    elif attr == 'utmzone':
-#        return srs.GetUTMZone()
-#    else:
-#        return srs.GetProjParm(attr)
 
 #extent as string to float array
 #ASSUME: box = minx,miny,maxx,maxy

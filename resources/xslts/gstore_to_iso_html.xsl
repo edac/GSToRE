@@ -15,7 +15,9 @@
  <xsl:template match="/metadata">
      <html>
          <head>
-             
+             <!-- to try to prevent the bots from following the download links -->
+             <meta name="robots" content ="index,nofollow"></meta>
+                 
              <style type="text/css">
                  body {
                     font-family: Verdana, Arial, Helvetica, sans-serif;

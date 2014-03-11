@@ -21,9 +21,10 @@ import json
 import pytz
 import math
 
-from ..lib.utils import get_all_formats, get_all_services, create_zip
+from ..lib.utils import *
 from ..lib.spatial import *
 from ..lib.mongo import gMongo
+from ..lib.spatial_streamer import *
 
 from ..models.categories import Category
 from ..models.collections import Collection
@@ -34,6 +35,7 @@ from ..models.features import Feature
 from ..models.metadata import MetadataStandards
 from ..models.apps import GstoreApp
 from ..models.licenses import License
+from ..models.provenance import *
 
 import os, tempfile, shutil
 import subprocess, re
@@ -57,7 +59,7 @@ class Dataset(Base):
         Column('taxonomy', String(50)),
         Column('feature_count', Integer),
         Column('record_count', Integer),
-        Column('dateadded', TIMESTAMP, default="now()"),
+        Column('dateadded', TIMESTAMP, FetchedValue()),
         Column('basename', String(100)),
         Column('geom', String),
         Column('geomtype', String),
@@ -78,6 +80,7 @@ class Dataset(Base):
         Column('is_cacheable', Boolean, default=True),
         Column('aliases', ARRAY(String)),
         Column('license_id', Integer, ForeignKey('gstoredata.licenses.id')),
+        Column('date_published', TIMESTAMP),
         Column('uuid', UUID), # we aren't setting this in postgres anymore
         schema='gstoredata' #THIS IS KEY
     ) 
@@ -117,6 +120,11 @@ class Dataset(Base):
     #relate to citations
     citations = relationship('Citation', secondary='gstoredata.datasets_citations', backref='datasets')
 
+    #relate to repositories
+    repositories = relationship('Repository', secondary='gstoredata.repositories_apps_datasets', backref='datasets')
+
+    #to the prov traces
+    prov_bases = relationship('ProvBase', backref='datasets')
 
     #relates to the d1 stuff
     scimeta_objects = relationship('DataoneScienceMetadataObject', backref='datasets')
@@ -192,7 +200,24 @@ class Dataset(Base):
 
         exc_lst = self.excluded_standards
         return [i for i in lst if i not in exc_lst]
-           
+
+    def get_repositories(self):
+        '''
+        get repos by app - 
+
+        {   
+            app: [repos],
+            app: [repos]
+        }
+        '''
+        repos = {}
+
+        for app in self.apps_cache:
+            rs = [r.name for r in self.repositories if app in [a.route_key for a in r.apps]]
+            if rs:
+                repos[app] = rs
+        
+        return repos
 
     #return a source by set & extension for this dataset
     #default to active sources only
@@ -220,8 +245,8 @@ class Dataset(Base):
 
         '''
 
-        if self.taxonomy == 'file':
-            return None
+        if self.taxonomy in ['file', 'table', 'service']:
+            return None, None
         elif self.taxonomy == 'geoimage':
             srcs = self.sources
             src = None
@@ -271,7 +296,6 @@ class Dataset(Base):
                 return None, fmtfile
 
             #nope, go build the vector
-            #TODO: why is this showing up in the logs as an error? even though the vectors are generated and diplayed correctly?
             if not os.path.isdir(os.path.join(fmtpath, str(self.uuid), 'shp')):
                 #make the directory
                 if not os.path.isdir(os.path.join(fmtpath, str(self.uuid))):
@@ -288,18 +312,21 @@ class Dataset(Base):
 
     #build the dict for the full service description
     #see the service view, search v3 results
-    def get_full_service_dict(self, base_url, req):
-        #update the url
-        base_url += str(self.uuid)
+    def get_full_service_dict(self, base_url, req, app):
+#        #update the url
+#        base_url += str(self.uuid)
 
 
         ##TODO: need to escape the description text - this:
         #1935 15' Quad #217 Aerial Photo Mosaic Index - AZ
         #returns a result but doesn't parse
     
-        results = {'id': self.id, 'uuid': self.uuid, 'description': self.description, 
-                'spatial': {'bbox': string_to_bbox(self.box), 'epsg': 4326}, 'lastupdate': self.dateadded.strftime('%Y%m%d'), 'name': self.basename, 'taxonomy': self.taxonomy,
+        results = {'type': 'dataset', 'id': self.id, 'uuid': self.uuid, 'description': self.description, 
+                'lastupdate': self.dateadded.strftime('%Y%m%d'), 'name': self.basename, 'taxonomy': self.taxonomy,
                 'categories': [{'theme': t.theme, 'subtheme': t.subtheme, 'groupname': t.groupname} for t in self.categories]}
+        if self.box:
+            results.update({'spatial': {'bbox': string_to_bbox(self.box), 'epsg': self.orig_epsg}})
+            
 
         if self.begin_datetime and self.end_datetime:
             if self.begin_datetime.year >= 1900 and self.end_datetime.year >= 1900:
@@ -321,7 +348,7 @@ class Dataset(Base):
                 dlds = [(s.set, s.extension) for s in srcs] # if not s.is_external]
 
                 #links = [{s.extension: s.get_location()} for s in srcs if s.is_external]
-            elif self.taxonomy == 'vector':
+            elif self.taxonomy in ['vector', 'table']:
                 #get the formats
                 #check for a source
                 #if none, derived + fmt
@@ -339,40 +366,38 @@ class Dataset(Base):
                         #if it's not in there, that's a whole other problem (i.e. why is it listed in the first place?)
                         continue
                     sf = sf[0]
-#                    if sf.is_external:
-#                        links.append({f: sf.get_location()})
-#                    else:
                     dlds.append((sf.set, f))
-            elif self.taxonomy == 'services':
+            elif self.taxonomy == 'service':
                 #TODO: figure out what to put here
                 pass
 
             #combine the links (don't change url) with downloads (build url)
             qp = '' if self.is_cacheable else '?ignore_cache=True'
-            dlds = [{s[1]: '%s/%s.%s.%s%s' % (base_url, self.basename, s[0], s[1], qp) for s in dlds}] if dlds else []
+            dlds = [{s[1]: base_url + build_dataset_url(app, self.uuid, self.basename, s[0], s[1]) + qp for s in dlds}] if dlds else []  #'%s/%s.%s.%s%s' % (base_url, self.basename, s[0], s[1], qp)
             dlds = links + dlds
 
             #update the wxs services to have the more complete url (version, request, service)
             svc_list = []
             for s in svcs:
-                url = '%s/services/ogc/%s?SERVICE=%s&REQUEST=GetCapabilities' % (base_url, s, s)
-                if s in ['wms', 'wfs']:
-                    vsn = '1.1' if s == 'wms'  else '0.0'
-                else:
-                    vsn = '1.2'
+                if s in ['rest']:
+#                    #TODO: resolve what this needs to be
+                    continue
 
-                url += '&VERSION=1.' + vsn
-                
+                if s in ['wms', 'wfs']:
+                    vsn = '1.1.1' if s == 'wms'  else '1.0.0'
+                else:
+                    vsn = '1.1.2'
+                    
+                url = base_url + build_ogc_url(app, 'datasets', self.uuid, s, vsn)
+
                 svc_list.append({s: url})
 
-            #results.update({'services': [{s: '%s/services/ogc/%s' % (base_url, s) for s in svcs}] if svcs else [], 'downloads': dlds})
             results.update({'services': svc_list, 'downloads': dlds})
 
             #add the link to the mapper 
             #TODO: when the mapper moves, get rid of this
             if self.taxonomy in ['geoimage', 'vector']:
-                mapper = '%s/mapper' % (base_url)
-                results.update({'preview': mapper})
+                results.update({'preview': base_url + build_mapper_url(app, self.uuid)})
 
         else:
             results.update({'services': [], 'downloads': [], 'preview': '', 'availability': False})
@@ -381,21 +406,16 @@ class Dataset(Base):
             supported_standards = self.get_standards(req)
 
             #get the supported formats per standard
-            md_fmts = {}
+            mt = []
             for supported_standard in supported_standards:
                 std = DBSession.query(MetadataStandards).filter(MetadataStandards.alias==supported_standard).first()
                 if not std:
                     continue
+                services = self.get_services(req) if '19119' in supported_standard else []    
 
-                if '19119' in supported_standard:
-                    #need to add all of the supported services
-                    supported_services = self.get_services(req)
-                    for supported_service in supported_services:
-                        md_fmts['%s:%s' % (supported_standard, supported_service.upper())] = std.supported_formats
-                else:
-                    md_fmts[supported_standard] = std.supported_formats
+                mt += std.get_urls(app, 'datasets', base_url, self.uuid, services)
 
-            mt = [{s: {e: '%s/metadata/%s.%s' % (base_url, s, e) for e in md_fmts[s]} for s in md_fmts}]
+            #'%s/metadata/%s.%s' % (base_url, s, e)
 
             #TODO: add the date modified back in although it doesn't matter per standard (it's all gstore, so it's all the same date)
             #     MAYBE ADD SOME KEY? all: date? to go with fgdc: date, iso: date if not gstore-ified?
@@ -425,7 +445,7 @@ class Dataset(Base):
             md = {}
             mt = []
             for o in om:
-                mt.append({o.original_xml_standard: {"xml": '%s/metadata/%s.xml' % (base_url, o.original_xml_standard)}})
+                mt.append({o.original_xml_standard: {"xml": base_url + build_metadata_url(app, 'datasets', self.uuid, o.original_xml_standard, 'xml')}})
 
 #            #get the date-modified by standard
             utc = pytz.utc
@@ -446,7 +466,41 @@ class Dataset(Base):
         
         if md:
             results.update({'metadata-modified': md})
-        
+
+
+        #TODO: maybe not this? but maybe add the source links (maybe not though)
+        #check for provenance bases for this app and dataset
+        app_bases = DBSession.query(ProvBase).join(ProvOntology).join(GstoreApp).filter(and_(GstoreApp.route_key==app, ProvBase.dataset_id==self.id)).all()
+
+        if app_bases:
+            '''
+            add the links for the prov OUTPUTS and maybe the original DS?
+            for the app 
+
+            "prov": {
+                "ontology": {
+                    "traces": {
+                        "format": url
+                    }
+                }
+            }
+
+            /apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/prov/{ontology}.{ext}
+            '''
+            ontologies = {}
+
+            for ab in app_bases:
+                ont = ab.ontologies
+                traces = ontologies[ont.ontology_key] if ont.ontology_key in ontologies else {}
+
+                mappings = DBSession.query(ProvMapping).filter(and_(ProvMapping.ontology_id==ab.ontology_id, ProvMapping.inputstandards_id==ab.inputstandards_id)).all()
+
+                for mapping in mappings:
+                    traces.update({str(mapping.output_format): base_url + build_prov_trace_url(app, self.uuid, ont.ontology_key, str(mapping.output_format))})
+
+                ontologies[ont.ontology_key] = traces
+
+            results.update({"prov": ontologies})
 
         #TODO: add the html card view also maybe
 
@@ -462,6 +516,8 @@ class Dataset(Base):
     def get_index_doc(self, req=None):
         '''
         return the json for the elasticsearch index
+
+        NOTE: THIS IS NOT THE METHOD FOR REGISTERING THE DATASET IN THE ES INSTANCE
 
         '''
 
@@ -530,13 +586,13 @@ class Dataset(Base):
         return es
         
 
-    def get_onlinks(self, base_url):
+    def get_onlinks(self, base_url, req, app):
         '''
         return a flattened list of online linkages
 
         NOTE: not for dataone
         '''
-        dct = self.get_full_service_dict(base_url, None)
+        dct = self.get_full_service_dict(base_url, req, app)
         
         services = dct['services'] if dct['services'] else []
         services = [link for values in services for link in values.itervalues()]
@@ -550,7 +606,7 @@ class Dataset(Base):
         #tada: online linkages
         return services + downloads + metadatas
 
-    def get_distribution_links(self, base_url):
+    def get_distribution_links(self, base_url, req, app):
         '''
         return a dictionary of download links with file types and sizes
         ordered by our preferred formats by taxonomy 
@@ -567,7 +623,7 @@ class Dataset(Base):
         ''' 
 
         #TODO: maybe cache this? or something
-        dct = self.get_full_service_dict(base_url, None)
+        dct = self.get_full_service_dict(base_url, req, app)
         #as {fmt: link}
         downloads = dct['downloads'][0] if dct['downloads'] else {}
 
@@ -576,6 +632,8 @@ class Dataset(Base):
             preferred = ['tif', 'img', 'sid', 'ecw', 'dem', 'zip']
         elif self.taxonomy == 'vector':
             preferred = ['zip', 'shp', 'kml', 'gml', 'geojson', 'json', 'csv', 'xls']
+        elif self.taxonomy == 'table':
+            preferred = ['zip', 'csv', 'xls', 'json']
 
         canonical_format = ''
         for p in preferred:
@@ -819,9 +877,7 @@ class Dataset(Base):
         if format == 'xls':
             return self.build_excel(basepath, mongo_uri, metadata_info)    
 
-        fields = self.attributes
-        encode_as = 'utf-8'
-
+        
         #convert from the geojson to avoid the encoding issues (ignored chars, etc)
         fmt = 'geojson' if format == 'shp' else format
 
@@ -879,151 +935,80 @@ class Dataset(Base):
         csv, json, geojson, kml, gml
 
         '''
+        #get the vectors
+        gm = gMongo(mongo_uri)
+        vectors = gm.query({'d.id': self.id})
 
-        fields = self.attributes
-        encode_as = 'utf-8'
+        is_spatial = False if fmt in ['json', 'csv'] else True
+        records = [self.convert_doc_to_record(vector, epsg, fmt, is_spatial) for vector in vectors]
 
-        def generate_stream():
-            #set up the head, tail, folder info, etc
-            folder_head = ''
-            field_set = ''
-            folder_tail = ''
-            delimiter = '\n'
-            schema_url = ''
-            if fmt == 'geojson':
-                head = """{"type": "FeatureCollection", "features": ["""
-                tail = "\n]}"
-                delimiter = ',\n'
-            elif fmt == 'kml':
-                head = """<?xml version="1.0" encoding="UTF-8"?>
-                                <kml xmlns="http://earth.google.com/kml/2.2">
-                                <Document>"""
-                tail = """\n</Document>\n</kml>"""
-                folder_head = "<Folder><name>%s</name>" % (self.description)
-                folder_tail = "</Folder>"
+        fields = [{"name": f.name, "type": f.ogr_type, "len": f.ogr_width} for f in self.attributes]
 
-                schema_url = base_url + '%s/attributes.kml' % (self.uuid)
+        if 'obs' in records[0]['datavalues'][0]:
+            #this is not a good plan but we don't have the flag for "dataset contains observation timestamp" today
+            #and it's as a string for now
+            fields.append({"name": "observed", "type": 4, "len": 20})
 
-                kml_flds = [{'type': ogr_to_kml_fieldtype(f.ogr_type), 'name': f.name} for f in fields]
-                kml_flds.append({'type': 'string', 'name': 'observed'})
-                field_set = """<Schema name="%(name)s" id="%(id)s">%(sfields)s</Schema>""" % {'name': str(self.uuid), 'id': str(self.uuid), 
-                    'sfields': '\n'.join(["""<SimpleField type="%s" name="%s"><displayName>%s</displayName></SimpleField>""" % (k['type'], k['name'], k['name']) for k in kml_flds])
-                }     
-            elif fmt == 'csv':
-                head = '' 
-                tail = ''
-                delimiter = '\n'
-
-                field_set = ','.join([f.name for f in fields]) + ',fid,dataset,observed\n'
-            elif fmt == 'gml':
-                head = """<?xml version="1.0" encoding="UTF-8"?>
-                                        <gml:FeatureCollection 
-                                            xmlns:gml="http://www.opengis.net/gml" 
-                                            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
-                                            xmlns:xlink="http://www.w3.org/1999/xlink"
-                                            xmlns:ogr="http://ogr.maptools.org/">
-                                        <gml:description>GSTORE API 3.0 Vector Stream</gml:description>\n""" 
-                tail = """\n</gml:FeatureCollection>"""
-            elif fmt == 'json':
-                head = """{"features": ["""
-                tail = "]}"
-                delimiter = ',\n'
-        
-            #get the vectors
-            gm = gMongo(mongo_uri)
-            vectors = gm.query({'d.id': self.id})
-            total = vectors.count()
-
-            yield head + folder_head + field_set
-            cnt = 0
-            for vector in vectors:
-                result = convert(vector, schema_url, epsg)
-                if cnt < total - 1 and total > 1:
-                    result += delimiter
-
-                cnt += 1
-                yield result 
-
-            yield folder_tail + tail
-
-        #convert the mongo doc to a feature
-        def convert(vector, schema_url, epsg):
-            #convert the mongo to a chunk of something based on the format
-            fid = int(vector['f']['id'])
-            did = int(vector['d']['id'])
-            obs = vector['obs'] if 'obs' in vector else ''
-            obs = obs.strftime('%Y-%m-%dT%H:%M:%S+00') if obs else ''
-
-            #get the geometry
-            if not fmt in ['csv', 'json']:
-                wkb = vector['geom']['g'] if 'geom' in vector else ''
-                if not wkb:
-                    #need to get it from shapes
-                    feat = DBSession.query(Feature).filter(Feature.fid==fid).first()
-                    wkb = feat.geom
-                    
-                #and convert to geojson, kml, or gml
-                geom_repr = wkb_to_output(wkb, epsg, fmt)
-                if not geom_repr:
-                    return ''
-
-            atts = vector['atts']
-            #there's some wackiness with a unicode char and mongo (and also a bad char in the data, see fid 6284858)
-            #convert atts to name, value tuples so we only have to deal with the wackiness once
-            atts = [(a['name'], convert_by_ogrtype(a['val'], ogr.OFTString, fmt) if isinstance(a['val'], str) or isinstance(a['val'], unicode) else a['val']) for a in atts]
-
-            #add the observed datetime for everything
-            atts.append(('observed', obs))
-
-            #TODO: add observed to kml/gml and field list (also double check attribute schema for kml for observed)
-            if fmt == 'kml': 
-                #make sure we've encoded the value string correctly for kml
-                feature = "\n".join(["""<SimpleData name="%s">%s</SimpleData>""" % (v[0], v[1]) for v in atts])
-
-                #and no need for a schema url since it can be an internal schema linked by uuid here
-                feature = """<Placemark id="%s">
-                            <name>%s</name>
-                            %s\n%s
-                            <ExtendedData><SchemaData schemaUrl="%s">%s</SchemaData></ExtendedData>
-                            <Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
-                            </Placemark>""" % (fid, fid, geom_repr, '', schema_url, feature)
-            elif fmt == 'gml':
-                #going to match the gml from the dataset downloader
-                #need a list of values as <ogr:{att name}>VAL</ogr:{att name}>
-                vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0], a[1], a[0]) for a in atts])
-                feature = """<gml:featureMember><ogr:g_%(basename)s><ogr:geometryProperty>%(geom)s</ogr:geometryProperty>%(values)s</ogr:g_%(basename)s></gml:featureMember>""" % {
-                        'basename': self.basename, 'geom': geom_repr, 'values': vals} 
-            elif fmt == 'geojson':
-                vals = dict([(a[0], a[1]) for a in atts])
-                vals.update({'fid':fid, 'dataset_id': did})
-                feature = json.dumps({"type": "Feature", "properties": vals, "geometry": json.loads(geom_repr)})
-            elif fmt == 'csv':
-                vals = []
-                for f in fields:
-                    att = [a for a in atts if str(a[0]) == f.name]
-                    #this is, quite possibly, the stupidest thing ever. but it 'solves' the unicode error
-                    v = '%s' % att[0][1] if att else ""
-                    #and wrap in double quotes if there's a comma
-                    vals.append('%s' % v)
-                vals += [str(fid), str(did), obs]
-                feature = ','.join(vals)
-            elif fmt == 'json':
-                #no geometry, just attributes (good for timeseries requests)
-                vals = dict([(a[0], a[1]) for a in atts])
-                feature = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals})
-            else:
-                feature = ''
-                    
-            return feature
-
+        if fmt == 'kml':
+            streamer = KmlStreamer(fields)
+            streamer.update_description(self.description)
+        elif fmt =='gml':
+            streamer = GmlStreamer(fields)
+            streamer.update_description(self.description)
+            streamer.update_namespace(self.basename)
+        elif fmt == 'geojson':
+            streamer = GeoJsonStreamer(fields)
+        elif fmt == 'json':
+            streamer = JsonStreamer(fields)
+        elif fmt == 'csv':
+            streamer = CsvStreamer(fields)
+        else:
+            return ''
 
         tmp_path = tempfile.mkdtemp()
         tmp_file = os.path.join(tmp_path, '%s.%s' % (self.basename, fmt))
-        for g in generate_stream():
+        for g in streamer.yield_set(records):
             with open(tmp_file, 'a') as f:
                 f.write(g)
-
         return tmp_file
+
+    def convert_doc_to_record(self, doc, epsg, geometry_format, is_spatial=True):
+        '''
+        take the mongo doc and convert to a record for streaming
+
+        '''        
+        #deal with the fid v rid (must be one or the other from the doc)
+        record_id = doc['f']['id'] if 'f' in doc else doc['r']['id'] if 'r' in doc else ''
+        if not record_id:
+            return {}
+
+        #get the observed timestamp
+        observed = doc['obs'].strftime('%Y-%m-%dT%H:%M:%S+00') if 'obs' in doc else ''
+        
+        #deal with the geometry
+        geom_repr = ''
+        if is_spatial:
+            wkb = doc['geom']['g'] if 'geom' in doc else ''
+            if not wkb and 'f' in doc:
+                #just to doublecheck
+                feat = DBSession.query(Feature).filter(Feature.fid==record_id).first()
+                wkb = feat.geom if feat else ''
+
+            if wkb:
+                geom_repr = wkb_to_output(wkb, epsg, geometry_format)              
+        
+        #rebuild the data values as [(field, value), (field, value), ...]
+        atts = doc['atts']
+
+        #deal with encoding (particularly for kml/gml)
+        #there's some wackiness with a unicode char and mongo (and also a bad char in the data, see fid 6284858)
+        #convert atts to name, value tuples so we only have to deal with the wackiness once
+        datavalues = [(a['name'], convert_by_ogrtype(a['val'], ogr.OFTString, geometry_format) if isinstance(a['val'], str) or isinstance(a['val'], unicode) else a['val']) for a in atts]
+
+        #append the observed timestamp
+        datavalues.append(('observed', observed))
+
+        return {"id": int(record_id), "geom": geom_repr, "datavalues": datavalues}
 
     def move_vectors(self, to_mongo_uri, from_mongo_uri):
         '''

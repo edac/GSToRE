@@ -7,15 +7,8 @@ from pyramid.httpexceptions import HTTPNotFound, HTTPNotImplemented
 
 from .models import DBSession
 
-'''
-to run like paster
 
-cd /opt/modwsgi/gstore_v3_env/
-bin/pshell gstore_v3/development.ini
-
-'''
-
-#TODO: set up some nice 404 pages
+#TODO: put in some reasonable error messages. 
 #custom error methods   
 @notfound_view_config(request_method='GET')
 def notfound_get(request):
@@ -53,7 +46,7 @@ def any_service(segment_name, *allowed):
         if info['match'][segment_name] in allowed:
             return True
     return predicate
-servicelist = any_service('service', 'wms', 'wfs', 'wcs', 'map', 'wms_tiles')
+servicelist = any_service('service', 'wms', 'wfs', 'wcs', 'map', 'wms_tiles', 'clip')
 
 #check for valid metadata standards
 def any_standard(segment_name, *allowed):
@@ -95,7 +88,7 @@ def main(global_config, **settings):
     config.add_static_view(name='xslts', path='gstore_v3:../resources/xslts')
 
     #TODO: comment this out for production (or don't copy the stuff that's in the sandbox dir)
-    #config.add_static_view(name='samples', path='gstore_v3:../resources/samples')
+    config.add_static_view(name='samples', path='gstore_v3:../resources/samples')
 
     config.add_route('home', '/')    
 
@@ -127,19 +120,29 @@ def main(global_config, **settings):
     config.add_route('features', '/apps/{app}/features.{ext}', custom_predicates=(applist,))
 
 #to the metadata
+
+    #config.add_route('metadata_sitemap', '/apps/{app}/sitemap.html', custom_predicates=(applist,))
     
-    config.add_route('metadata', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata/{standard}.{ext}', custom_predicates=(applist,))
-    #the resolved, no xlink version. maybe this only applies to the iso? or return transform of whatever but it will be the same as the file from above
-    config.add_route('metadata_resolved', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata/resolved/{standard}.{ext}', custom_predicates=(applist,standardslist,))
-    
-    config.add_route('xlink_metadata', '/apps/{app}/metadata/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
+    config.add_route('metadata', '/apps/{app}/{datatype}/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata/{standard}.{ext}', custom_predicates=(applist,))
+
+#to the provenance
+    '''
+    trace: generated prov (only supporting rdf now)
+    base: the source file for generating the rdf (in our case, the source ds xml)
+    '''
+    config.add_route('provenance_trace', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/prov/{ontology}.{ext}', custom_predicates=(applist,))
+    config.add_route('provenance_base', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/prov/{ontology}/{standard}.{ext}', custom_predicates=(applist,))    
 
 #to the search
-    config.add_route('search_datasets', '/apps/{app}/search/datasets.{ext}', custom_predicates=(applist,))
-    config.add_route('search_facets', '/apps/{app}/search/facets/{facet}.{ext}', custom_predicates=(applist,)) #TODO: is this what is needs to be? need some route, though.
-    config.add_route('search_features', '/apps/{app}/search/features.json', custom_predicates=(applist,))
-    config.add_route('search_geolookups', '/apps/{app}/search/{geolookup}.json', custom_predicates=(applist,geolookuplist,))
     config.add_route('search_categories', '/apps/{app}/search/categories.json', custom_predicates=(applist,))
+    config.add_route('search_features', '/apps/{app}/search/features.json', custom_predicates=(applist,))
+    
+    config.add_route('searches', '/apps/{app}/search/{doctypes}.{ext}', custom_predicates=(applist,))
+
+    config.add_route('search_within_collection', '/apps/{app}/search/collection/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/datasets.{ext}', custom_predicates=(applist,))
+    
+    config.add_route('search_facets', '/apps/{app}/search/facets/{facet}.{ext}', custom_predicates=(applist,)) #TODO: is this what is needs to be? need some route, though.
+    
 
 #to ogc services (datasets | tile indexes)
     #for the base layers
@@ -169,8 +172,6 @@ def main(global_config, **settings):
     config.add_route('dataone_log_slash', '/dataone/v1/log/')
     config.add_route('dataone_search', '/dataone/v1/object')
     config.add_route('dataone_search_slash', '/dataone/v1/object/')
-
-
     config.add_route('dataone_object', '/dataone/v1/object/{pid:.*}')
     config.add_route('dataone_object_slash', '/dataone/v1/object/{pid:.*}/')
     config.add_route('dataone_meta', '/dataone/v1/meta/{pid:.*}')
@@ -184,23 +185,16 @@ def main(global_config, **settings):
     config.add_route('dataone_error_slash', '/dataone/v1/error/') 
 
     #maintenance routes
-#    config.add_route('dataone_addcore', '/dataone/v1/core/add')
-#    config.add_route('dataone_addmetadata', '/dataone/v1/metadata/add')
-#    config.add_route('dataone_addvector', '/dataone/v1/vector/add')
-#    config.add_route('dataone_addsource', '/dataone/v1/source/add')
-#    config.add_route('dataone_addpackage', '/dataone/v1/package/add')
-#    config.add_route('dataone_addobsolete', '/dataone/v1/obsolete/add')
-#    config.add_route('dataone_updatepackage', '/dataone/v1/package/{pid:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/update')
-
     config.add_route('dataone_add', '/dataone/v1/{object}/add')
     config.add_route('dataone_update', '/dataone/v1/{object}/update')
 
 #to the dataset
     #use the integer dataset_id or the uuid
     config.add_route('dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}', custom_predicates=(applist, typelist,))
-    config.add_route('zip_dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}.zip', custom_predicates=(applist, typelist,))
+    #config.add_route('zip_dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}.zip', custom_predicates=(applist, typelist,))
     config.add_route('add_dataset', '/apps/{app}/datasets', custom_predicates=(applist,)) #POST
     config.add_route('update_dataset', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,)) #PUT
+    config.add_route('update_dataset_index', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/index', custom_predicates=(applist,))
     config.add_route('dataset_services', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/services.{ext}', custom_predicates=(applist,))
 
     config.add_route('dataset_streaming', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/dataset.{ext}', custom_predicates=(applist,))
@@ -208,6 +202,11 @@ def main(global_config, **settings):
 
     #elasticsearch builder
     config.add_route('dataset_indexer', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/index.json', custom_predicates=(applist,))
+
+#to repository services
+    config.add_route('repositories', '/apps/{app}/repositories.json', custom_predicates=(applist,))
+    config.add_route('repository', '/apps/{app}/repository/{repo}.json', custom_predicates=(applist,))
+    config.add_route('search_repo', '/apps/{app}/repository/{repo}/{doctypes}/{standard}.{ext}', custom_predicates=(applist,))
 
 #to hydroserver
     #services (MODIFY FOR WSDL VS REST)
@@ -220,7 +219,9 @@ def main(global_config, **settings):
     config.add_route('update_tileindex', '/apps/{app}/tileindexes/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
 
 #to collections
-    config.add_route('collections', '/apps/{app}/collections/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
+    config.add_route('collections', '/apps/{app}/collections/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/services.{ext}', custom_predicates=(applist,))
+    #config.add_route('collection_metadata', '/apps/{app}/collections/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata/{standard}.{ext}', custom_predicates=(applist,))
+    config.add_route('collection_footprint', '/apps/{app}/collections/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/footprint.{ext}', custom_predicates=(applist,))
     config.add_route('add_collection', '/apps/{app}/collections', custom_predicates=(applist,))
     config.add_route('update_collection', '/apps/{app}/collections/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
 

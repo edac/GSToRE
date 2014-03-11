@@ -54,7 +54,7 @@ def transform_xml(xml, xslt_path, params):
     note: xml is the xml as string
     '''
     #where params is a dict {"key": "value"}
-    param_str = ' '.join(['%s=%s' % (p, params[p] if ' ' not in params[p] else '"%s"' % params[p]) for p in params])
+    param_str = convert_to_xslt_params(params)
 
     #want the input xml to come from stdin (so -s:-)
     cmd = 'saxonb-xslt -s:- -xsl:%s %s' % (xslt_path, param_str)
@@ -64,6 +64,26 @@ def transform_xml(xml, xslt_path, params):
     output = s.communicate(input=xml.encode('utf-8'))[0]
     ret = s.wait()
     return output
+
+def transform_xml_file(xml_path, xslt_path, params):
+    '''
+    use saxonb-xslt for the transform (lxml only supports xslt 1, our xslts are in 2.0)
+
+    note: xml is the xml as string
+    '''
+    #where params is a dict {"key": "value"}
+    param_str = convert_to_xslt_params(params)
+
+    #want the input xml to come from stdin (so -s:-)
+    cmd = 'saxonb-xslt -s:%s -xsl:%s %s' % (xml_path, xslt_path, param_str)
+    
+    #shell must be true for saxonb to handle stdout here (otherwise it's a file not found error)
+    s = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+    output = s.communicate()[0]
+    ret = s.wait()
+    return output
+
+    return '' 
 
 def validate_xml(xml):
     '''
@@ -82,6 +102,9 @@ def validate_xml(xml):
     stdout, stderr = s.communicate(input=xml)
     ret = s.wait()
     return stderr
+
+def convert_to_xslt_params(params):
+    return ' '.join(['%s=%s' % (p, params[p] if ' ' not in params[p] else '"%s"' % params[p]) for p in params])
 
 
 '''
@@ -141,8 +164,17 @@ def get_all_services(req):
     return svcs.split(',')
 
 '''
+get default repositories
+'''
+def get_all_repositories(req):
+    repos =  req.registry.settings['DEFAULT_REPOSITORIES']
+    if not repos: 
+        return []
+    return repos.split(',')
+
+'''
 get the default standards
-except gstore 
+except gstore so that it doesn't turn up in the "public" links but also isn't excluded in the database
 '''
 def get_all_standards(req):
     stds = req.registry.settings['DEFAULT_STANDARDS']
@@ -150,14 +182,71 @@ def get_all_standards(req):
         return []
     return [s for s in stds.split(',') if s != 'GSTORE']
 
+#'''
+#get default metadata standards (i think this is not the one we want)
+#'''
+#def get_all_standards(req):
+#    stds =  req.registry.settings['DEFAULT_STANDARDS']
+#    if not stds:
+#        return []
+#    return stds.split(',')
+
+
 '''
-get default metadata standards
+build standard route urls (ogc services, metadata services, dataset downloads)
+
+for things like the tile index or dataset or collection ogc service, the structure is the same
+
+and for those that care, the route_path/route_url method for request is problematic with the load balancer (balancer/apps v appnode/gstore_v3/apps)
+where the app node doesn't know about the balancer or the balancer url in any useful way. and the proxy widget in pyramid only works with traversal? 
+and not url dispatch. so. 
 '''
-def get_all_standards(req):
-    stds =  req.registry.settings['DEFAULT_STANDARDS']
-    if not stds:
-        return []
-    return stds.split(',')
+def build_ogc_url(app, data_type, uuid, service, version):
+    '''
+    /apps/{app}/{type}/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/services/{service_type}/{service}
+
+    and the structure of the getcapabilities:
+    ?SERVICE={service}&REQUEST=GetCapabilities&VERSION={version}
+
+    '''
+    #return req.route_path('services', app=app, type=data_type, id=uuid, service=service, service_type='ogc') +'?SERVICE=%s&REQUEST=GetCapabilities&VERSION=%s' % (service, version)
+    return '/apps/%s/%s/%s/services/%s/%s?SERVICE=%s&REQUEST=GetCapabilities&VERSION=%s' % (app, data_type, uuid, 'ogc', service, service, version) 
+
+
+def build_metadata_url(app, data_type, uuid, standard, extension):
+    '''
+    /apps/{app}/{datatype}/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata/{standard}.{ext}
+    '''
+    #return req.route_path('metadata', app=app, datatype=data_type, id=uuid, standard=standard, ext=extension)
+    return '/apps/%s/%s/%s/metadata/%s.%s' % (app, data_type, uuid, standard, extension)
+
+def build_dataset_url(app, uuid, basename, aset, extension):
+    '''
+    /apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}
+    '''
+    #return req.route_path('dataset', app=app, id=uuid, basename=basename, type=aset, ext=extension)
+    return '/apps/%s/datasets/%s/%s.%s.%s' % (app, uuid, basename, aset, extension)
+
+def build_service_url(app, data_type, uuid):
+    '''
+    /apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/services.json
+    '''
+    return '/apps/%s/%s/%s/services.json' % (app, data_type, uuid)
+    
+def build_mapper_url(app, uuid):
+    '''
+    /apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/mapper
+    '''
+
+    #return req.route_path('mapper', app=app, id=uuid)
+    return '/apps/%s/datasets/%s/mapper' % (app, uuid)
+
+def build_prov_trace_url(app, uuid, ontology, format):
+    '''
+    /apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/prov/{ontology}.{ext}
+    '''
+    return '/apps/%s/datasets/%s/prov/%s.%s' % (app, uuid, ontology, format)
+    
 
 '''
 convert the multidict request parameters to lowercase keys

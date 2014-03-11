@@ -19,7 +19,7 @@
         <metadata>
             <!-- add the xsd for validation -->
             <xsl:choose>
-                <xsl:when test="identification/@dataset and spatial/raster">
+                <xsl:when test="identification/@identifier and spatial/raster">
                     <xsl:attribute name="xsi:noNamespaceSchemaLocation" select="'http://www.ngdc.noaa.gov/metadata/published/xsd/ngdcSchema/schema.xsd'"></xsl:attribute>
                 </xsl:when>
                 <xsl:otherwise>
@@ -28,7 +28,7 @@
             </xsl:choose>    
             <idinfo>
                 <xsl:if test="spatial/raster">
-                    <datsetid><xsl:value-of select="identification/@dataset"/></datsetid>
+                    <datsetid><xsl:value-of select="identification/@identifier"/></datsetid>
                 </xsl:if>
                 
                 <xsl:variable name="identity-citation-id" select="identification/citation[@role='identify']/@ref"/>
@@ -641,7 +641,7 @@
                 <metstdv>FGDC-STD-001-1998</metstdv>
                 
                 <mettc>local time</mettc>
-                <xsl:if test="identification/@dataset and spatial/raster">
+                <xsl:if test="identification/@identifier and spatial/raster">
                     <metextns>
                         <onlink>http://www.fgdc.gov/standards/projects/FGDC-standards-projects/csdgm_rs_ex/MetadataRemoteSensingExtens.pdf</onlink>
                         <metprof>Extensions for Remote Sensing Metadata, FGDC-STD-012-2002</metprof>
@@ -654,20 +654,20 @@
         <cntinfo>
             <xsl:if test="organization">
                 <cntorgp>
-                    <xsl:if test="organization/name">
+                    <xsl:if test="organization/name and organization/name/text()">
                         <cntorg><xsl:value-of select="organization/name"/></cntorg> 
                     </xsl:if>
-                    <xsl:if test="organization/person">
+                    <xsl:if test="organization/person and organization/person/text()">
                         <cntper><xsl:value-of select="organization/person"/></cntper>
                     </xsl:if>
                 </cntorgp>
             </xsl:if>
             <xsl:if test="person">
                 <cntperp>
-                    <xsl:if test="person/name">
+                    <xsl:if test="person/name and person/name/text()">
                         <cntper><xsl:value-of select="person/name"/></cntper>
                     </xsl:if>
-                    <xsl:if test="person/organization">
+                    <xsl:if test="person/organization and person/organization/text()">
                         <cntorg><xsl:value-of select="person/organization"/></cntorg>
                     </xsl:if>
                 </cntperp>
@@ -684,7 +684,7 @@
                     <city><xsl:value-of select="address/city"/></city>
                     <state><xsl:value-of select="address/state"/></state>
                     <postal><xsl:value-of select="address/postal"/></postal>
-                    <xsl:if test="address/country and address/country != ''">
+                    <xsl:if test="address/country and address/country/text()">
                         <country><xsl:value-of select="address/country"/></country>
                     </xsl:if>
                 </cntaddr>

@@ -33,6 +33,7 @@
           <xs:element ref="contacts"/>
           <xs:element ref="citations"/>
           <xs:element ref="sources" minOccurs="0"/>
+          <xs:element ref="datasets" minOccurs="0"/>
         </xs:sequence>
       </xs:choice>
     </xs:complexType>
@@ -109,7 +110,7 @@
         <xs:element ref="native" minOccurs="0" maxOccurs="1"/>
         <xs:element ref="credit" minOccurs="0" maxOccurs="1"/>
       </xs:sequence>
-      <xs:attribute name="dataset" use="optional"></xs:attribute>
+      <xs:attribute name="identifier" use="optional"></xs:attribute>
     </xs:complexType>
   </xs:element>
   <xs:element name="time">
@@ -752,7 +753,13 @@
       </xs:sequence>
     </xs:complexType>
   </xs:element>
-  
+  <xs:element name="datasets">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="dataset" minOccurs="1" maxOccurs="unbounded"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
   
   <!-- standard patterns -->
   <xs:simpleType name="non-empty-element">

@@ -3,8 +3,9 @@ from pyramid.response import Response
 from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError, HTTPBadRequest
 
 from sqlalchemy import desc, asc, func
-from sqlalchemy.sql.expression import and_
+from sqlalchemy.sql.expression import and_, cast
 from sqlalchemy.sql import between
+import sqlalchemy
 
 import os, json, re
 from xml.sax.saxutils import escape
@@ -47,17 +48,19 @@ def feature(request):
     if format not in ['json', 'geojson', 'kml', 'gml']:
         return HTTPNotFound()
 
+
+    #it's the uuid to feature id search that fails (and without mods, can't index on uuid - need operator and it's unavailable?)
     try:
         i = int(feature_id)
         clause = Feature.fid==i
     except:
-        clause = Feature.uuid==feature_id
+        #clause = Feature.uuid==feature_id
+        clause = cast(Feature.uuid, sqlalchemy.types.TEXT)==feature_id
 
     feature = DBSession.query(Feature).filter(clause).first()
     if not feature:
         return HTTPNotFound('Invalid feature request')
 
-    #TODO: get the dataset for the feature and make sure it's not embargoed or inactive
     if feature.dataset.is_embargoed or feature.dataset.inactive or not feature.dataset.is_available:
         return HTTPNotFound('Unavailable')
 
@@ -67,12 +70,14 @@ def feature(request):
     mongo_uri = gMongoUri(connstr, collection)
     gm = gMongo(mongo_uri)
 
-    #TODO: update this? it returns multiple docs per feature id for time series data so this is probably not what we want (stripping off the first, anyway)
-    vectors = gm.query({'f.id': feature.fid})
+    vectors = gm.query({'d.id': feature.dataset_id, 'f.id': feature.fid})
 
     if not vectors:
         return HTTPServerError()
 
+    #return Response(json.dumps({'d.id': feature.dataset_id, 'f.id': feature.fid, 'count': vectors.count()}))
+
+    #TODO: change this to not just be the first one
     vector = vectors[0]
 
     #this is basically the same as the convert_vector method in the streamer
@@ -80,7 +85,7 @@ def feature(request):
     #so it lives there and this is here and let's not speak of it again.
     fid = int(vector['f']['id'])
     did = int(vector['d']['id'])
-    obs = vector['obs'] if 'obs' in vector else ''
+    obs = vector['obs'].strftime('%Y%m%dT%H:%M:%S') if 'obs' in vector else ''
 
     #get the geometry
     if not format in ['json']:
@@ -582,6 +587,7 @@ def features(request):
     response.content_type = content_type
     #because it will be an issue, let's go for cors.
     response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['X-Robots-Tag'] = 'noindex'
     response.app_iter = yield_results()
     return response
 
@@ -732,8 +738,18 @@ def add_attributes(request):
     bad_recs = []
     inserts = []
     for rec in records:
-        fid = rec['fid']
-        uid = rec['uuid']
+        #if it's tabular data, we have an rid (record id) but no fid and no uid
+        fid = rec['fid'] if 'fid' in rec else ''
+        uid = rec['uuid'] if 'uuid' in rec else ''
+
+        rid = rec['rid'] if 'rid' in rec else ''
+
+        if not fid and not rid:
+            r = rec
+            r.update({"err": "bad identifier"})
+            bad_recs.append(r)
+            continue
+        
         obs = rec['observed'] if 'observed' in rec else ''
         atts = rec['atts']
 
@@ -764,11 +780,11 @@ def add_attributes(request):
             #try the pre-fetched list first
             geom = [g[1] for g in geoms if g[0] == fid]
             geom = geom[0] if geom else ''
-        if not geom:
+        if not geom and the_dataset.taxonomy not in ['table']:
             #otherwise, try the shapes table
             geom = DBSession.query(Feature.geom).filter(Feature.fid==fid).first()
             geom = geom[0] if geom else '' #for the tuple action
-        if not geom:
+        if not geom and the_dataset.taxonomy not in ['table']:
             #we are really in trouble here
             r = rec
             r.update({"err": "bad geom"})
@@ -776,19 +792,31 @@ def add_attributes(request):
             continue
 
         #check the geometry size!
-        geom_size = check_wkb_size(geom)
+        geom_size = check_wkb_size(geom) if geom else 0
 
         #build the shard key from the dataset uuid and the feature uuid
-        shardkey = dataset_uuid.split('-')[0] + uid.split('-')[0]
+        #unless it's a table and then it's the dataset uuid first 8 + the dataset uuid last 8 (this is basically a similar structure to the dataset with one feature for all recs)
+        shardkey = dataset_uuid.split('-')[0] + uid.split('-')[0] if the_dataset.taxonomy not in ['table'] else dataset_uuid.split('-')[0] + dataset_uuid.split('-')[-1][:8]
 
         #build the mongo object
         #we are including the year, month, day, hour, minute as separate items in case we want to 
         #do aggregation later (easier now than trying to update a gajillion docs)
-        obj = {'key': shardkey, 'f': {'id': fid, 'u': uid}, 'd': {'id': dataset_id, 'u': dataset_uuid}, 'atts': atts}
-        if geom_size < 3.0:
-            #check the size of the wkb and if it's bigger than 3.0 mb, do not write it to mongo (insert will fail).
-            #technically, our limit is 4mb but that's for the doc NOT just the one element
-            obj.update({'geom': {'g': geom}})
+
+        #fid is here for tables and vectors, but the uuid only for vectors.
+        obj = {'key': shardkey, 'd': {'id': dataset_id, 'u': dataset_uuid}, 'atts': atts}
+
+        
+
+        if the_dataset.taxonomy not in ['table']:
+            obj.update({'f': {'id': fid, 'u': uid}})
+            if geom_size < 3.0:
+                #check the size of the wkb and if it's bigger than 3.0 mb, do not write it to mongo (insert will fail).
+                #technically, our limit is 4mb but that's for the doc NOT just the one element
+                obj.update({'geom': {'g': geom}})
+        else:
+            #mark it as a record id instead so the dataset + fid searches don't go badly
+            obj.update({'r': {'id': rid}})
+            
         if obsd:
             obj.update({'obs': obsd, 'year': obsd.year, 'mon': obsd.month, 'day': obsd.day, 'hour': obsd.hour, 'mnt': obsd.minute})
         inserts.append(obj)
@@ -824,7 +852,7 @@ def add_attributes(request):
             inserts_to_post = inserts[i:j]
 
             #hang on the to the fids? although it means nothing for the sensor data
-            fids = [x['f']['id'] for x in inserts_to_post]
+            fids = [x['f']['id'] for x in inserts_to_post] if the_dataset.taxonomy not in ['table'] else [x['r']['id'] for x in inserts_to_post]
             
             try:
                 fail = gm.insert(inserts_to_post)
@@ -867,7 +895,7 @@ def add_attributes(request):
 @view_config(route_name='update_feature', request_method='PUT')
 def update_feature(request):
     '''
-    modify an existing feature - add qualty flag or something
+    modify an existing feature - add quality flag or something
     '''
     return Response('')
 

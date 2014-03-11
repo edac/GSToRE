@@ -3,6 +3,8 @@ from sqlalchemy import MetaData, Table, ForeignKey, Column, String, Integer, Boo
 from sqlalchemy.orm import relationship, backref, scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
+from sqlalchemy.orm import relationship, backref
+
 from zope.sqlalchemy import ZopeTransactionExtension
 
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
@@ -23,6 +25,11 @@ class GstoreApp(Base):
         schema='gstoredata'
     )
 
+    #relate to repositories
+    repositories = relationship('Repository', secondary='gstoredata.repositories_apps_datasets', backref='apps')
+
+    prov_ontologies = relationship('ProvOntology', backref='prov_apps')
+
     '''
     just the metadata requirements right now (liability, etc)
     '''
@@ -34,5 +41,30 @@ class GstoreApp(Base):
         self.name = name
         self.route_key = route_key
 
+    def get_repositories(self, req=None):
+        '''
+        get the list of repos with the supported metadata standards
 
+        and a count of things?
 
+        {
+            {repo}: {
+                "description": 
+                "url":
+                "standards": []                
+            }
+        }
+        '''
+
+        repos = self.repositories
+
+        output = {}
+
+        for repo in repos:
+            output[repo.name] = {
+                "description": repo.description,
+                "url": repo.url,
+                "standards": repo.get_standards(req)
+            }
+
+        return output

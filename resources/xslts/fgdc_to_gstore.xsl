@@ -250,10 +250,10 @@
             </original>
             
             <identification>
-                <xsl:attribute name="dataset">
+                <xsl:attribute name="identifier">
                     <xsl:choose>
                         <xsl:when test="idinfo/datsetid">
-                            <xsl:attribute name="dataset" select="idinfo/datsetid"></xsl:attribute>
+                            <xsl:value-of select="idinfo/datsetid"/>
                         </xsl:when>
                         <xsl:otherwise>
                             <xsl:value-of select="fn:tokenize(fn:substring-before(fn:base-uri(.), '.xml'), '/')[last()]"/>
@@ -1235,7 +1235,10 @@
                        </xsl:if>  
                        <xsl:if test="cntinfo/cntperp">
                            <person>
-                               <organization><xsl:value-of select="cntinfo/cntperp/cntorg"></xsl:value-of></organization>
+                               <xsl:if test="cntinfo/cntperp/cntorg">
+                                   <organization><xsl:value-of select="cntinfo/cntperp/cntorg"></xsl:value-of></organization>
+                               </xsl:if>
+                               
                                <name><xsl:value-of select="cntinfo/cntperp/cntper"></xsl:value-of></name>
                            </person>
                        </xsl:if>

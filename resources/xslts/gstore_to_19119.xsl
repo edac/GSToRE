@@ -33,7 +33,7 @@
             <xsl:attribute name="xsi:schemaLocation" select="'http://www.isotc211.org/2005/gmi http://www.ngdc.noaa.gov/metadata/published/xsd/schema.xsd'"/>
             
             <gmd:fileIdentifier>
-                <gco:CharacterString><xsl:value-of select="fn:concat(fn:upper-case($app), '::', identification/@dataset, '::ISO-19119:', fn:upper-case($service-type))"/></gco:CharacterString>
+                <gco:CharacterString><xsl:value-of select="fn:concat(fn:upper-case($app), '::', identification/@identifier, '::ISO-19119:', fn:upper-case($service-type))"/></gco:CharacterString>
             </gmd:fileIdentifier>
             
             <gmd:language>

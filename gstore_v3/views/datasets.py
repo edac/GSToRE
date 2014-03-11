@@ -5,15 +5,13 @@ from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError, HTT
 
 from sqlalchemy.exc import DBAPIError
 
-#from the models init script
 from ..models import DBSession
-#from the generic model loader (like meta from gstore v2)
 from ..models.datasets import *
 from ..models.sources import Source, SourceFile, MapfileSetting
 from ..models.metadata import OriginalMetadata, DatasetMetadata
 from ..models.apps import GstoreApp
 
-import os, json, re, tempfile
+import os, json, tempfile
 from xml.sax.saxutils import escape
 
 from ..lib.utils import *
@@ -21,6 +19,7 @@ from ..lib.spatial import *
 from ..lib.database import *
 from ..lib.mongo import gMongoUri
 from ..lib.es_indexer import DatasetIndexer
+from ..lib.spatial_streamer import *
 
 
 '''
@@ -31,6 +30,9 @@ datasets
 def return_fileresponse(output, mimetype, filename):
     fr = FileResponse(output, content_type=mimetype)
     fr.content_disposition = 'attachment; filename=%s' % filename
+
+    #add a no-robots to see if that helps (we would like to have the metadata crawled)
+    fr.headers['X-Robots-Tag'] = 'noindex'
     
     #TODO: may want to reconsider the cookie age
     '''
@@ -44,30 +46,8 @@ def return_fileresponse(output, mimetype, filename):
     fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/')
     return fr
 
-#REMOVED: run this functionality from the interface and use the services.json
-###TODO: add the html renderer to this
-#@view_config(route_name='html_dataset', renderer='dataset_card.mako')
-#def show_html(request):
-#    dataset_id = request.matchdict['id']
-#    app = request.matchdict['app']
 
-#    d = get_dataset(dataset_id)
-
-#    if not d:
-#        return HTTPNotFound()
-
-#    #http://129.24.63.66/gstore_v3/apps/rgis/datasets/8fc27d61-285d-45f6-8ef8-83785d62f529/soils83.html
-#    #http://{load_balancer}/apps/.....
-
-#    load_balancer = request.registry.settings['BALANCER_URL']
-#    base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
-#    
-#    rsp = d.get_full_service_dict(base_url, request)
-
-#    return rsp
-    
-
-@view_config(route_name='zip_dataset')
+#@view_config(route_name='zip_dataset')
 @view_config(route_name='dataset')
 def dataset(request):
     #use the original dataset_id structure 
@@ -99,6 +79,9 @@ def dataset(request):
     if app not in d.apps_cache:
         return HTTPBadRequest()
 
+    if format not in d.get_formats(request):
+        return HTTPNotFound()    
+
     #so now we have the dataset
     #let's get the source for the set + extension combo
     #need the mimetype, list of files
@@ -120,7 +103,9 @@ def dataset(request):
     xslt_path = request.registry.settings['XSLT_PATH']
     fmtpath = request.registry.settings['FORMATS_PATH']
     tmppath = request.registry.settings['TEMP_PATH']
-    base_url = '%s/apps/%s/datasets/' % (request.registry.settings['BALANCER_URL'], app)
+    #base_url = '%s/apps/%s/datasets/' % (request.registry.settings['BALANCER_URL'], app)
+
+    base_url = request.registry.settings['BALANCER_URL']
     
     #check for a requested metadata standard
     #if there isn't one, get the app preferred ordered list and go for the best match
@@ -142,25 +127,13 @@ def dataset(request):
 
     #TODO: what happens if standard is null?
     
-    metadata_info = {'app': app, 'base_url': base_url, 'standard': std, "xslt_path": xslt_path + '/xslts', 'validate': False}
+    metadata_info = {'app': app, 'base_url': base_url, 'standard': std, "xslt_path": xslt_path + '/xslts', 'validate': False, "request": request}
     
     taxonomy = str(d.taxonomy)
-    if taxonomy in ['services']:
-        src = d.get_source(datatype, format)
-        
-        if not src:
-            #not valid source information for the dataset
-            return HTTPNotFound()
-
-        loc = src.get_location()
-        if not loc:
-            return HTTPNotFound()
-            
-        return HTTPFound(location=loc)
 
     #check for a source for everyone
     src = d.get_source(datatype, format)
-    if not src and d.taxonomy in ['geoimage', 'file']:
+    if not src and d.taxonomy in ['geoimage', 'file', 'service']:
         return HTTPNotFound()
 
     #outside link so redirect
@@ -213,7 +186,7 @@ def dataset(request):
         output = src.pack_source(output_path, outname, xslt_path, metadata_info)
         
         return return_fileresponse(output, mimetype, outname)
-    elif taxonomy in ['vector']:
+    elif taxonomy in ['vector', 'table']:
         #generate the file and pack the zip
         #note that the kml isn't being packed as kmz - we include metadata with every download here
 
@@ -223,14 +196,8 @@ def dataset(request):
         mongo_uri = gMongoUri(mconn, mcoll)
 
         srid = int(request.registry.settings['SRID'])
-
-        #for the original write to ogr directly build option
-        #success = d.build_vector(format, cached_path, mongo_uri, srid, metadata_info)
-
+        
         #for the new stream to ogr2ogr option (or just stream if not shapefile)
-        load_balancer = request.registry.settings['BALANCER_URL']
-        base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
-#        TODO: don't forget the metadata_info HERE!
         success = d.stream_vector(format, output_path, mongo_uri, srid, metadata_info)
 
         #check the response for failure
@@ -263,7 +230,7 @@ def stream_dataset(request):
     if format not in ['json', 'geojson', 'csv', 'kml', 'gml']:
         return HTTPBadRequest()
 
-    #TODO: add the parmaeter searches
+    #TODO: add the parameter searches
     params = normalize_params(request.params)
 
     #go get the dataset
@@ -272,163 +239,58 @@ def stream_dataset(request):
     if not d:
         return HTTPNotFound()
 
-    if d.taxonomy != 'vector' or d.inactive or app not in d.apps_cache or d.is_embargoed:
+    if d.taxonomy not in ['vector', 'table'] or d.inactive or app not in d.apps_cache or d.is_embargoed:
         return HTTPBadRequest()
 
     if not d.is_available:
         return HTTPServiceUnavailable()
+
+    supported_formats = d.get_formats(request)
+    if format not in supported_formats:
+        return HTTPNotFound()    
 
     connstr = request.registry.settings['mongo_uri']
     collection = request.registry.settings['mongo_collection']
     mongo_uri = gMongoUri(connstr, collection)
     gm = gMongo(mongo_uri)
 
-    encode_as = 'utf-8'   
     epsg = int(request.registry.settings['SRID'])
-    
-    fields = d.attributes
 
-    folder_head = ''
-    folder_tail = ''
-    delimiter = '\n'
-    schema_url = ''
-    field_set = ''
-    
-    if format == 'geojson':
-        content_type = 'application/json; charset=UTF-8'
-        head = """{"type": "FeatureCollection", "features": ["""
-        tail = "\n]}"
-        delimiter = ',\n'
-    elif format == 'json':
-        content_type = 'application/json; charset=UTF-8'
-        head = """{"features": ["""
-        tail = "]}"
-        delimiter = ',\n'
-    elif format == 'kml':
-        content_type = 'application/vnd.google-earth.kml+xml; charset=UTF-8'
-        head = """<?xml version="1.0" encoding="UTF-8"?>
-                        <kml xmlns="http://earth.google.com/kml/2.2">
-                        <Document>"""
-        tail = """\n</Document>\n</kml>"""
-        folder_head = "<Folder><name>%s</name>" % (d.description)
-        folder_tail = "</Folder>"
-
-        load_balancer = request.registry.settings['BALANCER_URL']
-        base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
-
-        kml_flds = [{'type': ogr_to_kml_fieldtype(f.ogr_type), 'name': f.name} for f in fields]
-        kml_flds.append({'type': 'string', 'name': 'observed'})
-        field_set = """<Schema name="%(name)s" id="%(id)s">%(sfields)s</Schema>""" % {'name': str(d.uuid), 'id': str(d.uuid), 
-            'sfields': '\n'.join(["""<SimpleField type="%s" name="%s"><displayName>%s</displayName></SimpleField>""" % (k['type'], k['name'], k['name']) for k in kml_flds])
-        }
-
-        schema_url = '%s%s/attributes.kml' % (base_url, d.uuid)
-
-    elif format == 'gml':
-        content_type = 'application/xml; subtype="gml/3.1.1; charset=UTF-8"'
-        head = """<?xml version="1.0" encoding="UTF-8"?>
-                                <gml:FeatureCollection 
-                                    xmlns:gml="http://www.opengis.net/gml" 
-                                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
-                                    xmlns:xlink="http://www.w3.org/1999/xlink"
-                                    xmlns:ogr="http://ogr.maptools.org/">
-                                <gml:description>GSTORE API 3.0 Vector Stream</gml:description>\n""" 
-        tail = """\n</gml:FeatureCollection>"""
-    elif format == 'csv':
-        content_type = 'text/csv; charset=UTF-8'
-        head = '' 
-        tail = ''
-        delimiter = '\n'
-        field_set = ','.join([f.name for f in fields]) + ',fid,dataset,observed\n'
-    else:
-        return HTTPBadRequest()
+    is_spatial = False if format in ['json', 'csv'] else True
 
     vectors = gm.query({'d.id': d.id})
-    total = vectors.count()
+    
+    records = [d.convert_doc_to_record(vector, epsg, format, is_spatial) for vector in vectors]
 
-    def yield_results():
-        yield head
+    fields = [{"name": f.name, "type": f.ogr_type, "len": f.ogr_width} for f in d.attributes]
 
-        cnt = 0
-        for vector in vectors:
-            vector_result = convert_vector(vector, fields, format, d.basename, schema_url, epsg)
-            if cnt == 0:
-                vector_result = folder_head + field_set + vector_result + delimiter
-            elif cnt == total - 1:
-                vector_result += folder_tail
-            else:
-                vector_result += delimiter
+    if 'obs' in records[0]['datavalues'][0]:
+        #this is not a good plan but we don't have the flag for "dataset contains observation timestamp" today
+        #and it's as a string for now
+        fields.append({"name": "observed", "type": 4, "len": 20})
 
-            cnt += 1
-            yield vector_result.encode(encode_as)
-
-        yield tail
-
-    #TODO: figure out a better solution (and revise the feature streamer) that can call some generic method 
-    #      and return a formatted vector chunk
-    def convert_vector(vector, fields, fmt, basename, schema_url, epsg):
-        '''
-        for notes, see the feature streamer methods
-        '''
-        fid = int(vector['f']['id'])
-        did = int(vector['d']['id'])
-        obs = vector['obs'] if 'obs' in vector else ''
-        obs = obs.strftime('%Y-%m-%dT%H:%M:%S+00') if obs else ''
-
-        #get the geometry
-        if not fmt in ['csv', 'json']:
-            wkb = vector['geom']['g'] if 'geom' in vector else ''
-            if not wkb:
-                #need to get it from shapes
-                feat = DBSession.query(Feature).filter(Feature.fid==fid).first()
-                wkb = feat.geom
-                
-            #and convert to geojson, kml, or gml
-            geom_repr = wkb_to_output(wkb, epsg, fmt)
-            if not geom_repr:
-                return ''
-                
-        atts = vector['atts']
-        atts = [(a['name'], unicode(a['val']).encode('ascii', 'xmlcharrefreplace')) for a in atts]
-        atts.append(('observed', obs))
-
-        if fmt == 'kml':
-            feature = "\n".join(["""<SimpleData name="%s">%s</SimpleData>""" % (v[0], re.sub(r'[^\x20-\x7E]', '', escape(str(v[1])))) for v in atts])
-            feature = """<Placemark id="%s">
-                        <name>%s</name>
-                        %s\n%s
-                        <ExtendedData><SchemaData schemaUrl="%s">%s</SchemaData></ExtendedData>
-                        <Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
-                        </Placemark>""" % (fid, fid, geom_repr, '', schema_url, feature)
-        elif fmt == 'gml':
-            vals = ''.join(['<ogr:%s>%s</ogr:%s>' % (a[0], re.sub(r'[^\x20-\x7E]', '', escape(str(a[1]))), a[0]) for a in atts])
-            feature = """<gml:featureMember><ogr:g_%(basename)s><ogr:geometryProperty>%(geom)s</ogr:geometryProperty>%(values)s</ogr:g_%(basename)s></gml:featureMember>""" % {'basename': basename, 'geom': geom_repr, 'values': vals} 
-        elif fmt == 'json':
-            vals = dict([(a[0], a[1]) for a in atts])
-            feature = json.dumps({'fid': fid, 'dataset_id': str(vector['d']['u']), 'properties': vals})
-        elif fmt == 'geojson':
-            vals = dict([(a[0], a[1]) for a in atts])
-            vals.update({'fid':fid, 'dataset_id': did})
-            feature = json.dumps({"type": "Feature", "properties": vals, "geometry": json.loads(geom_repr)})
-        elif fmt == 'csv':
-            vals = []
-            for f in fields:
-                att = [a for a in atts if a[0] == f.name]
-                #need to be sure to handle the fact that if the value for an attribute is null, it's not in mongo
-                #i hope that doesn't turn out to be really bad.
-                v = att[0][1] if att else ""
-                vals.append(v)
-            vals += [str(fid), str(did), obs]
-            feature = ','.join(vals)
-        else:
-            feature = ''
-
-        return feature
+    if format == 'kml' and d.taxonomy in ['vector']:
+        streamer = KmlStreamer(fields)
+        streamer.update_description(d.description)
+    elif format =='gml' and d.taxonomy in ['vector']:
+        streamer = GmlStreamer(fields)
+        streamer.update_description(d.description)
+        streamer.update_namespace(d.basename)
+    elif format == 'geojson' and d.taxonomy in ['vector']:
+        streamer = GeoJsonStreamer(fields)
+    elif format == 'json':
+        streamer = JsonStreamer(fields)
+    elif format == 'csv':
+        streamer = CsvStreamer(fields)
+    else:
+        return HTTPBadRequest()
+        
                 
     response = Response()
-    response.content_type = content_type
+    response.content_type = streamer.content_type
+    response.headers['X-Robots-Tag'] = 'noindex'
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.app_iter = yield_results()
+    response.app_iter = streamer.yield_set(records)
     return response
    
 
@@ -470,19 +332,16 @@ def services(request):
         metadata: [] as {standard: {fmt: url}}
     }
     '''
-
-#    #get the host url
-#    host = request.host_url
-#    g_app = request.script_name[1:]
-#    base_url = '%s/%s/apps/%s/datasets/' % (host, g_app, app)
-
+    
     load_balancer = request.registry.settings['BALANCER_URL']
-    base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
+    #base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
 
-    rsp = d.get_full_service_dict(base_url, request)
+    rsp = d.get_full_service_dict(load_balancer, request, app)
 
+ 
     if format == 'json':
         response = render_to_response('json', rsp, request=request)
+        response.headers['Access-Control-Allow-Origin'] = '*'
         response.content_type='application/json'
         return response
     elif format == 'html':
@@ -525,123 +384,23 @@ def indexer(request):
     if not d:
         return HTTPNotFound()
 
-        
-    ''' 
-    {
-    "dataset": {
-        "properties": {
-            "abstract": {
-                "type": "string"
-            },
-            "active": {
-                "type": "boolean"
-            },
-            "aliases": {
-                "type": "string",
-                "index_name": "alias"
-            },
-            "applications": {
-                "type": "string",
-                "index_name": "application"
-            },
-            "area": {
-                "type": "double"
-            },
-            "available": {
-                "type": "boolean"
-            },
-            "category": {
-                "properties": {
-                    "apps": {
-                        "type": "string"
-                    },
-                    "groupname": {
-                        "type": "string"
-                    },
-                    "subtheme": {
-                        "type": "string"
-                    },
-                    "theme": {
-                        "type": "string"
-                    }
-                }
-            },
-            "category_facets": {
-                "type": "nested",
-                "properties": {
-                    "apps": {
-                        "type": "string"
-                    },
-                    "groupname": {
-                        "type": "string",
-                        "index": "not_analyzed",
-                        "omit_norms": true,
-                        "index_options": "docs"
-                    },
-                    "subtheme": {
-                        "type": "string",
-                        "index": "not_analyzed",
-                        "omit_norms": true,
-                        "index_options": "docs"
-                    },
-                    "theme": {
-                        "type": "string",
-                        "index": "not_analyzed",
-                        "omit_norms": true,
-                        "index_options": "docs"
-                    }
-                }
-            },
-            "date_added": {
-                "type": "date",
-                "format": "YYYY-MM-dd"
-            },
-            "embargo": {
-                "type": "boolean"
-            },
-            "formats": {
-                "type": "string"
-            },
-            "geomtype": {
-                "type": "string"
-            },
-            "isotopic": {
-                "type": "string"
-            },
-            "location": {
-                "properties": {
-                    "bbox": {
-                        "type": "geo_shape",
-                        "tree": "quadtree",
-                        "tree_levels": 40
-                    },
-                    "counties": {
-                        "type": "string",
-                        "index_name": "county"
-                    },
-                    "quads": {
-                        "type": "string",
-                        "index_name": "quad"
-                    }
-                }
-            },
-            "services": {
-                "type": "string"
-            },
-            "taxonomy": {
-                "type": "string"
-            },
-            "title": {
-                "type": "string"
-            }
-        }
-    }
-}
-    '''
+    #add the dataset to the index
+    es_description = {
+        "host": request.registry.settings['es_root'],
+        "index": request.registry.settings['es_dataset_index'], 
+        "type": 'dataset',
+        "user": request.registry.settings['es_user'].split(':')[0],
+        "password": request.registry.settings['es_user'].split(':')[-1]
+    } 
 
-    index = d.get_index_doc(request)
-
-    return {"dataset": index}
+    indexer = DatasetIndexer(es_description, d, request)  
+    #TODO: update the list for facets
+    indexer.build_document([])
+    #add to the index
+    try:
+        indexer.put_document()
+    except:
+        return HTTPServerError('failed to put index document for %s' % d.uuid)
 
 '''
 dataset maintenance
@@ -729,7 +488,7 @@ def add_dataset(request):
     taxonomy = post_data['taxonomy']
     apps = post_data['apps'] if 'apps' in post_data else []
     validdates = post_data['dates'] if 'dates' in post_data else {}
-    spatials = post_data['spatial']
+    spatials = post_data['spatial'] if 'spatial' in post_data else []
     formats = post_data['formats']
     services = post_data['services']
     categories = post_data['categories']
@@ -737,14 +496,18 @@ def add_dataset(request):
     metadatas = post_data['metadata']
     standards = post_data['standards'] if 'standards' in post_data else []
     acquired = post_data['acquired'] if 'acquired' in post_data else ''
+    records = post_data['records'] if 'records' in post_data else 0
 
-    box = map(float, spatials['bbox'].split(','))
-    epsg = spatials['epsg']
-    geomtype = spatials['geomtype'] if 'geomtype' in spatials else ''
-    geom = spatials['geom'] if 'geom' in spatials else ''
-    features = spatials['features'] if 'features' in spatials else 0
-    records = spatials['records'] if 'records' in spatials else 0
-
+    geom = ''
+    epsg = int(request.registry.settings['SRID'])
+    if spatials:
+        box = map(float, spatials['bbox'].split(','))
+        epsg = spatials['epsg']
+        geomtype = spatials['geomtype'] if 'geomtype' in spatials else ''
+        geom = spatials['geom'] if 'geom' in spatials else ''
+        features = spatials['features'] if 'features' in spatials else 0
+        
+        
     #add the inactive flag
     active = post_data['active'].lower() if 'active' in post_data else ''
 
@@ -764,11 +527,12 @@ def add_dataset(request):
     new_dataset = Dataset(description)
     new_dataset.basename = basename
     new_dataset.taxonomy = taxonomy
+    new_dataset.record_count = records
     if taxonomy == 'vector':
         new_dataset.geomtype = geomtype
         new_dataset.feature_count = features
-        new_dataset.record_count = records
     new_dataset.orig_epsg = epsg
+        
     new_dataset.inactive = False if active == 'true' else True
 
     if embargoed == 'true':
@@ -776,12 +540,13 @@ def add_dataset(request):
         new_dataset.is_embargoed = True
         new_dataset.embargo_release_date = embargo_release
 
-    if not geom:
+    if not geom and taxonomy not in ['table']:
         #go make one
         geom = bbox_to_wkb(box, SRID)
 
-    new_dataset.geom = geom
-    new_dataset.box = box
+    if taxonomy not in ['table']:
+        new_dataset.geom = geom
+        new_dataset.box = box
     
     new_dataset.apps_cache = [app] + apps
 
@@ -896,6 +661,9 @@ def add_dataset(request):
             #new_dataset.project_id = p.id
             new_dataset.projects.append(p)
 
+    #TODO: add the publication date
+    new_dataset.date_published = datetime.now()
+
     #create the new dataset with all its pieces
     try:
         DBSession.add(new_dataset)
@@ -904,6 +672,8 @@ def add_dataset(request):
         DBSession.refresh(new_dataset)
     except Exception as err:
         return HTTPServerError(err)
+
+    dataset_uuid = str(new_dataset.uuid)
 
     #add the dataset to the index
     es_description = {
@@ -921,10 +691,12 @@ def add_dataset(request):
     try:
         indexer.put_document()
     except:
-        return HTTPServerError('failed to put index document for %s' % new_dataset.uuid)
+        return HTTPServerError('failed to put index document for %s' % dataset_uuid)
+
+    DBSession.close()
  
     #and just for kicks, return the uuid
-    return Response(str(new_dataset.uuid))
+    return Response(dataset_uuid)
 
 #TODO: change this back to PUT and figure out why pycurl hung up on it.
 @view_config(route_name='update_dataset', request_method='POST')
@@ -957,7 +729,7 @@ def update_dataset(request):
     formats
     services
     '''
-    elements_to_update = {}
+    elements_to_update = []
 
     keys = post_data.keys()
     for key in keys:
@@ -998,8 +770,11 @@ def update_dataset(request):
                         converted = om.convert_to_gstore_metadata(xslt_path)
                     except Exception as e:
                         raise
-                   
-            
+
+            #update the es doc for the metadata elements now that it's gstore schema       
+            elements_to_update.append('abstract')
+            elements_to_update.append('isotopic')
+            elements_to_update.append('keywords')
         elif key == 'activate':
             #TODO: add es updater for flag in index doc
         
@@ -1012,7 +787,7 @@ def update_dataset(request):
             #move the vector data from gstore.vectors to gstore.inactive if FALSE
             #move from gstore.inactive to gstore.vectors if TRUE
 
-            if d.taxonomy in ['vector']:
+            if d.taxonomy in ['vector', 'table']:
                 connstr = request.registry.settings['mongo_uri']
                 live_collection = request.registry.settings['mongo_collection']
                 inactive_collection = request.registry.settings['mongo_inactive_collection']
@@ -1028,9 +803,7 @@ def update_dataset(request):
                 
                 d.move_vectors(to_mongo_uri, from_mongo_uri)
 
-
-            #yes, this is json/dict, but the update is a string script widget and cannot deal with True.
-            elements_to_update.update({"active": str(not inactive).lower()})
+            elements_to_update.append("active")
             
         elif key == 'available':
             #TODO: add es updater for flag in index doc
@@ -1040,7 +813,7 @@ def update_dataset(request):
             available = True if available == 'True' else False
             d.is_available = available
 
-            elements_to_update.update({"available": str(available).lower()})
+            elements_to_update.append("available")
         elif key == 'embargo':
             #TODO: add es updater for flag in index doc
             embargo = post_data[key]
@@ -1057,7 +830,7 @@ def update_dataset(request):
                 #add it to the table, if one isn't supplied, it's embargoed indefinitely or we can add a date
                 d.embargo_release_date = embargo_date
 
-            if d.taxonomy in ['vector']:
+            if d.taxonomy in ['vector', 'table']:
                 #move the documents if it's a vector
                 connstr = request.registry.settings['mongo_uri']
                 live_collection = request.registry.settings['mongo_collection']
@@ -1074,7 +847,7 @@ def update_dataset(request):
                 
                 d.move_vectors(to_mongo_uri, from_mongo_uri)
 
-            elements_to_update.update({"embargo": str(embargo).lower()})
+            elements_to_update.append("embargo")
         elif key == 'bbox':
             parts = post_data[key]
             if 'geom' not in parts and 'box' not in parts:
@@ -1102,7 +875,7 @@ def update_dataset(request):
                     "coordinates": [[[box[0], box[1]], [box[2], box[1]], [box[2], box[3]], [box[0], box[3]], [box[0], box[1]]]]
                 }
 
-            elements_to_update.update({"location": {"bbox": loc}, "area": area})
+            elements_to_update.append("location")
             
         elif key == 'epsg':
             epsg = post_data['epsg']
@@ -1160,16 +933,23 @@ def update_dataset(request):
             d.excluded_formats = [f for f in excluded_formats if f not in formats]
 
 
-            elements_to_update.update({"formats": formats})
+            elements_to_update.append("formats")
 
         elif key == 'services':
             services = post_data['services']
             excluded_services = get_all_services(request)
             d.excluded_services = [s for s in excluded_services if s not in services]
 
-            elements_to_update.update({"services": services})
+            elements_to_update.append("services")
+
+        elif key == 'repositories':
+            services = post_data['repositories']
+            excluded_repositories = get_all_repositories(request)
+            d.excluded_repositories = [s for s in excluded_repositories if s not in repositories]
+
+            elements_to_update.append("repositories")    
         elif key == 'taxonomy':  
-            taxo = post_data['taxonomy']
+            taxo = post_data[key]
 
             taxonomy = taxo['taxonomy']
             geomtype = taxo['geomtype'] if 'geomtype' in taxo else ''
@@ -1181,9 +961,7 @@ def update_dataset(request):
             if geomtype and taxonomy.lower() == 'vector':
                 d.geomtype = geomtype.upper()
 
-            elements_to_update.update({"taxonomy": taxonomy.lower()})
-            if geomtype and taxonomy.lower() == 'vector':
-                elements_to_update.update({"geomtype": geomtype.upper()})
+            elements_to_update.append("taxonomy")
 
         elif key == 'records':
             records = post_data['records']
@@ -1214,7 +992,16 @@ def update_dataset(request):
             for citation in citations:
                 c = Citation(citation)
                 d.citations.append(c)
-       
+        elif key == 'publication_date':
+            '''
+            use with embargo/activate -
+            if releasing the embargo, include flag to use this datetime (instead of date_added)
+            if activating for the first time, include flag to use this datetime (instead of date_added)
+                 
+            '''
+            pdate = datetime.now()
+            d.date_published = pdate
+            elements_to_update.append("date_published")
     try:
         DBSession.commit()
     except Exception as err:
@@ -1232,16 +1019,54 @@ def update_dataset(request):
 
     indexer = DatasetIndexer(es_description, d, request)  
     try:
-        #es_url, data = 
-        indexer.update_document(elements_to_update)
-        #return Response(json.dumps({"url": es_url, "data": data}))
+        indexer.build_partial(elements_to_update)
+        indexer.update_partial()
+
+    except Exception as ex:
+        return HTTPServerError('failed to update document (%s)' % ex)
+
+    finally:
+        DBSession.close()
+
+    return Response('updated')
+
+@view_config(route_name='update_dataset_index', request_method='POST')
+def update_dataset_index(request):
+    '''
+    just update the es index doc in place (not updating/inserting anything to postgres)
+
+    for postgres database changes that need to be mapped to es but weren't changed through the update dataset route
+
+    url?elements=key1,key2,key3
+    '''
+    dataset_id = request.matchdict['id']
+    d = get_dataset(dataset_id)
+    if not d:
+        return HTTPNotFound()
+
+    params = normalize_params(request.params)
+
+    param_keys = params['elements'].split(',') if 'elements' in params else []
+
+    if not param_keys:
+        return HTTPBadRequest()
+
+    es_description = {
+        "host": request.registry.settings['es_root'],
+        "index": request.registry.settings['es_dataset_index'], 
+        "type": 'dataset',
+        "user": request.registry.settings['es_user'].split(':')[0],
+        "password": request.registry.settings['es_user'].split(':')[-1]
+    } 
+
+    indexer = DatasetIndexer(es_description, d, request)  
+    try:
+        indexer.build_partial(param_keys)
+        indexer.update_partial()
     except Exception as ex:
         return HTTPServerError('failed to update document (%s)' % ex)
 
     return Response('updated')
-
-
-
 
 
 	

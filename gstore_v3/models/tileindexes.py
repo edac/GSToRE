@@ -3,6 +3,7 @@ from sqlalchemy import MetaData, Table, ForeignKey
 from sqlalchemy import Column, String, Integer, Boolean, FetchedValue, TIMESTAMP, Numeric
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql.expression import and_
+from sqlalchemy import func
 
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -15,6 +16,7 @@ from ..lib.spatial import *
 from osgeo import ogr, osr
 
 import os 
+import subprocess
 from zope.sqlalchemy import ZopeTransactionExtension
 
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
@@ -23,6 +25,10 @@ from sqlalchemy.dialects.postgresql import UUID, ARRAY
 '''
 tile indexes
 '''
+#TODO: test mrcog 2010 index with external pyramids:
+#gdaladdo --config COMPRESS_OVERVIEW JPEG --config PHOTOMETRIC_OVERVIEW YCBCR --config INTERLEAVE_OVERVIEW PIXEL -ro A1_NE.tif 2 4 8 16
+#for each tif in a directory
+#for f in *.tif; do gdaladdo --config COMPRESS_OVERVIEW JPEG --config INTERLEAVE_OVERVIEW PIXEL -ro $f 2 4 6 8 16; done
 
 class TileIndex(Base):
     __table__ = Table('tileindexes', Base.metadata,
@@ -50,6 +56,7 @@ class TileIndex(Base):
         return '<TileIndex (%s, %s)>' % (self.uuid, self.name)
 
 
+    #TODO: this didn't work through pshell but the function DOES work from psql
     #generate the extent from the union of all bboxes for the datasets in the collection
     def get_index_extent(self):
         '''
@@ -64,7 +71,9 @@ class TileIndex(Base):
         --or to get the wkt extent
         select st_extent(bbox) from tile_geom;
         '''
-        pass
+
+        #execute the generate_tileindex_bbox(id) stored procedure to update the bbox
+        DBSession.query(func.gstoredata.generate_tileindex_bbox(self.id))
 
     def generate_index_shapefiles(self, out_location):
         '''
@@ -82,7 +91,9 @@ class TileIndex(Base):
 
         epsgs = self.epsgs
 
-        spatialref = epsg_to_sr(4326)
+
+        SRID = 4326
+        spatialref = epsg_to_sr(SRID)
         
         for epsg in epsgs:
             #get the right datasets, from the tileindex (to avoid the instrumented list deal)
@@ -113,6 +124,8 @@ class TileIndex(Base):
                 wkb = d.geom
                 geom = wkb_to_geom(wkb, epsg)
 
+                reproject_geom(geom, SRID, epsg)
+
                 feature = ogr.Feature(lyr.GetLayerDefn())
                 feature.SetField('location', str(d.location))
                 feature.SetField('name', str(d.description))
@@ -123,10 +136,24 @@ class TileIndex(Base):
                 feature.Destroy()
 
             prjfile = open('%s/tile_%s.prj' % (out_location, epsg), 'w')
-            outref.MorphToESRI()
+            #outref.MorphToESRI()
             prjfile.write(outref.ExportToWkt())
             prjfile.close()
 
+            #self.generate_spatial_index('tile_%s' % epsg, out_location)
+
+            
+    def generate_spatial_index(self, tile, out_location):
+        '''
+        add a spatial index (qix)
+        this may or may not really improve performance much, most of the tile issues are network-bound reads 
+        
+        ogrinfo -sql "CREATE SPATIAL INDEX on tile_2258" /home/sscott/tileindexes/e305d3ed-9db2-4895-8a35-bde79150e272/tile_2258.shp
+        '''
+        cmd = 'ogrinfo -sql "CREATE SPATIAL INDEX on %s" %s.shp' % (tile, os.path.join(out_location, tile))
+        s = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+        output = s.communicate()[0]
+        ret = s.wait()         
 
         '''
 >>> from gstore_v3.models import *
@@ -162,5 +189,33 @@ class TileIndexView(Base):
 
     def __repr__(self):
         return '<TileIndexView (%s, %s)>' % (self.tile_uuid, self.dataset_uuid)
+'''
+to build the view:
 
+-- View: gstoredata.get_tileindexes
+
+-- DROP VIEW gstoredata.get_tileindexes;
+
+CREATE OR REPLACE VIEW gstoredata.get_tileindexes AS 
+ SELECT t.id AS tile_id, t.uuid AS tile_uuid, t.name AS tile_name, d.id AS gid, d.uuid AS dataset_uuid, d.description, f.location, d.geom, d.orig_epsg, d.begin_datetime, d.end_datetime
+   FROM gstoredata.tileindexes t
+   LEFT JOIN gstoredata.tileindexes_datasets ts ON ts.tile_id = t.id
+   LEFT JOIN gstoredata.datasets d ON ts.dataset_id = d.id
+   LEFT JOIN gstoredata.sources s ON d.id = s.dataset_id
+   LEFT JOIN gstoredata.source_files f ON s.id = f.source_id
+  WHERE s.set::text = 'original'::text AND s.extension::text = 'tif'::text AND f.location::text ~~ '%.tif'::text;
+
+ALTER TABLE gstoredata.get_tileindexes
+  OWNER TO gstore;
+GRANT ALL ON TABLE gstoredata.get_tileindexes TO gstore;
+GRANT SELECT ON TABLE gstoredata.get_tileindexes TO gstoreread;
+'''
+
+'''
+for mrcog 2012
+
+http://129.24.63.115/apps/rgis/tileindexes/c9035d03-f6ff-4317-a959-456a6df5b56a/services/ogc/wms?REQUEST=GetMap&SERVICE=WMS&VERSION=1.1.1&FORMAT=image/png&LAYERS=test_mrcog_2012_2903&width=1000&height=1000&style=&SRS=epsg:2903&bbox=1454715,1413770,1459965,1418945
+
+http://129.24.63.115/apps/rgis/tileindexes/c9035d03-f6ff-4317-a959-456a6df5b56a/services/ogc/wms?REQUEST=GetMap&SERVICE=WMS&VERSION=1.1.1&FORMAT=image/png&LAYERS=test_mrcog_2012_2903&width=1000&height=1000&style=&SRS=epsg:2903&bbox=1454790,1411071,1473263,1429519
+'''
 

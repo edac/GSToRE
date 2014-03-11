@@ -31,10 +31,16 @@ _FORMATS = {
 #      now that we've decided not to update fgdc/iso/whatever independently. doesn't hurt,
 #      just not so necessary.
 class GstoreMetadata():
+    '''
+    for xml using the gstore schema
+    '''
+
+    date_format = '%Y-%m-%d'
+    time_format = '%H:%M:%S'
+
     def __init__(self, xml):
         #as an actual lxml.etree object, not just text
         self.xml = xml
-        
 
     '''
     update the gstore metadata stored internally
@@ -75,6 +81,9 @@ class GstoreMetadata():
             title = title.replace('&', '&amp;') if '&amp;' not in title and '&' in title else title
             self.update_title(title)
 
+        #check for dataset and drop that (it's in all the migrated data)
+        self.drop_dataset_attribute()
+
         identifier = elements_to_update['identifier'] if 'identifier' in elements_to_update else ''
         if identifier:
             self.update_identifier(identifier)
@@ -87,7 +96,24 @@ class GstoreMetadata():
         if onlinks and base_url:
             self.update_onlinks(onlinks, base_url)
 
-        self.update_distribution(elements_to_update['distribution'])
+        if 'distribution' in elements_to_update:
+            self.update_distribution(elements_to_update['distribution'])
+        else:
+            #drop the distribution completely so nothing wonky gets through
+            self.drop_distribution()
+
+        if 'pubdate' in elements_to_update:
+            self.update_pubdate(elements_to_update['pubdate'])    
+
+        if 'timeperiod' in elements_to_update:
+            self.update_timeperiod(elements_to_update['timeperiod'])
+
+        if 'bbox' in elements_to_update:
+            self.update_bbox(elements_to_update['bbox'])    
+
+        #only for ds records though
+        if 'dataset_links' in elements_to_update:
+            self.update_datasets(elements_to_update['dataset_links'])
 
         #TODO: re-enable this once the sprefs are fixed
         if ('fgdc' in out_standard.lower() or 'gstore' in out_standard.lower()) and spatialref_file:
@@ -100,7 +126,12 @@ class GstoreMetadata():
 
     def update_identifier(self, identifier):
         ident = self.xml.find('identification')
-        ident.attrib['dataset'] = identifier        
+        ident.attrib['identifier'] = identifier        
+
+    def drop_dataset_attribute(self):
+        ident = self.xml.find('identification')
+        if 'dataset' in ident.attrib:
+            del ident.attrib['dataset']
 
     def update_title(self, title):
         title_element = self.xml.find('identification/title')
@@ -116,6 +147,156 @@ class GstoreMetadata():
         if title_element:
             title_element[0].text = title
 
+    def update_pubdate(self, pubdate):
+        '''
+        update the identity citation's publication date/time
+
+        for gstore, this would be the object's date added date time (published in the system)
+        '''
+        id_citation_element = self.xml.xpath('identification/citation[@role="identify"]')
+        if id_citation_element is None:
+            return 
+        id_citation_ref = id_citation_element[0].attrib['ref']
+        citation_element = self.xml.xpath('citations/citation[@id="%s"]' % id_citation_ref)
+
+        pubdate_element = citation_element[0].find('publication/pubdate')
+        if pubdate_element is None:
+            publication_element = citation_element.find('publication')
+            pubdate_element = etree.Element('pubdate')           
+            publication_element.insert(0, pubdate_element)
+
+        pubdate_date, pubdate_time = self.parse_date_and_time(pubdate)
+        pubdate_element.attrib['date'] = pubdate_date
+        if pubdate_time:
+            pubdate_element.attrib['time'] = pubdate_time
+
+    def update_bbox(self, bbox):
+        '''
+        bbox as [minx,miny,maxx,maxy]
+        '''
+
+        spatial_element = self.xml.find('spatial')
+        if spatial_element is None:
+            #sibling element order: identification, constraints, spatial
+            prev_sib_element = self.xml.find('constraints')
+            if prev_sib_element is None:
+                #and this has to be there or it's invalid gstore metadata
+                prev_sib_element = self.xml.find('identification')
+                
+            index = self.xml.index(prev_sib_element)
+            spatial_element = etree.Element('spatial')
+            self.xml.insert(index+1, spatial_element)
+
+            etree.SubElement(spatial_element, 'west')
+            etree.SubElement(spatial_element, 'east')
+            etree.SubElement(spatial_element, 'south')
+            etree.SubElement(spatial_element, 'north')
+  
+        west = spatial_element.find('west')
+        west.text = str(bbox[0])
+
+        east = spatial_element.find('east')
+        east.text = str(bbox[2])
+
+        south = spatial_element.find('south')
+        south.text = str(bbox[1])
+
+        north = spatial_element.find('north')
+        north.text = str(bbox[3])
+            
+
+    def update_timeperiod(self, date_info):
+        '''
+        {
+            "single": 
+        }
+
+        OR 
+
+        {
+            "start":
+            "end":
+        }
+
+        OR 
+
+        {
+            "multiple": []
+        }
+
+        which i don't actually know how we would do from the db. 
+        '''
+
+        time_element = self.xml.find('identification/time')
+        if time_element is None:
+            return ''
+
+        #make sure it's not already multiple dates (just keep those)
+        single_elements = time_element.xpath('single')    
+        if len(single_elements) > 1:
+            return ''
+
+        #chuck what's there except for the current element
+        for child in time_element:
+            if child.tag != 'current':
+                time_element.remove(child)
+
+        if 'single' in date_info:
+            single = etree.Element('single')
+            single_date, single_time = self.parse_date_and_time(date_info['single'])    
+
+            single.attrib['date'] = single_date
+            if single_time:
+                single.attrib['time'] = single_time
+
+            time_element.insert(0, single)    
+            
+        elif 'start' in date_info and 'end' in date_info:
+            start_date, start_time = self.parse_date_and_time(date_info['start'])
+            start = etree.Element('start')
+            start.attrib['date'] = start_date
+            if start_time:
+                start.attrib['time'] = start_time
+
+            end_date, end_time = self.parse_date_and_time(date_info['end'])
+            end = etree.Element('end')
+            end.attrib['date'] = end_date
+            if end_time:
+                end.attrib['end'] = end_time
+
+            range_element = etree.Element('range')
+            range_element.append(start)
+            range_element.append(end)
+
+            time_element.insert(0, range_element)
+        elif 'multiple' in date_info:
+            #really not sure how we would get multiple datetimes from anywhere in gstore
+            pass
+            
+
+    def parse_date_and_time(self, dt):
+        '''
+        need to handle the pre-1900 datasets to make sure we're emitting valid metadata (stupid prism)
+
+        '''
+        if not isinstance(dt, datetime) and dt.lower() == 'unknown':
+            return 'Unknown', ''
+
+        #otherwise, return the formatted strings    
+        d = ''
+        try:
+            d = dt.strftime(self.date_format) if dt.year >= 1900 else '%s%02d%02d' % (dt.year, dt.month, dt.day)
+        except:
+            d = 'Unknown'
+
+        #TODO: check on the < 1900 datetime with TIME for this
+        t = ''
+        try:
+            t = dt.strftime(self.time_format)
+        except:
+            t = '' 
+
+        return d, t
 
     def update_onlinks(self, onlinks, base_url):
         #TODO: we should have a better way of dealing with the gstore onlinks 
@@ -133,12 +314,34 @@ class GstoreMetadata():
         citation_element = citation_element[0]
         existing_onlinks = citation_element.findall('onlink')
         for existing_onlink in existing_onlinks:
-            if existing_onlink is None or (existing_onlink.text and (existing_onlink.text[0:4] != 'http' or base_url in existing_onlink.text or base_url.replace('https', 'http') in existing_onlink.text)) or not existing_onlink.text:
+            if existing_onlink is None or (
+                    existing_onlink.text and (
+                            existing_onlink.text[0:4] != 'http' or
+                            base_url in existing_onlink.text or
+                            base_url.replace('https', 'http') in existing_onlink.text
+                       )
+                    ) or not existing_onlink.text:
                 citation_element.remove(existing_onlink)
 
         #add the new ones
         for onlink in onlinks:
             etree.SubElement(citation_element, 'onlink').text = onlink
+
+    def update_datasets(self, datasets):
+        dataset_element = self.xml.find('datasets')
+
+        if dataset_element is None:
+            dataset_element = etree.SubElement(self.xml, 'datasets')
+            
+        #remove any children if there are any
+        existing_datasets = dataset_element.findall('dataset')
+        for existing_dataset in existing_datasets:
+            dataset_element.remove(existing_dataset)
+
+        #and add the new
+        for d in datasets:
+            etree.SubElement(dataset_element, 'dataset').text = d
+
 
     def update_metadata_pubdate(self):
         #update the metadata publication date for this new version (i.e. the version we're generating now)
@@ -146,8 +349,8 @@ class GstoreMetadata():
 
         new_date = datetime.now()
 
-        pubdate_element.attrib['date'] = new_date.strftime('%Y-%m-%d')
-        pubdate_element.attrib['time'] = new_date.strftime('%H:%M:%S')    
+        pubdate_element.attrib['date'] = new_date.strftime(self.date_format)
+        pubdate_element.attrib['time'] = new_date.strftime(self.time_format)    
 
     #TODO: replace this with a contact from the database
     def update_metadata_contact(self):
@@ -184,6 +387,12 @@ class GstoreMetadata():
         metadata_contact_element = self.xml.xpath('metadata/contact[@role="point-contact"]')
         metadata_contact_element[0].attrib['ref'] = new_id
 
+    def drop_distribution(self):
+        distribution_element = self.xml.find('distribution')
+        if distribution_element is not None:
+            parent = distribution_element.getparent()
+            parent.remove(distribution_element)
+    
     def update_distribution(self, distribution_info):
         '''
         liability: liability string (for fgdc)
@@ -215,6 +424,9 @@ class GstoreMetadata():
               </distributor>
            </distribution>
         '''
+
+        if not distribution_info:
+            return ''
 
         distribution_element = self.xml.find('distribution')
         if distribution_element is not None:
@@ -368,6 +580,10 @@ class GstoreMetadata():
     def get_isotopic(self):
         isotopic = self.xml.find('identification/isotopic')
         return '' if isotopic is None else isotopic.text
+
+    def get_keywords(self):
+        terms = self.xml.xpath('identification/themes/theme/term')
+        return [t.text for t in terms]
 
 #####################TO TEST
 '''

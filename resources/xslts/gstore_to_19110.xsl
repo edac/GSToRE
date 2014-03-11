@@ -120,6 +120,34 @@
                     <xsl:for-each select="attributes/attr">
                         <gfc:carrierOfCharacteristics>
                             <gfc:FC_FeatureAttribute>
+                                
+                                <xsl:if test="range">
+                                    <gfc:constrainedBy>
+                                        <gfc:FC_Constraint>
+                                            <gfc:description>
+                                                <xsl:variable name="max">
+                                                    <xsl:choose>
+                                                        <xsl:when test="range/max">
+                                                            <xsl:value-of select="fn:concat('Range Domain Max: ', range/max)"/>
+                                                        </xsl:when>
+                                                    </xsl:choose>
+                                                </xsl:variable>
+                                                <xsl:variable name="min">
+                                                    <xsl:choose>
+                                                        <xsl:when test="range/min">
+                                                            <xsl:value-of select="fn:concat('Range Domain Min: ', range/min)"/>
+                                                        </xsl:when>
+                                                    </xsl:choose>
+                                                </xsl:variable>
+                                                <!-- TODO: no attribute resolution yet -->
+                                                <gco:CharacterString>
+                                                    <xsl:value-of select="$max[text() != ''] | $min[text() != '']" separator=" | "/>
+                                                </gco:CharacterString>
+                                            </gfc:description>
+                                        </gfc:FC_Constraint>
+                                    </gfc:constrainedBy>
+                                </xsl:if>
+                                
                                 <gfc:memberName>
                                     <gco:LocalName><xsl:value-of select="label"/></gco:LocalName>
                                 </gfc:memberName>

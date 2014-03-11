@@ -11,7 +11,8 @@
   <link rel="stylesheet" type="text/css" href="${MEDIA_URL}/css/style.css" />
   <link rel="stylesheet" type="text/css" href="${MEDIA_URL}/css/mapper.css" />
 
-  <script src="http://www.openlayers.org/api/2.10/OpenLayers.js"></script>
+  <!--<script src="http://www.openlayers.org/api/2.10/OpenLayers.js"></script>-->
+  <script src="${MEDIA_URL}/javascript/openlayers/2.10/OpenLayers.js"></script>
   <script type="text/javascript" src="${MEDIA_URL}/javascript/geoext/1.0/GeoExt.js"></script>
 
  <!--

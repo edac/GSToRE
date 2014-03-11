@@ -19,7 +19,7 @@ from sqlalchemy.dialects.postgresql import UUID, ARRAY
 
 from ..models.apps import GstoreApp
 from ..models.standards import GstoreMetadata
-from ..lib.utils import transform_xml, validate_xml
+from ..lib.utils import *
 
 #this is bad
 from pyramid.threadlocal import get_current_registry
@@ -41,7 +41,8 @@ FROM_GSTORE_XSLTS = {
     "ISO-19110|XML": "gstore_to_19110.xsl",
     "ISO-19119|XML": "gstore_to_19119.xsl",
     "FGDC-STD-001-1998|HTML": "gstore_to_fgdc_html.xsl",
-    "FGDC-STD-012-2002|HTML": "gstore_to_fgdc_html.xsl"
+    "FGDC-STD-012-2002|HTML": "gstore_to_fgdc_html.xsl",
+    "ISO-19115:DS|XML": "gstore_to_ds.xsl"
 }
 
 
@@ -131,8 +132,6 @@ om.convert_to_gstore_metadata(xslt_path)
 
 
 
-http://129.24.63.115/apps/rgis/datasets/6d7801b8-68e9-4d92-8ba7-dc590157b093/metadata/fgdc.xml
-http://129.24.63.115/apps/rgis/datasets/0cd9878b-dd39-40fb-aef0-0dd41862983a/metadata/fgdc.xml
         '''
 
 #TODO: implement the full metadata schema
@@ -144,7 +143,7 @@ class DatasetMetadata(Base):
         Column('gstore_xml', String),
         #Column('original_id', Integer, ForeignKey('gstoredata.original_metadata.id')),
         Column('dataset_id', Integer, ForeignKey('gstoredata.datasets.id')),
-        Column('date_modified', TIMESTAMP),
+        Column('date_modified', TIMESTAMP, FetchedValue()),
         schema = 'gstoredata'
     )
 
@@ -195,8 +194,8 @@ class DatasetMetadata(Base):
 
         #strip in all of the extra bits: onlinks, distribution links, distributor, metadata pubdate, metadata contact, spref info (if fgdc), publication citations
 
-        onlinks = metadata_info['onlinks'] if 'onlinks' in metadata_info else d.get_onlinks(metadata_info['base_url'])
-        distribution_links = metadata_info['distribution_links'] if 'distribution_links' in metadata_info else d.get_distribution_links(metadata_info['base_url'])
+        onlinks = metadata_info['onlinks'] if 'onlinks' in metadata_info else d.get_onlinks(metadata_info['base_url'], metadata_info['request'], metadata_info['app'])
+        distribution_links = metadata_info['distribution_links'] if 'distribution_links' in metadata_info else d.get_distribution_links(metadata_info['base_url'], metadata_info['request'], metadata_info['app'])
             
 
         #get the rest of the distribution info (liability, etc)
@@ -213,8 +212,35 @@ class DatasetMetadata(Base):
         }
 
         identifier = metadata_info['identifier'] if 'identifier' in metadata_info else str(d.uuid)
+
+        #don't know why you would pass in anything not from the dataset, but dataone?
+        bbox = metadata_info['bbox'] if 'bbox' in metadata_info else d.box
+        pubdate = metadata_info['date_added'] if 'date_added' in metadata_info else d.dateadded
+        timeperiod = metadata_info['timeperiod'] if 'timeperiod' in metadata_info else {}
+        if not timeperiod:
+            #try building it
+            valid_start = d.begin_datetime
+            valid_end = d.end_datetime
+            timeperiod = {}
+            if valid_start and not valid_end:
+                timeperiod = {"single": valid_start}
+            elif not valid_start and valid_end:
+                #because a single date might be weirder?
+                timeperiod = {"start": "Unknown", "end": valid_end}
+            elif valid_start and valid_end:
+                timeperiod = {"start": valid_start, "end": valid_end}
         
-        elements_to_update = {"identifier": identifier, "title": d.description, "onlinks": onlinks, "base_url": metadata_info['base_url'], "distribution": distribution_info, "publications": d.citations} 
+        elements_to_update = {"identifier": identifier, "title": d.description, "onlinks": onlinks, "base_url": metadata_info['base_url'], "distribution": distribution_info} 
+
+        if d.citations:
+            elements_to_update.update({"publications": d.citations})
+        if bbox:
+            elements_to_update.update({"bbox": bbox})
+        if pubdate:
+            elements_to_update.update({"pubdate": pubdate})    
+        if timeperiod:
+            elements_to_update.update({"timeperiod": timeperiod})
+        
         xml = self.get_as_xml()
         
         gm = GstoreMetadata(xml)
@@ -227,16 +253,19 @@ class DatasetMetadata(Base):
             #http://129.24.63.115/xslts/gstore_schema.xsd
             return updated_xml
 
-        params = {}
+        params = {} 
         if '19119' in out_standard:
             svc = metadata_info['service'] if 'service' in metadata_info else 'wms'
+            vsn = '1.1.1' if svc == 'wms' else '1.0.0' if svc == 'wfs' else '1.1.2'
             params.update({"service-type": svc})
-            params.update({"service-version": '1.1.1' if svc == 'wms' else '1.0.0' if svc == 'wfs' else '1.1.2'})
-            params.update({"service-base-url": '%s%s/services/ogc' % (metadata_info['base_url'], d.uuid) if 'service' in metadata_info else ''})
+            params.update({"service-version": vsn})
+            #params.update({"service-base-url": '%s%s/services/ogc' % (metadata_info['base_url'], d.uuid) if 'service' in metadata_info else ''})
+            params.update({"service-base-url": metadata_info['base_url'] + build_ogc_url(metadata_info['app'], 'datasets', d.uuid, svc, vsn) if 'service' in metadata_info else ''})
 
-        if '19115' in out_standard and d.taxonomy == 'vector':
+        if '19115' in out_standard and d.taxonomy in ['vector', 'table']:
             #add the param for the fc link
-            params.update({"fc-url": '%s%s/metadata/ISO-19110.xml' % (metadata_info['base_url'], d.uuid) if 'base_url' in metadata_info else ''})
+            #params.update({"fc-url": '%s%s/metadata/ISO-19110.xml' % (metadata_info['base_url'], d.uuid) if 'base_url' in metadata_info else ''})
+            params.update({"fc-url": metadata_info['base_url'] + build_metadata_url(metadata_info['app'], 'datasets', d.uuid, 'ISO-19110', 'xml') if 'base_url' in metadata_info else ''})
 
         #we need to make sure we include the app string to generate unique fileIdentifiers for ISO (app::uuid::standard)
         if out_standard in ['ISO-19115:2003','ISO-19119']:
@@ -264,6 +293,11 @@ class DatasetMetadata(Base):
         xml = self.get_as_xml()
         gm = GstoreMetadata(xml)
         return gm.get_isotopic()
+
+    def get_keywords(self):
+        xml = self.get_as_xml()
+        gm = GstoreMetadata(xml)
+        return gm.get_keywords()
         
     def write_to_disk(self, output_location, out_standard, out_format, xslt_path, metadata_info, validate=True):
         '''
@@ -279,6 +313,132 @@ class DatasetMetadata(Base):
             return True
 
         return False
+
+'''
+gstore metadata for the collection objects (a little different, more on the output side than the input/storage side)
+'''
+class CollectionMetadata(Base):
+    __table__ = Table('collection_metadata', Base.metadata,
+        Column('id', Integer, primary_key=True),
+        Column('uuid', UUID, FetchedValue()),
+        Column('gstore_xml', String),
+        Column('collection_id', Integer, ForeignKey('gstoredata.collections.id')),
+        Column('date_modified', TIMESTAMP),
+        schema='gstoredata'
+    )
+
+    def get_as_xml(self):
+        '''
+        convert the text blob to xml
+        '''
+        text = self.gstore_xml
+        if not text:
+            return None
+        
+        try:
+            return etree.fromstring(text.encode('utf-8'))
+        except:
+            return None
+
+    def transform(self, out_standard, out_format, xslt_path, metadata_info, validate=True):
+        '''
+        - transform the gstore_xml to whatever standard specified
+        - strip in all of the extra bits (THIS DOESN'T INCLUDE DOWNLOADY BITS)
+        - validate
+        - return complete xml
+
+        metadata_info:
+            app
+            base_url
+        '''
+
+        xslt_fn = FROM_GSTORE_XSLTS['%s|%s' % (out_standard, out_format.upper())] if '%s|%s' % (out_standard, out_format.upper()) in FROM_GSTORE_XSLTS and out_standard != 'GSTORE' else ''
+        if not xslt_fn and out_standard != 'GSTORE':
+            return 'No matching stylesheet'
+
+        #NOTE: we are not including the spatial reference info in the collection-level fgdc, just a bbox
+
+        xslt_path = os.path.join(xslt_path, xslt_fn)
+
+        c = self.collections
+
+        onlinks = metadata_info['onlinks'] if 'onlinks' in metadata_info else c.get_onlinks(metadata_info['base_url'], metadata_info['request'], metadata_info['app'])
+
+        dataset_links = c.get_dataset_links(metadata_info['base_url'], metadata_info['request'], metadata_info['app']) if 'FGDC' not in out_standard else []
+       
+        identifier = metadata_info['identifier'] if 'identifier' in metadata_info else str(c.uuid)
+        
+        elements_to_update = {"identifier": identifier, "title": c.name, "onlinks": onlinks, "base_url": metadata_info['base_url'], "dataset_links": dataset_links} 
+        xml = self.get_as_xml()
+        
+        gm = GstoreMetadata(xml)
+        gm.update_xml(elements_to_update, out_standard, '')    
+        
+        updated_xml = gm.get_as_text()
+
+        if out_standard == 'GSTORE':
+            #TODO: put the schema in first and then just punt
+            #http://129.24.63.115/xslts/gstore_schema.xsd
+            return updated_xml
+
+        params = {} 
+        #TODO: add the service link for the tile index if there is one
+#        if '19119' in out_standard:
+#            svc = metadata_info['service'] if 'service' in metadata_info else 'wms'
+#            vsn = '1.1.1' if svc == 'wms' else '1.0.0' if svc == 'wfs' else '1.1.2'
+#            params.update({"service-type": svc})
+#            params.update({"service-version": vsn})
+#            #params.update({"service-base-url": '%s%s/services/ogc' % (metadata_info['base_url'], d.uuid) if 'service' in metadata_info else ''})
+#            params.update({"service-base-url": metadata_info['base_url'] + build_ogc_url(metadata_info['request'], metadata_info['app'], 'datasets', c.uuid, svc, vsn) if 'service' in metadata_info else ''})
+
+        #we need to make sure we include the app string to generate unique fileIdentifiers for ISO (app::uuid::standard)
+        if out_standard in ['ISO-19115:2003','ISO-19119']:
+            params.update({"app": metadata_info['app'] if 'app' in metadata_info else 'rgis'})
+
+        if out_format == 'html':
+            params = {}
+
+        output = transform_xml(updated_xml, xslt_path, params)
+
+        if validate:
+            valid = validate_xml(output)
+            if 'ERROR' in valid:
+                return None
+
+        return output
+
+
+    #TODO: these are silly, do something else to get the elements
+    def get_abstract(self):
+        xml = self.get_as_xml()
+        gm = GstoreMetadata(xml)
+        return gm.get_abstract()
+
+    def get_isotopic(self):
+        xml = self.get_as_xml()
+        gm = GstoreMetadata(xml)
+        return gm.get_isotopic()
+
+    def get_keywords(self):
+        xml = self.get_as_xml()
+        gm = GstoreMetadata(xml)
+        return gm.get_keywords()
+
+    def write_to_disk(self, output_location, out_standard, out_format, xslt_path, metadata_info, validate=True):
+        '''
+        write the metadata to a file on disk
+        after transforming to whatever flavor it needs to be
+        '''
+
+        output = self.transform(out_standard, out_format, xslt_path, metadata_info, validate)
+
+        if output:
+            with open(output_location, 'w') as f:
+                f.write(output)
+            return True
+
+        return False
+
 
 
 class MetadataStandards(Base):
@@ -306,5 +466,20 @@ class MetadataStandards(Base):
     def __repr__(self):
         return '<MetadataStandard %s (%s)>' % (self.alias, ','.join(self.supported_formats))
 
+    def get_urls(self, app, doctype, baseurl, identifier, services=[]):
+        '''
+        return the set of urls for the standard + supported formats
+
+        pass if it's 19119 and there's no service array
+        '''
+
+        md_fmts = {}
+        if self.alias == 'ISO-19119' and services:
+            for service in services:
+                md_fmts['%s:%s' % (self.alias, service.upper())] = self.supported_formats
+        elif self.alias != 'ISO-19119':
+            md_fmts[self.alias] = self.supported_formats
+
+        return [{s: {e: baseurl + build_metadata_url(app, doctype, identifier, s, e) for e in md_fmts[s]} for s in md_fmts}]  
+        
   
-    

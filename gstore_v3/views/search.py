@@ -1,7 +1,7 @@
 from pyramid.view import view_config
 from pyramid.response import Response
 
-from pyramid.httpexceptions import HTTPNotFound, HTTPServerError
+from pyramid.httpexceptions import HTTPNotFound, HTTPServerError, HTTPBadRequest
 
 import sqlalchemy
 from sqlalchemy import desc, asc, func
@@ -23,8 +23,9 @@ from ..models.features import Feature
 from ..models.vocabs import geolookups
 from ..lib.spatial import *
 from ..lib.mongo import *
-from ..lib.utils import normalize_params, convert_timestamp, get_single_date_clause, get_overlap_date_clause, match_pattern
-from ..lib.database import get_dataset
+from ..lib.utils import *
+from ..lib.database import get_dataset, get_collection
+from ..lib.es_searcher import *
 
 #starting with requests instead - unclear if you can concat query + query_raw to handle the dot field name concats
 #from elasticutils import S, F
@@ -32,11 +33,60 @@ from ..lib.database import get_dataset
 import requests
 
 '''
+empty response
+'''
+def return_no_results(ext='json'):
+    if ext == 'json':
+        response = Response(json.dumps({"total": 0, "results": []}))
+        response.content_type = 'application/json'
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
+
+    #TODO: generate empty KML response
+    return Response()
+
+'''
+doctype response
+'''
+#TODO: replace the streamers here with the other streamer? meh, the other json is a different structure so maybe not.
+def generate_search_response(searcher, request, app, limit, base_url, ext, version=3):
+    '''
+    generate the streamer for the search results for doctypes
+    '''
+    total = searcher.get_result_total()
+
+    if total < 1:
+        return return_no_results(ext)
+
+    #TODO: figure out what to do if, horrifically, the es uuid count does not match the dataset count
+    search_objects = searcher.get_result_ids()
+    
+    subtotal = len(search_objects)
+    if subtotal < 1:
+        return return_no_results(ext)
+
+    limit = subtotal if subtotal < limit else limit
+
+    response = Response()
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    if ext == 'json':
+        json_streamer = StreamDoctypeJson(app, base_url, request, total, version, limit)
+        response.content_type = 'application/json'
+        response.app_iter = json_streamer.yield_set(search_objects, limit)
+    elif ext == 'kml':
+        kml_streamer = StreamDoctypeKml(app, base_url) 
+        response.content_type = 'application/vnd.google-earth.kml+xml; charset=UTF-8'
+        response.app_iter = kml_streamer.yield_set(search_objects, limit)
+    else:
+        return HTTPNotFound()
+        
+    return response
+
+'''
 search
 '''
 #return the category tree
 @view_config(route_name='search_categories', renderer='json')
-#@view_config(route_name='search', match_param='resource=datasets', request_param='categories=1', renderer='json')
 def search_categories(request):
     #TODO: allow other formats (kml, etc) 
     #IT IS POST FROM RGIS FOR SOME REASON
@@ -156,9 +206,7 @@ def search_categories(request):
 
             level = 2
         else:
-            resp = {'total': 0, 'results': []}
-
-            level = 3
+            return return_no_results()
     else:
         #get themes with datasets in the app
         '''
@@ -217,29 +265,28 @@ def search_categories(request):
     
     data = results.json()
     if 'facets' not in data:
-        resp = {'total': 0, 'results': []} 
-    else:
-        facets = data['facets']['categories']['terms']
-        resp = {"total": len(facets)}
-        rslts = []
-        if level == 0:
-            rslts = [{"text": facet['term'], "leaf": False, "id": facet['term']} for facet in facets]
-        elif level == 1:
-            rslts = [{"text": facet['term'], "leaf": False, "id": '%s__|__%s' % (parts[0], facet['term'])} for facet in facets]
-        elif level == 2:
-            rslts = [{"text": facet['term'], "True": False, "cls": "folder", "id": '%s__|__%s__|__%s' % (parts[0], parts[1], facet['term'])} for facet in facets]
-        resp.update({"results": rslts})
+        return return_no_results()
+
+    facets = data['facets']['categories']['terms']
+    resp = {"total": len(facets)}
+    rslts = []
+    if level == 0:
+        rslts = [{"text": facet['term'], "leaf": False, "id": facet['term']} for facet in facets]
+    elif level == 1:
+        rslts = [{"text": facet['term'], "leaf": False, "id": '%s__|__%s' % (parts[0], facet['term'])} for facet in facets]
+    elif level == 2:
+        rslts = [{"text": facet['term'], "leaf": True, "cls": "folder", "id": '%s__|__%s__|__%s' % (parts[0], parts[1], facet['term'])} for facet in facets]
+    resp.update({"results": rslts})
 
     response = Response(json.dumps(resp))
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.content_type="application/json"    
     return response
 
-#return datasets
-#TODO: maybe not renderer - firefox open with?   
-#@view_config(route_name='search', match_param='resource=datasets', renderer='json')
-@view_config(route_name='search_datasets')
-def search_datasets(request):
+
+#search for any of the doctypes in es 
+@view_config(route_name='searches')
+def search_doctypes(request):
     '''
     PARAMS:
     limit
@@ -260,418 +307,143 @@ def search_datasets(request):
     taxonomy
     geomtype
 
-    uuid
-
-
     /search/datasets.json?query=property&offset=0&sort=lastupdate&dir=desc&limit=15&theme=Boundaries&subtheme=General&groupname=New+Mexico
     '''
     ext = request.matchdict['ext']
     app = request.matchdict['app']
 
+    doctypes = request.matchdict['doctypes']
+
+    #reset doctypes from the route-required plural to the doctype-required singular
+    doctypes = ','.join([dt[:-1] for dt in doctypes.split(',')])
+
     params = normalize_params(request.params)
 
-    #pagination
-    limit = int(params.get('limit')) if 'limit' in params else 15
-    offset = int(params.get('offset')) if 'offset' in params else 0
-
-    #get version 
+    #get version (not for querying, just for the output) 
     version = int(params.get('version')) if 'version' in params else 2
 
-    #category params
-    theme = params.get('theme') if 'theme' in params else ''
-    subtheme = params.get('subtheme') if 'subtheme' in params else ''
-    groupname = params.get('groupname') if 'groupname' in params else ''
+    #and we still like the limit here
+    limit = int(params['limit']) if 'limit' in params else 15
 
-    theme = theme.replace('+', ' ')
-    subtheme = subtheme.replace('+', ' ' )
-    groupname = groupname.replace('+', ' ' )
-    
-    #check for valid utc datetime
-    start_added = params.get('start_time') if 'start_time' in params else ''
-    end_added = params.get('end_time') if 'end_time' in params else ''
-
-    #check for valid utc datetime
-    start_valid = params.get('valid_start') if 'valid_start' in params else ''
-    end_valid = params.get('valid_end') if 'valid_end' in params else ''
-
-    #TODO: add the uuid back in (but as a prefix? search)
-    #check for uuid (and append wildcard if not match to the regex)
-    search_uuid = params.get('uuid', '')
-
-
-    format = params.get('format', '')
-    taxonomy = params.get('taxonomy', '')
-    geomtype = params.get('geomtype', '').replace('+', ' ')
-    service = params.get('service', '')
-
-
-    sort = params.get('sort') if 'sort' in params else 'lastupdate'
-    if sort not in ['lastupdate', 'description', 'geo_relevance']:
-        return HTTPNotFound()
-
-    sort = 'date_added' if sort == 'lastupdate' else sort
-    sort = 'title' if sort == 'description' else sort
-
-    sortdir = params.get('dir').upper() if 'dir' in params else 'DESC'
-    order = 'desc' if sortdir == 'DESC' else 'asc'
-
-    #TODO: needs a better query param structure (also +, -, etc, for es)
-    keyword = params.get('query') if 'query' in params else ''
-    keyword = keyword.replace('+', ' ')
-
-
-    box = params.get('box') if 'box' in params else ''
-    epsg = params.get('epsg') if 'epsg' in params else ''
-
-    #set up the elasticsearch connection
-    es_connection = request.registry.settings['es_root']
-    es_index = request.registry.settings['es_dataset_index']
-    #TODO: modify this to run multiple doctypes (like dataset and collections)
-    es_type = 'dataset'
-    es_user = request.registry.settings['es_user'].split(':')[0]
-    es_password = request.registry.settings['es_user'].split(':')[-1]
-
-    es_url = es_connection + es_index + '/' + es_type + '/_search'
-
-    #set up the json for the request
-    #where we only want the _ids (uuids) back
-    query_request = {"size": limit, "from": offset, "fields": ["_id"]}   
-
-    #TODO: this should probably be revised to not have two sets of filtered
-    #filtered = {"query": {"term": {"applications": app.lower()}}}
-    filtered = {}
-
-    #set up the filters, with the mandatory app part
-    #currently everything is AND
-    f_and = [{"term": {"applications": app.lower()}}, {"term": {"embargo": False}}, {"term": {"active": True}}]
-    
-    #add some category stuff
-    if theme:
-        f_and.append({"query": {"match": {"category.theme": {"query": theme, "operator": "and"}}}})
-    if subtheme:
-        f_and.append({"query": {"match": {"category.subtheme": {"query": subtheme, "operator": "and"}}}})
-    if groupname:
-        f_and.append({"query": {"match": {"category.groupname": {"query": groupname, "operator": "and"}}}})
-
-    if format:
-        f_and.append({"query": {"term": {"formats": format.lower()}}})
-
-    if service:
-        f_and.append({"query": {"term": {"services": service.lower()}}})
-
-    if taxonomy:
-        f_and.append({"query": {"term": {"taxonomy": taxonomy.lower()}}})
-
-        #NOTE: geomtype is not currently in the indexed docs
-        if geomtype and geomtype.upper() in ['POLYGON', 'POINT', 'LINESTRING', 'MULTIPOLYGON', '3D POLYGON', '3D LINESTRING']:
-            f_and.append({"query": {"term": {"geomtype": geomtype.lower()}}})
-
-    if keyword:
-        #TODO: this may be a little extreme
-#        f_and.append({"query": {"match": {"title": {"query": keyword, "operator": "and"}}}})
-#        f_and.append({"query": {"match": {"aliases": }}})
-        key_search = {
-            "query": {
-                
-                    "filtered": {
-                        "filter": {
-                            "or": [
-                                {"query": {"match": {"title": {"query": keyword, "operator": "and"}}}},
-                                {"query": {"match": {"aliases": {"query": keyword, "operator": "and"}}}}
-                            ]
-                        }
-                    }
-                }
+    #set up the elasticsearch search object
+    searcher = EsSearcher(
+        {
+            "host": request.registry.settings['es_root'], 
+            "index": request.registry.settings['es_dataset_index'], 
+            "type": doctypes, 
+            "user": request.registry.settings['es_user'].split(':')[0], 
+            "password": request.registry.settings['es_user'].split(':')[-1]
         }
-        f_and.append(key_search)
-
-    #fun with dates
-    dfmt = '%Y-%m-%d'
-    if start_added or end_added:
-        range_request = {}
-        started = convert_timestamp(start_added)
-        ended = convert_timestamp(end_added)
-        if started and not ended:
-            range_request.update({"gte": started.strftime(dfmt)})
-        if not started and ended:
-            range_request.update({"lte": ended.strftime(dfmt)})
-        if started and ended:
-            range_request.update({"gte": started.strftime(dfmt), "lte": ended.strftime(dfmt)})
-        f_and.append({"range": {"date_added": range_request}})
-
-    #TODO: this is not actually in the indexes
-#    if start_valid or end_valid:    
-#        range_request = {}
-#        if start_valid and not end_valid:
-#            range_request.update({"gte": convert_timestamp(start_valid).strftime(dfmt)})
-#        if not start_valid and end_valid:
-#            range_request.update({"lte": convert_timestamp(start_valid).strftime(dfmt)})
-#        if start_valid and end_valid:
-#            range_request.update({"from": convert_timestamp(start_valid).strftime(dfmt), "to": convert_timestamp(start_valid).strftime(dfmt)})
-#        f_and.append({"range": {"date_valid": range_request}})
-
-
-    #set up the initial sort
-    sort_arr = [{"dataset." + sort : {"order": order.lower()}}]
-    if sort != 'title':
-        sort_arr.append({"dataset.title": {"order": "asc"}})
-    s = {"sort": sort_arr}
-
-    
-    search_area = 0.  #ha, this is so bad (div by zero later)
-    spatial_search = False
-    #Like nailing jelly to kittens
-    if box:
-        #build the query for the bbox search
-        srid = int(request.registry.settings['SRID'])
-        epsg = int(epsg) if epsg else srid
-
-        #TODO: could probably do this with a to_geojson ogr method. (the output polygon array, i mean)
-        bbox = string_to_bbox(box)
-        bbox_geom = bbox_to_geom(bbox, epsg)
-        if epsg != srid:
-            reproject_geom(bbox_geom, epsg, srid)
-
-        search_area = bbox_geom.Area()
-
-        coords = [[[bbox[0], bbox[1]],[bbox[0],bbox[3]],[bbox[2],bbox[3]],[bbox[2],bbox[1]],[bbox[0],bbox[1]]]]
-        
-        geo_shape = {
-            "location.bbox" : {
-                "shape": {
-                    "type": "Polygon",
-                    "coordinates": coords
-                }
-            }
-        }
-
-        f_and.append({"geo_shape": geo_shape})
-
-        #add the sort by georelevance
-        s = {"sort": [{"_score": order.lower()}]}
-        spatial_search = True
-
-    #finish building the POST data
-    if f_and:
-        #don't include an empty AND array (returns no results)
-        filtered.update({"filter": {"and": f_and}})
-        
-    if spatial_search:
-        #need to wrap the one query in a custom_score query widget instead
-        i_query = {
-            "custom_score": {
-                "query": {"filtered": filtered},
-                "params": {
-                    "search_area": search_area
-                },
-                "script": "_source.dataset.area / search_area"
-            } 
-        }
-
-        query_request.update({"query": i_query})
-    else:
-        query_request.update({"query": {"filtered": filtered}})
-
-    #add the sort
-    query_request.update(s)
-    
+    )
+    try:
+        searcher.parse_basic_query(app, params)
+    except Exception as ex:
+        return HTTPBadRequest(json.dumps({"query": searcher.query_data, "msg": ex.message}))
 
     if 'check' in params:
         #for testing - get the elasticsearch json request
-        return Response(json.dumps({"search": query_request, "url": es_url}), content_type = 'application/json')
+        return Response(json.dumps({"search": searcher.get_query(), "url": searcher.es_url}), content_type = 'application/json')
 
-    results = requests.post(es_url, data=json.dumps(query_request), auth=(es_user, es_password))
+    try:
+        searcher.search()
+    except Exception as ex:
+        return HTTPServerError(ex.message)
 
-    if results.status_code != 200:
-        #return HTTPServerError('%s, %s' % (results.status_code, results.text))
-        return Response(json.dumps({"total": 0, "results": []}), content_type = 'application/json')
+    base_url = request.registry.settings['BALANCER_URL']
     
-    total = results.json()['hits']['total'] if 'hits' in results.json() else 0
+    return generate_search_response(searcher, request, app, limit, base_url, ext, version)
 
-    if total < 1:
-        #TODO: add the cors to this
-        return Response(json.dumps({"total": 0, "results": []}), content_type = 'application/json')
+@view_config(route_name='search_within_collection')
+def search_within_collection(request):
+    '''
+    search for datasets within a single collection object
 
-    #TODO: figure out what to do if, horrifically, the es uuid count does not match the dataset count
-    dataset_ids = [i['_id'] for i in results.json()['hits']['hits']]
-
-    has_georel = False
-
-    load_balancer = request.registry.settings['BALANCER_URL']
-    base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
-
-    #NOTE: calls to get_current_registry during the app_iter yield part returns NONE so there's an error and we can't get what we need
-    head = """{"total": %s, "results": [""" % (total)
-    tail = ']}'
-
-    if ext=='kml':
-        head = """<?xml version="1.0" encoding="UTF-8"?>
-                        <kml xmlns="http://earth.google.com/kml/2.2">
-                        <Document>"""
-        tail = """\n</Document>\n</kml>"""
-        folder_head = "<Folder><name>Search Results</name>"
-        folder_tail = "</Folder>"
-        field_set = """<Schema name="searchFields"><SimpleField type="string" name="DatasetUUID"><displayName>Dataset UUID</displayName></SimpleField><SimpleField type="string" name="DatasetName"><displayName>Dataset Name</displayName></SimpleField><SimpleField type="string" name="Category"><displayName>Category</displayName></SimpleField><SimpleField type="string" name="DatasetServices"><displayName>Dataset Information</displayName></SimpleField></Schema>"""
-
-    subtotal = len(dataset_ids)
-    if subtotal < 1:
-        if ext == 'json':
-            return {"total": 0, "results": []}
-        else:
-            #TODO: return empty kml set
-            return Response()
-    limit = subtotal if subtotal < limit else limit
-
-    def yield_results():
-        #query for the datasets
-        datasets = DBSession.query(Dataset).filter(Dataset.uuid.in_(dataset_ids))
+    - by date range
+    - by bbox
+    - by keywords
+    - by category?
     
-    
-        #note: georelevance is added not as an extra field but as the second element in a tuple. the first element is the dataset object. hence the wonkiness.
-        if version == 2:
-            '''
-            {"box": [-109.114059, 31.309483, -102.98925, 37.044096000000003], "lastupdate": "02/29/12", "gr": 0.0, "text": "NM Property Tax Rates - September 2011", "config": {"what": "dataset", "taxonomy": "vector", "formats": ["zip", "shp", "gml", "kml", "json", "csv", "xls"], "services": ["wms", "wfs"], "tools": [1, 1, 1, 1, 0, 0], "id": 130043}, "id": 130043, "categories": "Boundaries__|__General__|__New Mexico"}
-            ''' 
+    '''
 
-            cnt = 0
-            for d in datasets:
-                #d = get_dataset(ds)
-#                if not d:
-#                    continue
-                    
-                if has_georel:
-                    gr = ds[1]
-                else:
-                    gr = 0.0
+    app = request.matchdict['app']
+    collection_id = request.matchdict['id']
+    ext = request.matchdict['ext']
 
-                services = d.get_services(request)
-                fmts = d.get_formats(request)
-            
-                #TODO: not this REVISE 
-                tools = [0 for i in range(6)]
-                if fmts:
-                    tools[0] = 1
-                if d.taxonomy in ['vector', 'geoimage']:
-                    tools[1] = 1
-                    tools[2] = 1
-                    tools[3] = 1
-                if d.has_metadata_cache:
-                    tools[2] = 1
-
-                    
-                #let's build some json
-                rst = json.dumps({"text": d.description, "categories": '%s__|__%s__|__%s' % 
-                                (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
-                                "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
-                                "box": [float(b) for b in d.box], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id, "gr": gr})
-
-                to_yield = ''
-                if cnt == 0:
-                    to_yield = head
-
-                to_yield += rst + ','
-
-                if cnt == limit - 1:
-                    to_yield = to_yield[:-1] + tail
-                
-                cnt += 1
-
-                yield to_yield
-        elif version == 3:
-            '''
-            new format
-            '''
-            cnt = 0
-            
-#            for ds in dataset_ids:
-#                d = get_dataset(ds)
-#                if not d:
-#                    continue
-            for d in datasets:
-                    
-                if has_georel:
-                    gr = ds[1]
-                else:
-                    gr = 0.0
-                    
-                rst = d.get_full_service_dict(base_url, request)
-                rst.update({'gr': gr})
-                rst = json.dumps(rst)
-                
-                to_yield = ''
-                if cnt == 0:
-                    to_yield = head
-
-                to_yield += rst + ','
-
-                if cnt == limit - 1:
-                    to_yield = to_yield[:-1] + tail
-
-                cnt += 1
-                yield to_yield                    
-
-    def yield_kml():
-        '''
-        geometry = bbox
-        description = html chunk with description, link to services.html(?), downloads, services?, metadata, some other stuff
-
-        point test = http://129.24.63.115/apps/rgis/search/datasets.kml?theme=Climate&subtheme=SNOTEL&limit=100
-        polygon test = http://129.24.63.115/apps/rgis/search/datasets.kml?theme=Boundaries&limit=50
-        '''
-        yield head
-
-        cnt = 0
-
-        for ds in datas:
-            kml = build_kml(ds)
-
-            if cnt == 0:
-                kml = folder_head + field_set + kml + '\n'
-            elif cnt == limit - 1:
-                kml += folder_tail
-            else:
-                kml += '\n'
-
-            cnt += 1
-            yield kml.encode('utf-8')
-        yield tail      
-        
-
-    def build_kml(d):
-        bbox = [float(b) for b in d.box]
-        geom = d.geom
-        if not check_for_valid_extent(bbox):
-            #the extent area == 0, it's a point so let's just use the point
-            geom = wkt_to_geom('POINT (%s %s)' % (bbox[0], bbox[1]), 4326)
-            geom = geom_to_wkb(geom)
-        geom_repr = wkb_to_output(geom, 4326, 'kml')
-
-        rst = d.get_full_service_dict(base_url, request)
-        
-        flds = """<SimpleData name="DatasetUUID">%s</SimpleData><SimpleData name="DatasetName">%s</SimpleData><SimpleData name="Category">%s</SimpleData><SimpleData name="DatasetServices">%s</SimpleData>""" % (d.uuid, d.description.replace('&', '&amp;') if '&amp;' not in d.description else d.description, rst['categories'][0]['theme'] + ' | ' + rst['categories'][0]['subtheme'] + ' | ' + rst['categories'][0]['groupname'], '/'.join([base_url, d.uuid, 'services.json']))
-        
-        feature = """<Placemark id="%s">
-                    <name>%s</name>
-                    <TimeStamp><when>%s</when></TimeStamp>
-                    %s\n
-                    <ExtendedData><SchemaData schemaUrl="#searchFields">%s</SchemaData></ExtendedData>
-                    <Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
-                    </Placemark>""" % (d.id, d.description.replace('&', '&amp;') if '&amp;' not in d.description else d.description, d.dateadded.strftime('%Y-%m-%d'), geom_repr, flds)
-                    
-        return feature
-
-    
-
-    response = Response()
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    if ext == 'json':
-        response.content_type = 'application/json'
-        response.app_iter = yield_results()
-    elif ext == 'kml':
-        response.content_type = 'application/vnd.google-earth.kml+xml; charset=UTF-8'
-        response.app_iter = yield_kml()
-    else:
+    c = get_collection(collection_id)
+    if not c:
         return HTTPNotFound()
+
+    params = normalize_params(request.params)
+    
+    #set up the elasticsearch search object
+    searcher = CollectionWithinSearcher(
+        {
+            "host": request.registry.settings['es_root'], 
+            "index": request.registry.settings['es_dataset_index'], 
+            "type": 'dataset', 
+            "user": request.registry.settings['es_user'].split(':')[0], 
+            "password": request.registry.settings['es_user'].split(':')[-1]
+        }
+    )
+    try:
+        searcher.parse_basic_query(app, params)
+        searcher.update_collection_filter(c.uuid)
+    except:
+        return HTTPBadRequest()
+
+    if 'check' in params:
+        #for testing - get the elasticsearch json request
+        return Response(json.dumps({"search": searcher.get_query(), "url": searcher.es_url}), content_type = 'application/json')
+
+    try:
+        searcher.search()
+    except Exception as ex:
+        return HTTPServerError()
+
+    base_url = request.registry.settings['BALANCER_URL']
+    
+    return generate_search_response(searcher, request,app, limit, base_url, ext, version)
+
+
+#NOTE: we chucked the geolookups structure completely to just keep a cleaner url moving forward.
+@view_config(route_name='searches', match_param="doctypes=nm_quads", renderer='json')
+@view_config(route_name='searches', match_param="doctypes=nm_gnis", renderer='json')
+@view_config(route_name='searches', match_param="doctypes=nm_counties", renderer='json')  
+def search(request):
+    '''
+    quad = /search/geolookups.json?query=albuquer&layer=nm_quads&limit=20
+    placename = /search/geolookups.json?query=albu&layer=nm_gnis&limit=20
+
+    current working request = http://129.24.63.66/gstore_v3/apps/rgis/search/nm_quads.json?query=albu
+    '''
+    geolookup = request.matchdict['doctypes']
+
+    #pagination
+    limit = int(request.params.get('limit')) if 'limit' in request.params else 25
+    offset = int(request.params.get('offset')) if 'offset' in request.params else 0
+
+    #sort direction
+    sortdir = request.params.get('dir').upper() if 'dir' in request.params else 'DESC'
+    direction = 1 if sortdir == 'DESC' else 0
+
+    #keyword
+    keyword = request.params.get('query') if 'query' in request.params else ''
+    keyword = keyword.replace('+', ' ') if keyword else keyword
+    
+    #get the epsg for the returned results
+    epsg = request.params.get('epsg') if 'epsg' in request.params else ''
+
+    order_clause = geolookups.c.description.asc() if direction else geolookups.c.description.desc()
+    
+    #TODO: add the rest of the filtering
+    keyword = '%'+keyword+'%'
+    geos = DBSession.query(geolookups).filter(geolookups.c.what==geolookup).filter(or_(geolookups.c.description.ilike(keyword), "array_to_string(aliases, ',') like '%s'" % keyword)).order_by(order_clause).limit(limit).offset(offset)
+
+    #dump the results
+    #TODO: check for anything weird about the bbox (or deal with reprojection, etc)
+    response = Response(json.dumps({'results': [{'text': g.description, 'box': [float(b) for b in g.box]} for g in geos]}))
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.content_type="application/json"    
     return response
 
 
@@ -846,41 +618,245 @@ def search_features(request):
     return {'total': len(fids), 'features': fids[s:e]}
 
 
-#TODO: replace this with FACET search route thing
-#NOTE: we chucked the geolookups structure completely to just keep a cleaner url moving forward.
-whats = ["nm_counties", "nm_gnis", "nm_quads"]
-#return geolookup data
-@view_config(route_name='search_geolookups', renderer='json')
-def search(request):
+'''
+search output options
+'''    
+class StreamDoctypeJson():
     '''
-    quad = /search/geolookups.json?query=albuquer&layer=nm_quads&limit=20
-    placename = /search/geolookups.json?query=albu&layer=nm_gnis&limit=20
-
-    current working request = http://129.24.63.66/gstore_v3/apps/rgis/search/nm_quads.json?query=albu
+    generate the json output for the search results
     '''
-    geolookup = request.matchdict['geolookup']
-    if geolookup not in whats:
-        return HTTPNotFound()
 
-    #pagination
-    limit = int(request.params.get('limit')) if 'limit' in request.params else 25
-    offset = int(request.params.get('offset')) if 'offset' in request.params else 0
-
-    #sort direction
-    sortdir = request.params.get('dir').upper() if 'dir' in request.params else 'DESC'
-    direction = 1 if sortdir == 'DESC' else 0
-
-    #keyword
-    keyword = request.params.get('query') if 'query' in request.params else ''
-    keyword = keyword.replace('+', ' ') if keyword else keyword
+    head = '{"total": %s, "subtotal": %s, "results": ['
+    tail = ']}'
     
-    #get the epsg for the returned results
-    epsg = request.params.get('epsg') if 'epsg' in request.params else ''
+    def __init__(self, app, base_url, request, total, version, subtotal):
+        self.app = app
+        self.base_url = base_url
+        self.request = request
+        self.head = self.head % (total, subtotal)
+        self.version = version
 
-    #TODO: add the rest of the filtering
-    keyword = '%'+keyword+'%'
-    geos = DBSession.query(geolookups).filter(geolookups.c.what==geolookup).filter(or_(geolookups.c.description.ilike(keyword), "array_to_string(aliases, ',') like '%s'" % keyword))
+        
 
-    #dump the results
-    #TODO: check for anything weird about the bbox (or deal with reprojection, etc)
-    return {'results': [{'text': g.description, 'box': [float(b) for b in g.box]} for g in geos]}
+    def yield_set(self, object_tuples, limit):
+        yield self.head
+
+        cnt = 0
+
+        for object_tuple in object_tuples:
+            if object_tuple[1] == 'dataset' and self.version == 2:
+                to_yield = json.dumps(self.build_v2(object_tuple)) + ','
+            elif self.version == 3:
+                to_yield = json.dumps(self.build_v3(object_tuple)) + ','
+            else:
+                to_yield = '{},'
+
+            if cnt == limit - 1:
+                to_yield = to_yield[:-1]
+
+            cnt += 1
+            yield to_yield
+
+        yield self.tail
+
+    def build_v2(self, object_tuple):
+        '''
+        haha. nope.
+        '''
+
+        if object_tuple[1] != 'dataset':
+            return {}
+
+        d = get_dataset(object_tuple[0])
+        if not d:
+            return {}
+
+        services = d.get_services(request)
+        fmts = d.get_formats(request)
+    
+        #TODO: not this REVISE 
+        tools = [0 for i in range(6)]
+        if fmts:
+            tools[0] = 1
+        if d.taxonomy in ['vector', 'geoimage']:
+            tools[1] = 1
+            tools[2] = 1
+            tools[3] = 1
+        if d.has_metadata_cache:
+            tools[2] = 1 
+
+        return {"text": d.description, "categories": '%s__|__%s__|__%s' % 
+                                (d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname),
+                                "config": {"id": d.id, "what": "dataset", "taxonomy": d.taxonomy, "formats": fmts, "services": services, "tools": tools},
+                                "box": [float(b) for b in d.box] if d.box else [], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id}
+        
+    def build_v3(self, object_tuple):
+        '''
+        still ridiculous
+        '''
+
+        o = None
+        if object_tuple[1] == 'collection':
+            o = get_collection(object_tuple[0])
+        elif object_tuple[1] == 'dataset':
+            o = get_dataset(object_tuple[0])
+
+        if not o:
+            return {}
+
+        return o.get_full_service_dict(self.base_url, self.request, self.app)
+
+class StreamDoctypeKml():
+    '''
+    generate the kml output for the search results
+    '''
+
+    head = """<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://earth.google.com/kml/2.2">\n<Document>"""
+
+    tail = """\n</Document>\n</kml>"""
+
+    folder_head = """<Folder><name>Search Results</name>"""
+
+    folder_tail = """</Folder>"""
+
+    field_tmpl = '<SimpleField type="string" name="%(fieldname)s"><displayName>%(displayname)s</displayName></SimpleField>'
+    data_tmpl = '<SimpleData name="%(fieldname)s">%(data)s</SimpleData>'
+
+    default_fields = [
+        ("Type", "Data Type"),
+        ("UUID", "UUID"),
+        ("Name", "Name"),
+        ("Category", "Category"),
+        ("Services", "Service URL")
+    ]
+    
+    def __init__(self, app, base_url, fields=[]):
+        self.app = app
+        self.base_url = base_url
+        self.fields = fields #as a list of tuples (name, display)
+        self.field_set = self.generate_fields()
+
+    def generate_fields(self):
+        '''
+        build the field schema for the set of fields
+        of course, if it's not the default fields, the builder will be wrong
+        '''
+        flds = self.fields if self.fields else self.default_fields
+        return '<Schema name="searchFields">' + ''.join([self.field_tmpl % {'fieldname': f[0], 'displayname': f[1]} for f in flds]) + '</Schema>'
+
+    def yield_set(self, object_tuples, limit):
+        yield self.head
+
+        cnt = 0
+
+        for obj in object_tuples:
+            kml = self.build_item(obj)
+            
+            if cnt == 0:
+                kml = self.folder_head + self.field_set + kml + '\n'
+            elif cnt == limit - 1:
+                kml += self.folder_tail
+            else:
+                kml += '\n'
+
+            cnt += 1
+            yield kml.encode('utf-8')
+
+        yield self.tail
+
+
+    def build_item(self, object_tuple):
+        '''
+        get the bits we need for the field set
+
+        hooray for consistency
+        '''
+
+        data = {}
+        if object_tuple[1] == 'dataset':
+            d = get_dataset(object_tuple[0])
+            if not d:
+                return ''
+
+            if d.taxonomy in ['table']:
+                return ''
+
+            bbox = string_to_bbox(d.box)
+            geom = d.geom
+
+            uuid = d.uuid
+            obj_id = d.id
+            description = d.description
+            dateadded = d.dateadded
+
+            obj_data = {"Type": "Dataset", "UUID": uuid, "Name": description, "Category": ' | '.join([d.categories[0].theme, d.categories[0].subtheme, d.categories[0].groupname]), "Services": self.base_url+ build_service_url(self.app, 'datasets', uuid)}
+            
+        elif object_tuple[1] == 'collection':
+            c = get_collection(object_tuple[0])
+            if not c:
+                return ''
+
+            bbox = string_to_bbox(c.bbox)
+            geom = c.bbox_geom
+
+            obj_id = c.id
+            uuid = c.uuid
+            description = c.name 
+            dateadded = c.date_added   
+
+            obj_data = {"Type": "Collection", "UUID": uuid, "Name": description, "Category": ' | '.join([c.categories[0].theme, c.categories[0].subtheme, c.categories[0].groupname]), "Services": self.base_url+ build_service_url(self.app, 'collections', uuid)}
+        else:
+            return ''
+
+        if not check_for_valid_extent(bbox):
+            geom = wkt_to_geom('POINT (%s %s)' % (bbox[0], bbox[1]), 4326)
+            geom = geom_to_wkb(geom)
+
+        data = {"id": obj_id, "uuid": uuid, "description": description, "data": obj_data, "dateadded": dateadded}            
+
+        return self.build_feature(data, geom)
+
+
+    def build_feature(self, object_data, object_geometry):
+        '''
+        generate the kml chunk
+        '''
+
+        geom_repr = wkb_to_output(object_geometry, 4326, 'kml')
+
+        field_data = object_data['data']
+        data = '\n'.join(["""<SimpleData name="%(fieldname)s">%(fielddata)s</SimpleData>""" % {'fieldname': k, 'fielddata': v} for k, v in field_data.iteritems()])
+
+        feature = """<Placemark id="%s">
+                    <name>%s</name>
+                    <TimeStamp><when>%s</when></TimeStamp>
+                    %s\n
+                    <ExtendedData><SchemaData schemaUrl="#searchFields">%s</SchemaData></ExtendedData>
+                    <Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+                    </Placemark>""" % (object_data['id'], object_data['description'].replace('&', '&amp;') if '&amp;' not in object_data['description'] else object_data['description'], object_data['dateadded'].strftime('%Y-%m-%d'), geom_repr, data)
+
+        return feature
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+           

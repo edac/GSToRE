@@ -38,7 +38,7 @@ xsi:schemaLocation="http://www.isotc211.org/2005/gmi http://www.ngdc.noaa.gov/me
            <xsl:attribute name="xsi:schemaLocation" select="'http://www.isotc211.org/2005/gmi http://www.ngdc.noaa.gov/metadata/published/xsd/schema.xsd'"></xsl:attribute>
            <gmd:fileIdentifier>
                <gco:CharacterString>
-                   <xsl:value-of select="fn:concat(fn:upper-case($app), '::', identification/@dataset, '::ISO-19115:2003')"/>
+                   <xsl:value-of select="fn:concat(fn:upper-case($app), '::', identification/@identifier, '::ISO-19115:2003')"/>
                </gco:CharacterString>
            </gmd:fileIdentifier>
            <gmd:language>
@@ -50,7 +50,7 @@ xsi:schemaLocation="http://www.isotc211.org/2005/gmi http://www.ngdc.noaa.gov/me
            </gmd:characterSet>
            <gmd:hierarchyLevel>
                <gmd:MD_ScopeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ScopeCode" 
-                   codeListValue="dataset"></gmd:MD_ScopeCode>
+                   codeListValue="{if (spatial) then 'dataset' else 'nonGeographicDataset'}"></gmd:MD_ScopeCode>
            </gmd:hierarchyLevel>
            
            <xsl:variable name="identity-ptcontac-id">
@@ -685,13 +685,22 @@ xsi:schemaLocation="http://www.isotc211.org/2005/gmi http://www.ngdc.noaa.gov/me
                        </xsl:for-each>
                    </xsl:if>
                    
-<!--               TODO: is this all that it needs? also other data types?    -->
-                   <xsl:variable name="spref-type" select="if (spatial/raster) then 'grid' else 'vector'"></xsl:variable>
-                   <gmd:spatialRepresentationType>
-                       <gmd:MD_SpatialRepresentationTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_SpatialRepresentationTypeCode"
-                           codeListValue="{$spref-type}"></gmd:MD_SpatialRepresentationTypeCode>
-                   </gmd:spatialRepresentationType>
-                   
+                    <xsl:if test="spatial">
+                        <xsl:variable name="spref-type">
+                            <xsl:choose>
+                                <xsl:when test="spatial/raster">
+                                    <xsl:value-of select="'grid'"></xsl:value-of>
+                                </xsl:when>
+                                <xsl:when test="spatial/vector">
+                                    <xsl:value-of select="'vector'"></xsl:value-of>
+                                </xsl:when>
+                            </xsl:choose>
+                        </xsl:variable>
+                        <gmd:spatialRepresentationType>
+                            <gmd:MD_SpatialRepresentationTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_SpatialRepresentationTypeCode"
+                                codeListValue="{$spref-type}"></gmd:MD_SpatialRepresentationTypeCode>
+                        </gmd:spatialRepresentationType>
+                    </xsl:if>
 <!--               TODO: aggregation info    -->
                    
                    <gmd:language>
@@ -712,22 +721,24 @@ xsi:schemaLocation="http://www.isotc211.org/2005/gmi http://www.ngdc.noaa.gov/me
                
                    <gmd:extent>
                        <gmd:EX_Extent id="boundingExtent">
-                           <gmd:geographicElement>
-                               <gmd:EX_GeographicBoundingBox id="geographicExtent">
-                                   <gmd:westBoundLongitude>
-                                       <gco:Decimal><xsl:value-of select="spatial/west"></xsl:value-of></gco:Decimal>
-                                   </gmd:westBoundLongitude>
-                                   <gmd:eastBoundLongitude>
-                                       <gco:Decimal><xsl:value-of select="spatial/east"></xsl:value-of></gco:Decimal>
-                                   </gmd:eastBoundLongitude>
-                                   <gmd:southBoundLatitude>
-                                       <gco:Decimal><xsl:value-of select="spatial/south"></xsl:value-of></gco:Decimal>
-                                   </gmd:southBoundLatitude>
-                                   <gmd:northBoundLatitude>
-                                       <gco:Decimal><xsl:value-of select="spatial/north"></xsl:value-of></gco:Decimal>
-                                   </gmd:northBoundLatitude>
-                               </gmd:EX_GeographicBoundingBox>
-                           </gmd:geographicElement>
+                           <xsl:if test="spatial">
+                               <gmd:geographicElement>
+                                   <gmd:EX_GeographicBoundingBox id="geographicExtent">
+                                       <gmd:westBoundLongitude>
+                                           <gco:Decimal><xsl:value-of select="spatial/west"></xsl:value-of></gco:Decimal>
+                                       </gmd:westBoundLongitude>
+                                       <gmd:eastBoundLongitude>
+                                           <gco:Decimal><xsl:value-of select="spatial/east"></xsl:value-of></gco:Decimal>
+                                       </gmd:eastBoundLongitude>
+                                       <gmd:southBoundLatitude>
+                                           <gco:Decimal><xsl:value-of select="spatial/south"></xsl:value-of></gco:Decimal>
+                                       </gmd:southBoundLatitude>
+                                       <gmd:northBoundLatitude>
+                                           <gco:Decimal><xsl:value-of select="spatial/north"></xsl:value-of></gco:Decimal>
+                                       </gmd:northBoundLatitude>
+                                   </gmd:EX_GeographicBoundingBox>
+                               </gmd:geographicElement>
+                           </xsl:if>
                            <xsl:choose>
                                <xsl:when test="identification/time/range">
                                    <gmd:temporalElement>
@@ -801,7 +812,7 @@ xsi:schemaLocation="http://www.isotc211.org/2005/gmi http://www.ngdc.noaa.gov/me
                
                </gmd:MD_DataIdentification>
            </gmd:identificationInfo>
-           <xsl:if test="attributes and spatial/vector">
+           <xsl:if test="attributes and (spatial/vector or not(spatial))">
                <gmd:contentInfo>
                     <gmd:MD_FeatureCatalogueDescription>
                         <gmd:includedWithDataset>
@@ -840,9 +851,24 @@ xsi:schemaLocation="http://www.isotc211.org/2005/gmi http://www.ngdc.noaa.gov/me
                                     </gmd:CI_ResponsibleParty>
                                 </gmd:citedResponsibleParty>
                                 
-                                <xsl:if test="attributes/overview">
+                                <xsl:variable name="eaoverview">
+                                    <xsl:choose>
+                                        <xsl:when test="attributes/overview">
+                                            <xsl:value-of select="attributes/overview"/>
+                                        </xsl:when>
+                                    </xsl:choose>
+                                </xsl:variable>
+                                <xsl:variable name="eacite">
+                                    <xsl:choose>
+                                        <xsl:when test="attributes/eacite">
+                                            <xsl:value-of select="attributes/eacite"/>
+                                        </xsl:when>
+                                    </xsl:choose>
+                                </xsl:variable>
+                                
+                                <xsl:if test="$eaoverview or $eacite">
                                     <gmd:otherCitationDetails>
-                                        <gco:CharacterString><xsl:value-of select="attributes/overview"></xsl:value-of></gco:CharacterString>
+                                        <gco:CharacterString><xsl:value-of select="$eaoverview[text() != ''] | $eacite[text() != '']" separator=" "/></gco:CharacterString>
                                     </gmd:otherCitationDetails>
                                 </xsl:if>
 
