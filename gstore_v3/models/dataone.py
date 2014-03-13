@@ -689,6 +689,7 @@ class DataoneFormat(Base):
         Column('format', String(200)),
         Column('name', String(200)),
         Column('type', String(20)),
+        Column('mimetype', String(100)),
         schema = 'gstoredata'
     )  
     '''

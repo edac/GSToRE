@@ -40,18 +40,17 @@ see http://mule1.dataone.org/ArchitectureDocs-current/apis/MN_APIs.html
 '''
 some presets
 '''
-#TODO: move to config?
 NODE = 'urn:node:EDACGSTORE'
 SUBJECT = 'CN=gstore.unm.edu,DC=dataone,DC=org'
 RIGHTSHOLDER = 'CN=gstore.unm.edu,DC=dataone,DC=org'
 CONTACTSUBJECT = 'CN=gstore.unm.edu,O=Google,C=US,DC=cilogon,DC=org'
 NAME = 'EDAC Gstore Repository'
-DESCRIPTION = "Earth Data Analysis Center's (EDAC) Geographical Storage, Transformation and Retrieval Engine (GSTORE) platform archives data produced by various NM organizations, including NM EPSCoR and RGIS. GSTORE primarily houses GIS and other digital documents relevant to state agencies, local government, and scientific researchers. See RGIS and NM EPSCoR for more information on the scope of data. It currently uses the FGDC metadata standard to describe all of it's holdings."
+ALIAS = 'EDACGSTORE'
+DESCRIPTION = "Earth Data Analysis Center's (EDAC) Geographical Storage, Transformation and Retrieval Engine (GSTORE) platform archives data produced by various NM organizations, including NM EPSCoR and RGIS. GSTORE primarily houses GIS and other digital documents relevant to state agencies, local government, and scientific researchers. See RGIS and NM EPSCoR for more information on the scope of data. It currently uses the FGDC metadata standard to describe all of its holdings."
 CN_RESOLVER='https://cn.dataone.org/cn/v1/resolve'
 
 #TODO: add the system metadata date modified trigger to obsoleting step and then add something for actually updating that model
 
-#TODO: what else needs to be logged other than object/pid (read)?
 
 
 #convert to the d1 format
@@ -232,8 +231,8 @@ def dataone(request):
     #set up the dict
     rsp = {
            'node': NODE,
-           'name': 'GSTORE Node',
-           'description': 'DATAONE member node for GSTORE (EDAC)',
+           'name': NAME,
+           'description': DESCRIPTION,
            'baseUrl': base_url,
            'subject': SUBJECT,
            'contactsubject': CONTACTSUBJECT
@@ -486,8 +485,6 @@ def search(request):
         sysmeta = obsolete.system_metadatas[0]
         sys_date = sysmeta.date_changed
 
-#        docs.append({'identifier': obsolete_uuid, 'format': object_format, 'algo': algo, 'checksum': md5, 'date': datetime_to_dataone(search.most_recent), 'size': fsize})
-
         docs.append({'identifier': obsolete_uuid, 'format': object_format, 'algo': algo, 'checksum': md5, 'date': datetime_to_dataone(sys_date), 'size': fsize})
         
     return {'total': total, 'count': cnt, 'start': offset, 'docs': docs}
@@ -519,7 +516,7 @@ def show(request):
     dataone_path = request.registry.settings['DATAONE_PATH']
 
     try:
-        obsolete, obj_path, mimetype, format = get_obsoleted_object(pid, dataone_path)
+        obsolete, obj_path, mimetype, formatid, formatname = get_obsoleted_object(pid, dataone_path)
     except:    
         return return_error('object', 1020, 404)
 
@@ -583,7 +580,7 @@ def head(request):
     dataone_path = request.registry.settings['DATAONE_PATH']
 
     try:
-        obsolete, obj_path, mimetype, format = get_obsoleted_object(pid, dataone_path)
+        obsolete, obj_path, mimetype, formatid, formatname = get_obsoleted_object(pid, dataone_path)
     except:  
         lst = return_error_head(pid)
         rsp = Response()
@@ -597,10 +594,12 @@ def head(request):
 
         
     lst = [('Last-Modified','%s' % (str(datetime_to_http(obsolete.date_changed)))), ('Content-Type', str(mimetype)), ('Content-Length','%s' % (int(file_size)))]
-    lst.append(('DataONE-ObjectFormat', str(format)))
+
+    #see misleading mimetype-ness re get_obsoleted_object
+    lst.append(('DataONE-ObjectFormat', str(formatid)))
     lst.append(('DataONE-Checksum', '%s,%s' % (algo, str(file_hash))))
     #TODO: change this to something but i don't think it's ours to set so who the hell knows.
-    lst.append(('DataONE-SerialVersion', '1234'))
+    lst.append(('DataONE-SerialVersion', '1'))
 
     rsp = Response()
     rsp.headerlist = lst
@@ -666,10 +665,10 @@ def metadata(request):
 
     dataone_path = request.registry.settings['DATAONE_PATH']
 
-    obsolete, obj_path, mimetype, format = None, None, None, None
+    obsolete, obj_path, mimetype, formatid, formatname = None, None, None, None, None
     try:
         #mimetype is pretty much a lie here (it's the format.format) 
-        obsolete, obj_path, mimetype, format = get_obsoleted_object(pid, dataone_path)
+        obsolete, obj_path, mimetype, formatid, formatname = get_obsoleted_object(pid, dataone_path)
     except:
         return return_error('metadata', 1060, 404, '', pid)
 
@@ -705,8 +704,8 @@ def metadata(request):
     #use the obsoletedby's date as the system modified date?
 
     #dates should be from postgres, i.e. in utc
-    rsp = {'pid': pid, 'dateadded': datetime_to_dataone(obj.date_added), 'obj_format': str(mimetype), 'file_size': file_size, 
-           'uid': 'EDACGSTORE', 'o': 'EDAC', 'dc': 'everything', 'org': 'EDAC', 'hash_type': algo,
+    rsp = {'pid': pid, 'dateadded': datetime_to_dataone(obj.date_added), 'obj_format': str(formatid), 'file_size': file_size, 
+           'uid': ALIAS, 'o': 'EDAC', 'dc': 'everything', 'org': 'EDAC', 'hash_type': algo,
            'hash': file_hash, 'metadata_modified': datetime_to_dataone(sys_date), 'mn': NODE, 'obsoletes': obsoletes_uuid, 'obsoletedby': obsoleted_by_uuid, 'replication': replication, 'access_policies': access_policies}
 
     if obsoleted_by:
@@ -746,7 +745,7 @@ def checksum(request):
     dataone_path = request.registry.settings['DATAONE_PATH']
 
     try:
-        obsolete, obj_path, mimetype, format = get_obsoleted_object(pid, dataone_path)
+        obsolete, obj_path, mimetype, formatid, formatname = get_obsoleted_object(pid, dataone_path)
     except:
         return return_error('object', 1800, 404)
 
@@ -851,7 +850,7 @@ def replica(request):
 
     
     try:
-        obsolete, obj_path, mimetype, format = get_obsoleted_object(pid, dataone_path)
+        obsolete, obj_path, mimetype, formatid, formatname = get_obsoleted_object(pid, dataone_path)
     except: 
         return_error('object', 2185, 404)
 
@@ -892,8 +891,9 @@ def get_obsoleted_object(pid, dataone_path):
         if not obj:
             raise Exception('no data object')
 
-        mimetype = obj.formats.format
-        format = obj.formats.name  
+        formatid = obj.formats.format
+        formatname = obj.formats.name  
+        mimetype = obj.formats.mimetype
 
         #TODO: this won't work if we ever serve anything else
         packed_ext = 'csv' if 'csv' in mimetype else 'zip'
@@ -905,8 +905,9 @@ def get_obsoleted_object(pid, dataone_path):
         if not obj:
             raise Exception('no science metadata object')
 
-        mimetype = obj.formats.format
-        format = obj.formats.name
+        formatid = obj.formats.format
+        formatname = obj.formats.name
+        mimetype = obj.formats.mimetype
 
         obj_path = os.path.join(dataone_path, 'metadata', '%s.xml' % obsolete.uuid)
     elif cores.object_type == 'data package':
@@ -914,15 +915,17 @@ def get_obsoleted_object(pid, dataone_path):
         if not obj:
             raise Exception('no data package')
         
-        mimetype = obj.formats.format
-        format = obj.formats.name
+        formatid = obj.formats.format
+        formatname = obj.formats.name
+        mimetype = obj.formats.mimetype
 
         obj_path = os.path.join(dataone_path, 'packages', '%s.xml' % obsolete.uuid)
     else:
         raise Exception('invalid object type')
 
+    #TODO: mimetype is misleading, it's the formatid.format field
     #return the obsolete object, the actual path to the data file, the mimetype and name of the d1 format obj
-    return obsolete, obj_path, mimetype, format
+    return obsolete, obj_path, mimetype, formatid, formatname
 
 
 '''

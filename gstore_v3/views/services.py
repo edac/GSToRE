@@ -542,8 +542,8 @@ def datasets(request):
     tmppath = request.registry.settings['TEMP_PATH']
     srid = request.registry.settings['SRID']
     xslt_path = request.registry.settings['XSLT_PATH']
-    load_balancer = request.registry.settings['BALANCER_URL']
-    base_url = load_balancer
+    base_url = request.registry.settings['BALANCER_URL']
+   
 
     supported_standards = d.get_standards(request)
 
@@ -564,7 +564,7 @@ def datasets(request):
         mcoll = request.registry.settings['mongo_collection']
         mongo_uri = gMongoUri(mconn, mcoll)
 
-        metadata_info = {'app': app, 'base_url': '%s/apps/%s/datasets/' % (load_balancer, app), 'standard': std, "xslt_path": xslt_path + '/xslts', 'validate': False}
+        metadata_info = {'app': app, 'base_url': base_url, 'standard': std, "xslt_path": xslt_path + '/xslts', 'validate': False, 'request': request}
     else:
         fmtpath = ''
         mongo_uri = None
