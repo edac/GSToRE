@@ -659,7 +659,8 @@ class StreamDoctypeJson():
 
         yield self.tail
 
-        #to close the conn and release the postgres locks (TESTING)
+        #to close the conn and release the postgres locks
+        #THE FACTORY DOES NOT WORK WITH THE STREAMING RESPONSES!@#!#$
         DBSession.close()
 
     def build_v2(self, object_tuple):
@@ -766,6 +767,10 @@ class StreamDoctypeKml():
             yield kml.encode('utf-8')
 
         yield self.tail
+
+        #to close the conn and release the postgres locks
+        #THE FACTORY DOES NOT WORK WITH THE STREAMING RESPONSES!@#!#$
+        DBSession.close()
 
 
     def build_item(self, object_tuple):

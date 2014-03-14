@@ -8,6 +8,10 @@ from pyramid.httpexceptions import HTTPNotFound, HTTPNotImplemented
 
 from .models import DBSession
 
+#for the cleanup/locking problem
+from pyramid.events import subscriber
+from pyramid.events import NewRequest
+
 
 #TODO: put in some reasonable error messages. 
 #custom error methods   
@@ -64,6 +68,21 @@ def any_geolookup(segment_name, *allowed):
             return True
     return predicate
 geolookuplist = any_type('geolookup', 'nm_counties', 'nm_quads', 'nm_gnis')
+
+
+'''
+we shouldn't need this! we have pyramid_tm!
+but apparently we do. otherwise we just generate locks every which way
+until the system dies
+
+and this apparently does jack for the streaming (app_iter) responses
+'''
+def cleanup_callback(request):
+    DBSession.close()
+
+@subscriber(NewRequest)
+def add_cleanup_callback(event):
+    event.request.add_finished_callback(cleanup_callback)    
 
 
 '''

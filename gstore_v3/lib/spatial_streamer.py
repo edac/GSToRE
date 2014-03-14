@@ -4,6 +4,8 @@ from xml.sax.saxutils import escape
 from ..lib.spatial import *
 from ..lib.utils import *
 
+from ..models import DBSession
+
 class SpatialStreamer():
     '''
     basic setup for streaming vector data (for text-based formats only: geojson, json, csv, kml, gml)
@@ -59,6 +61,10 @@ class SpatialStreamer():
             yield self.folder_tail.encode(self.encode_as) + self.delimiter
         if self.tail:
             yield self.tail.encode(self.encode_as)
+
+        #this is just stupid pyramid
+        DBSession.close()
+        
 
     def yield_head(self):
         '''
