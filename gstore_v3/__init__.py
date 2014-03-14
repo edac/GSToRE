@@ -1,5 +1,6 @@
 from pyramid.config import Configurator
 from sqlalchemy import engine_from_config
+from sqlalchemy.pool import NullPool
 
 from pyramid.response import Response
 from pyramid.view import notfound_view_config
@@ -64,9 +65,6 @@ def any_geolookup(segment_name, *allowed):
     return predicate
 geolookuplist = any_type('geolookup', 'nm_counties', 'nm_quads', 'nm_gnis')
 
-#TODO: check for version query param as custom predicate 
-#def any_version():
-#versionlist = any_version('version', 2, 3)
 
 '''
 all the routing
@@ -77,12 +75,11 @@ def main(global_config, **settings):
     
     config = Configurator(settings=settings)    
     config.scan('.models')
-    engine = engine_from_config(settings, 'sqlalchemy.')
+    engine = engine_from_config(settings, 'sqlalchemy.', pool_reset_on_return='commit', poolclass=NullPool)
 
     #add the dataone logging engine (in its own postgres connection)
     dataone_engine = engine_from_config(settings, 'dataone.')
     models.initialize_sql([engine, dataone_engine])
-    #models.initialize_sql(engine)
 
     config.add_static_view('static', 'static', cache_max_age=3600)
     config.add_static_view(name='xslts', path='gstore_v3:../resources/xslts')
@@ -91,17 +88,6 @@ def main(global_config, **settings):
     config.add_static_view(name='samples', path='gstore_v3:../resources/samples')
 
     config.add_route('home', '/')    
-
-#    #TEST ROUTE
-#    config.add_route('test', '/test/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}')
-#    config.add_route('test_url', '/test/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}')
-#    config.add_route('test_wcs', '/test/services/wcs')
-#    config.add_route('test_fmt', '/test/services/{fmt}')
-#    config.add_route('test_fidsearch', '/test/mongo')
-#    config.add_route('test_insert', '/test/insert')
-#    config.add_route('test_bulkinsert', '/test/chunk/{id}/{amount}')
-
-    #config.add_route('test_urlencoding', '/test/encoder/{test}')
 
 #app routes (stats, etc)
     config.add_route('app_stats', 'apps/{app}/statistics/{stat}.{ext}', custom_predicates=(applist,))
@@ -112,7 +98,6 @@ def main(global_config, **settings):
     config.add_route('add_attributes', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/attributes', custom_predicates=(applist,)) #POST
 
 #to the features
-    #config.add_route('features', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/features.{ext}')
     config.add_route('add_features', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/features', custom_predicates=(applist,)) #POST
     config.add_route('add_feature_attributes', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/featureattributes', custom_predicates=(applist,)) #POST
     config.add_route('update_feature', '/apps/{app}/features/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,)) #PUT

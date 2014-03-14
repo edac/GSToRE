@@ -79,7 +79,7 @@ def generate_search_response(searcher, request, app, limit, base_url, ext, versi
         response.app_iter = kml_streamer.yield_set(search_objects, limit)
     else:
         return HTTPNotFound()
-        
+
     return response
 
 '''
@@ -658,6 +658,9 @@ class StreamDoctypeJson():
             yield to_yield
 
         yield self.tail
+
+        #to close the conn and release the postgres locks (TESTING)
+        DBSession.close()
 
     def build_v2(self, object_tuple):
         '''
