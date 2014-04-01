@@ -417,7 +417,7 @@ def generateService(mapfile, params, mapname=''):
 
             if 'xml' in content_type:
                 content_type = 'application/xml'            
-            return Response(content, content_type=content_type)
+            return Response(content, content_type=content_type, headers={'X-Robots-Tag': 'noindex'})
         elif request_type in ['getmap', 'getlegendgraphic']:     
             #any image response  
             if request_type == 'getmap':
@@ -435,7 +435,7 @@ def generateService(mapfile, params, mapname=''):
             
             buffer.seek(0)
             content_type = image_type[1]
-            return Response(buffer.read(), content_type=content_type)
+            return Response(buffer.read(), content_type=content_type, headers={'X-Robots-Tag': 'noindex'})
         elif request_type == 'getmapfile':
             #that's ours, we just want to save the mapfile to disk
             #and use the dataset id-source id.map for the filename to make sure it's unique
@@ -448,7 +448,7 @@ def generateService(mapfile, params, mapname=''):
                 with open(mapname, 'r') as f:
                     output = f.read()
                 
-            return Response(output)
+            return Response(output, headers={'X-Robots-Tag': 'noindex'})
         elif request_type in ['getcoverage']:
             mapscript.msIO_installStdoutToBuffer()
             mapfile.OWSDispatch(req)
@@ -462,7 +462,7 @@ def generateService(mapfile, params, mapname=''):
 #            if 'multipart/mixed' in content_type and fmt == 'image/x-aaigrid':
 #                content = parse_wcs_response(content, content_type)
 
-            return Response(content, content_type=content_type)
+            return Response(content, content_type=content_type, headers={'X-Robots-Tag': 'noindex'})
         elif request_type in ['gettiffcoverage']:
             '''
             prism example:
@@ -484,10 +484,11 @@ def generateService(mapfile, params, mapname=''):
                     if h[0].lower() not in ['content-disposition']:
                         output_headers[h[0]] = str(h[1])
                 output_headers['Content-disposition'] = 'attachment; filename=%s.tif' % (coverage)
+                output_headers['X-Robots-Tag'] = 'noindex'
                 return Response(tiff, headers=output_headers)
 
             #probably an error. neat.
-            return Response(content, content_type=content_type)
+            return Response(content, content_type=content_type, headers={'X-Robots-Tag': 'noindex'})
         else:
             return HTTPNotFound('Invalid OGC request')
     except Exception as err:

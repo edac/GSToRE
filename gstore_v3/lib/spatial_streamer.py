@@ -63,7 +63,10 @@ class SpatialStreamer():
             yield self.tail.encode(self.encode_as)
 
         #this is just stupid pyramid
-        DBSession.close()
+        #DBSession.close()
+        #also stupid, there is some timing issue with this on larger exports so 
+        #by the time it gets to the metadata, we have lost the connection and
+        #we fail.
         
 
     def yield_head(self):

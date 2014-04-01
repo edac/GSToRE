@@ -938,7 +938,7 @@ def add_object(request):
     '''
     for data object/science metadata
     {
-        'dataset': #id/uuid
+        'dataset': #id
         'options': {
             'dataset format':
             'metadata standard':
@@ -969,7 +969,7 @@ def add_object(request):
         dataset_format = options['dataset_format']
         dataobject_format = options['object_format']
 
-        format_obj = DBSession.query(DataoneFormat).filter(DataoneFormat.name==dataobject_format).first()
+        format_obj = DBSession.query(DataoneFormat).filter(DataoneFormat.format==dataobject_format).first()
         if not format_obj:
             return HTTPServerError('Invalid format name')
 
@@ -995,7 +995,7 @@ def add_object(request):
         metadata_standard = options['standard']
         metadata_format = options['object_format']
 
-        format_obj = DBSession.query(DataoneFormat).filter(DataoneFormat.name==metadata_format).first()
+        format_obj = DBSession.query(DataoneFormat).filter(DataoneFormat.format==metadata_format).first()
         if not format_obj:
             return HTTPServerError('Invalid format name')
 
@@ -1023,7 +1023,7 @@ def add_object(request):
         scimeta_obj_uuid = data['metadataobject']
         package_format = data['format']
 
-        format_obj = DBSession.query(DataoneFormat).filter(DataoneFormat.name==package_format).first()
+        format_obj = DBSession.query(DataoneFormat).filter(DataoneFormat.format==package_format).first()
         if not format_obj:
             return HTTPServerError('Invalid format name')
 
