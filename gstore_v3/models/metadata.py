@@ -260,7 +260,10 @@ class DatasetMetadata(Base):
             params.update({"service-type": svc})
             params.update({"service-version": vsn})
             #params.update({"service-base-url": '%s%s/services/ogc' % (metadata_info['base_url'], d.uuid) if 'service' in metadata_info else ''})
-            params.update({"service-base-url": metadata_info['base_url'] + build_ogc_url(metadata_info['app'], 'datasets', d.uuid, svc, vsn) if 'service' in metadata_info else ''})
+
+            #strip off the query params for this request 
+            #TODO: change the builder to not include query params maybe
+            params.update({"service-base-url": (metadata_info['base_url'] + build_ogc_url(metadata_info['app'], 'datasets', d.uuid, svc, vsn)).split('?')[0] if 'service' in metadata_info else ''})
 
         if '19115' in out_standard and d.taxonomy in ['vector', 'table']:
             #add the param for the fc link
