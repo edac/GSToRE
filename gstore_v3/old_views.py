@@ -18,14 +18,10 @@ from .models.datasets import *
 @view_config(route_name='home', renderer='templates/home.pt')
 def my_view(request):
     try:
-        #one = DBSession.query(MyModel).filter(MyModel.name=='one').first()
-        #one = DBSession.query(MyModel).filter(MyModel.name=='one').first()
         #get the host url
         host = request.host_url
         g_app = request.script_name[1:]
 
-        #base_url = '%s/%s/apps/%s/datasets/%s' % (host, g_app, app, d.uuid)
-        #base_url = '%s/%s' % (host, g_app)
         base_url = get_current_registry().settings['BALANCER_URL']
         
         one = DBSession.query(Dataset).filter(Dataset.id==143533).first()

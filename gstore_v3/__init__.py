@@ -6,6 +6,7 @@ from pyramid.response import Response
 from pyramid.view import notfound_view_config
 from pyramid.httpexceptions import HTTPNotFound, HTTPNotImplemented
 
+
 from .models import DBSession
 
 #for the cleanup/locking problem
@@ -75,7 +76,8 @@ we shouldn't need this! we have pyramid_tm!
 but apparently we do. otherwise we just generate locks every which way
 until the system dies
 
-and this apparently does jack for the streaming (app_iter) responses
+and this apparently does jack for the streaming (app_iter) 
+responses (OR there is some issue with timing, esp with pgpool)
 '''
 def cleanup_callback(request):
     DBSession.close()
@@ -100,8 +102,9 @@ def main(global_config, **settings):
     dataone_engine = engine_from_config(settings, 'dataone.')
     models.initialize_sql([engine, dataone_engine])
 
-    config.add_static_view('static', 'static', cache_max_age=3600)
+    #config.add_static_view('static', 'static', cache_max_age=3600)
     config.add_static_view(name='xslts', path='gstore_v3:../resources/xslts')
+    config.add_static_view(name='docs', path='gstore_v3:../resources/docs')
 
     #TODO: comment this out for production (or don't copy the stuff that's in the sandbox dir)
     config.add_static_view(name='samples', path='gstore_v3:../resources/samples')

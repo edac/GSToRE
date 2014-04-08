@@ -1,0 +1,262 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+    <title>GSToRE V3 API | Experimental - Datasets</title>
+    <link href="../bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
+    <link href="../docs.css" rel="stylesheet" media="screen">
+
+</head>
+<body>
+    <div id="wrap">
+<div class="navbar navbar-inverse" role="navigation">
+        <div class="container">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="../index.html">GSToRE V3</a>
+            </div>
+            <div class="collapse navbar-collapse">
+                <ul class="nav navbar-nav">
+                    <li><a href="../stable.html">Stable</a></li>
+                    <li class="active"><a href="#">Experimental</a></li>
+                    <li><a href="../architecture.html">Architecture</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container docs">
+        <div class="row">
+            <h1>Datasets</h1>
+
+            <p></p>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12 col-no-padding">
+                <ul>
+                    <li id="preview">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/datasets/{uuid}/mapper</span>
+                                <span class="http-name">Get dataset previewer</span>
+                            </h3>
+                        </div>
+
+                        <div class="http-options">
+                            <p>Basic data preview HTML.</p>
+                            <p class="bg-callouts bg-danger">Note: this functionality will be deprecated soon. Please take advantage of the OGC Services and other streaming data services in any future development.</p>
+
+                            
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                    <tr>
+                                        <td>uuid</td>
+                                        <td>Dataset identifier</td>
+                                        <td>uuid</td>
+                                        <td></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <p>None</p>
+
+                            <h5>Examples</h5>
+                            <p>View the HTML response for the <strong>2013 Jaroso Post Fire Imagery, 32</strong> raster dataset:</p>
+                            <p class="example">/apps/<span class="route-highlight">rgis</span>/datasets/<span class="route-highlight">43db7a5d-67ec-4635-aef6-97131bf390cb</span>/mapper</p>
+
+                            <h4>Response</h4>
+                            <p>The request returns an HTML page containing a basic map preview and dataset information.</p>
+                        </div>
+                    </li>
+
+                    <li id="attributes">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/datasets/{uuid}/attributes.{ext}</span>
+                                <span class="http-name">Get dataset attributes</span>
+                            </h3>
+                        </div>
+
+                        <div class="http-options">
+                            <p>Get the attribute definitions for a vector or tabular dataset.</p>
+                            
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                    <tr>
+                                        <td>uuid</td>
+                                        <td>Dataset identifier</td>
+                                        <td>uuid</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>ext</td>
+                                        <td>format</td>
+                                        <td>string</td>
+                                        <td>json, kml</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <p>None</p>
+
+                            <h5>Examples</h5>
+                            <p>View the JSON response for the <strong>SNOTEL Chamita, NM (Mar, 2014)</strong> vector dataset:</p>
+                            <p class="example">/apps/<span class="route-highlight">rgis</span>/datasets/<span class="route-highlight">2730123d-070c-45ee-8d8d-b5e4df135faf</span>/attributes.<span class="route-highlight">json</span></p>
+
+                            <h4>Response</h4>
+                            <div>
+                                <h5>JSON Schema</h5>
+                                <div class="schema-block">
+                                    <div><span class="schema-object">total</span> (<span class="schema-datatype">integer</span>): number of attributes</div>
+                                    <div><span class="schema-object">results</span> (<span class="schema-datatype">array(dict)</span>): 
+                                        <div class="schema-nested-object">
+                                            <div><span class="schema-object">datatype</span> (<span class="schema-datatype">string</span>): attribute type</div>
+                                            <div><span class="schema-object">description</span> (<span class="schema-datatype">string</span>): description of the attribute, if provided</div>
+                                            <div><span class="schema-object">original_name</span> (<span class="schema-datatype">string</span>): name of the attribute from the original source file (may be modified depending on the limitations of supported file types; see "name")</div>
+                                            <div><span class="schema-object">uuid</span> (<span class="schema-datatype">uuid</span>): attribute identifier</div>
+                                            <div><span class="schema-object">name</span> (<span class="schema-datatype">string</span>): attribute name (shapefile-safe)</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <pre>
+{
+    "total": 19,
+    "results": [
+        {
+            "datatype": "int",
+            "description": "NRCS Internal Site Number",
+            "original_name": "Site Id",
+            "uuid": "aeb97c0a-3c43-4abb-8837-c8f7e1a6f3a8",
+            "name": "site_id"
+        },
+        {
+            "datatype": "string",
+            "description": "Date",
+            "original_name": "Date",
+            "uuid": "c9746566-2942-4357-9b34-a1891eb7eff3",
+            "name": "date"
+        },
+        {
+            "datatype": "double",
+            "description": "Snow Water Equivalent",
+            "original_name": "WTEQ.I-1 (in)",
+            "uuid": "e5a53571-b025-4781-b42e-68a391ac6d4e",
+            "name": "wteqi_1"
+        }
+    ]
+}    
+                                </pre>
+                            </div>
+
+                            <div>
+                                <h5>KML Schema</h5>
+                                <p>Refer to the <a href="https://developers.google.com/kml/documentation/kmlreference#schema">KML Documentation</a> for more information.</p>
+                                <pre>
+&lt;Schema name=&quot;2730123d-070c-45ee-8d8d-b5e4df135faf&quot; id=&quot;2730123d-070c-45ee-8d8d-b5e4df135faf&quot;&gt;
+    &lt;SimpleField type=&quot;int&quot; name=&quot;site_id&quot;&gt;
+        &lt;displayName&gt;site_id&lt;/displayName&gt;
+    &lt;/SimpleField&gt;
+    &lt;SimpleField type=&quot;string&quot; name=&quot;date&quot;&gt;
+        &lt;displayName&gt;date&lt;/displayName&gt;
+    &lt;/SimpleField&gt;
+    &lt;SimpleField type=&quot;string&quot; name=&quot;time&quot;&gt;
+        &lt;displayName&gt;time&lt;/displayName&gt;
+    &lt;/SimpleField&gt;
+    &lt;SimpleField type=&quot;double&quot; name=&quot;wteqi_1&quot;&gt;
+        &lt;displayName&gt;wteqi_1&lt;/displayName&gt;
+    &lt;/SimpleField&gt;
+&lt;/Schema&gt;
+                                </pre>
+                            </div>
+                        </div>
+                    </li>
+
+                    <li id="statistics">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/datasets/{uuid}/statistics.{ext}</span>
+                                <span class="http-name">Get dataset statistics</span>
+                            </h3>
+                        </div>
+
+                        <div class="http-options">
+                            <p>Get basic statistics for a dataset. This includes descriptive statistics such as mean, minimum and maximum for 
+                            numeric fields for tabular of vector data or histograms for raster data.</p>
+                            
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <p>Coming soon.</p>
+
+                            <h5>Query Parameters</h5>
+                            <p>Coming soon.</p>
+
+                            <h5>Examples</h5>
+                            <p>Coming soon.</p>
+
+                            <h4>Response</h4>
+                            <p>Coming soon.</p>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+
+    
+    </div>
+    <footer >
+        <div class="container">
+            <div class="col-sm-6">
+                <p><a href="http://edac.unm.edu">Earth Data Analysis Center</a> &#169; 2014</p>
+                <p><a href="mailto:gstore@edac.unm.edu">gstore[at]edac.unm.edu</a></p>
+                <p><a href="../tos.html">Terms of Service</a></p>
+            </div>
+            <div class="col-sm-6">
+                <img src="../images/EDAC-Banner1_2.png">
+            </div>
+            
+        </div>
+    </footer>
+
+</body>
+</html>

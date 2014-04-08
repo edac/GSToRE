@@ -1,0 +1,184 @@
+html,
+body {
+  height: 100%;
+  /* The html and body elements cannot have any padding or margin. */
+}
+
+/* Wrapper for page content to push down footer */
+#wrap {
+  min-height: 100%;
+  height: auto;
+  /* Negative indent footer by its height */
+  margin: 0 auto -120px;
+  /* Pad bottom by footer height */
+  padding: 0 0 120px;
+}
+
+/* Set the fixed height of the footer here */
+footer {
+  height: 120px;
+  /**background-color: #f5f5f5;**/
+  background-color:#eaeae2;
+  border-top: 1px solid #ccc;
+  padding: 20px;
+}
+
+ul {
+    list-style:none;
+    padding:0;
+}
+
+pre {
+    overflow:auto;
+    word-break: normal;
+    word-wrap: normal;
+    white-space: pre;
+}
+
+kbd {
+    padding: 2px 4px;
+    font-size:90%;
+    color: #fff;
+    background-color: #585858;
+    border-radius:3px;
+    
+}
+
+.navbar {
+    border-radius: 0;
+}
+
+.jumbotron {
+    margin-left:auto;
+    margin-right:auto;
+}
+.jumbotron h1 {
+    font-size: 50px;
+}
+
+
+.col-no-padding {
+    padding-left:0;
+    padding-right:0;
+
+}
+
+.col-no-padding ul {
+    clear:both;
+}
+
+.docs {
+    padding: 20px;
+    color: #585858;
+}
+
+.docs h4, .docs h5 {
+    color: #0f6ab4;
+}
+
+
+
+.http-options {
+    clear:both;
+    /**background-color: #eaeae2;**/
+    padding: 20px;
+    border: 1px solid #cccccc;
+    border-top:none;
+}
+
+div.http-definition {
+    border: 1px solid #cccccc;
+    display: block;
+    clear: none;
+    float: left;
+    width: 100%;
+    margin:0;
+    padding: 0;
+    background-color: #c3d9ec;
+    vertical-align:baseline;
+}
+
+div.http-definition h3 {
+    line-height: 1em;
+    font-size: 14px;
+    margin: 11px 10px 10px 1px; /*this is stupid*/
+}
+
+.http-method {
+    margin-left:-1px;
+    padding: 10px;
+    background-color: #0f6ab4;
+    color: #ffffff;
+}
+.http-path {
+    padding-left: 20px;
+}
+.http-name {
+    float:right;
+}
+
+.example {
+    padding-left: 30px;
+}
+
+.caption {
+    font-size: 12px;    
+}
+
+.route-highlight, .schema-datatype {
+    color: #0877bf;
+}
+
+table.params {
+    width:100%;
+    border-collapse: collapse;
+    border-spacing:0;
+}
+table.params th {
+    color: #666666;
+    padding: 10px 20px;
+    border-bottom: 1px solid #cccccc;
+}
+table.params td {
+    padding: 10px 20px;
+    border-bottom: 1px solid #cccccc;
+}
+
+/** highlight the parameter **/
+table.params tr td:first-of-type {
+    /**font-weight: bold;**/
+}    
+
+table.params tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.schema-block {
+    padding-left:20px;
+}
+
+.schema-object {
+    font-weight: bold;
+}
+
+.schema-nested-object {
+    padding-left:20px;
+}
+
+.bg-callouts {
+    padding:10px 15px 15px 15px;
+}
+
+.bg-success {
+    background-color: #dff0d8;
+}
+.bg-warning {
+    background-color:#fcf8e3;
+}
+.bg-danger {
+    background-color:#f2dede;
+}
+
+.glyphicon {
+    padding:5px;
+}

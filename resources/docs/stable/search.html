@@ -1,0 +1,752 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+    <title>GSToRE V3 API | Stable - Search</title>
+    <link href="../bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
+    <link href="../docs.css" rel="stylesheet" media="screen">
+
+</head>
+<body>
+    <div id="wrap">
+        <div class="navbar navbar-inverse" role="navigation">
+        <div class="container">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="../index.html">GSToRE V3</a>
+            </div>
+            <div class="collapse navbar-collapse">
+                <ul class="nav navbar-nav">
+                    <li class="active"><a href="#">Stable</a></li>
+                    <li><a href="../experimental.html">Experimental</a></li>
+                    <li><a href="../architecture.html">Architecture</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="container docs">
+    <div class="row">
+        <h1>Search</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-12 col-no-padding">
+            <ul>
+                <li id="search-objects">
+                    <div>
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/search/{datatype}.{ext}</span>
+                                <span class="http-name">Search for data objects</span>
+                            </h3>
+                        </div>
+                        <div class="http-options">
+                            <p>
+                                Search for data objects within an application. 
+                            </p>
+                            <p>
+                                Search results are provided as a JSON response or as a KML file. The KML file 
+                                provides the data object's bounding box, title and service definition URL for
+                                any geospatial object. 
+                            </p>
+                        
+                            <h4>Request Parameters</h4>
+
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                    <tr>
+                                        <td>datatype</td>
+                                        <td>Type of object to include in the search</td>
+                                        <td>string</td>
+                                        <td>datasets, collections, tileindexes (as unordered, comma-delimited list; 1+)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>ext</td>
+                                        <td>Output format</td>
+                                        <td>string</td>
+                                        <td>json, kml</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                        <th>Required</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>version</td>
+                                        <td>Version of the response JSON to return</td>
+                                        <td>integer</td>
+                                        <td>2 or 3</td>
+                                        <td>F (defaults to 2; strongly encouraged to use 3)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>limit</td>
+                                        <td>Number of data objects to return</td>
+                                        <td>integer</td>
+                                        <td></td>
+                                        <td>F (defaults to 15)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>offset</td>
+                                        <td>Start of result set</td>
+                                        <td>integer</td>
+                                        <td></td>
+                                        <td>F (defaults to 0)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>dir</td>
+                                        <td>Sort order of the result set</td>
+                                        <td>string</td>
+                                        <td>ASC or DESC</td>
+                                        <td>F (defaults to DESC)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>sort</td>
+                                        <td>Element to use when sorting the result set.</td>
+                                        <td>string</td>
+                                        <td>lastupdate or text</td>
+                                        <td>F (defaults to date published or georelevance if performing a spatial search)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>start_time</td>
+                                        <td>Start date for date added comparison.</td>
+                                        <td>string</td>
+                                        <td>yyyyMMdd (UTC)</td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>end_time</td>
+                                        <td>End date for date added comparison.</td>
+                                        <td>string</td>
+                                        <td>yyyyMMdd (UTC)</td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>valid_start</td>
+                                        <td>Start date for valid date range comparison</td>
+                                        <td>string</td>
+                                        <td>yyyyMMdd (UTC)</td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>valid_end</td>
+                                        <td>End date for valid date range comparison</td>
+                                        <td>string</td>
+                                        <td>yyyyMMdd (UTC)</td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>box</td>
+                                        <td>Bounding box coordinates as a comma-delimited list</td>
+                                        <td>string</td>
+                                        <td>minx,minyy,maxx,maxy</td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>epsg</td>
+                                        <td>EPSG code of the provided BOX geometry</td>
+                                        <td>string</td>
+                                        <td></td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>theme</td>
+                                        <td>Theme keyword (see <a href="#search-categories">Return category facets</a>)</td>
+                                        <td>string</td>
+                                        <td></td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>subtheme</td>
+                                        <td>Subtheme keyword (see <a href="#search-categories">Return category facets</a>)</td>
+                                        <td>string</td>
+                                        <td></td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>groupname</td>
+                                        <td>Group name keyword (see <a href="#search-categories">Return category facets</a>)</td>
+                                        <td>string</td>
+                                        <td></td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>query</td>
+                                        <td>Keyword term(s)</td>
+                                        <td>string</td>
+                                        <td></td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>format</td>
+                                        <td>Filter by supported format type, ex. shp, tif or pdf</td>
+                                        <td>string</td>
+                                        <td></td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>service</td>
+                                        <td>Filter by supported service type</td>
+                                        <td>string</td>
+                                        <td>wms, wfs, wcs</td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>taxonomy</td>
+                                        <td>Type of dataset</td>
+                                        <td>string</td>
+                                        <td>file, vector, geoimage, table or service</td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>geomtype</td>
+                                        <td>Geometry type (only supported for the taxonomy=vector filter)</td>
+                                        <td>string</td>
+                                        <td>any valid OGR geometry type</td>
+                                        <td>F</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p class="bg-callouts bg-warning">Encode spaces as <kbd>+</kbd> if providing a phrase for the query, theme, subtheme, and groupname parameters.</p>
+
+                            <h5>Examples</h5>
+
+                            <p>Search for RGIS datasets in Digital Orthophotography and return results as JSON:</p>
+                            <p class="example">/apps/<span class="route-highlight">rgis</span>/search/<span class="route-highlight">datasets</span>.<span class="route-highlight">json</span>?version=3&limit=10&offset=0&theme=Digital+Orthopohotography</p>
+                            
+                            <p>Search for NM EPSCoR datasets and collections that contain the keyword "Quality" and return results as JSON:</p>
+                            <p class="example">/apps/<span class="route-highlight">epscor</span>/search/<span class="route-highlight">datasets,collections</span>.<span class="route-highlight">json</span>?version=3&limit=10&offset=0&query=Quality</p>
+
+                            <p>Search for RGIS datasets in Digital Orthophotography and return the first 10 results as a KML file:</p>
+                            <p class="example">/apps/<span class="route-highlight">rgis</span>/search/<span class="route-highlight">datasets</span>.<span class="route-highlight">kml</span>?limit=10&offset=0&theme=Digital+Orthopohotography</p>
+
+                            <h4>Response</h4>
+                            <div>
+                                <p>JSON response containing a raster, vector and file dataset. See specific data object reference for JSON schema specifications.
+                                </p>
+
+                                <h5>Schema</h5>
+                                <p>This refers only to the JSON response.</p>
+                                <div class="schema-block">
+                                    <div><span class="schema-object">total</span> (<span class="schema-datatype">integer</span>): number of data objects matching the filters</div>
+                                    <div><span class="schema-object">subtotal</span> (<span class="schema-datatype">integer</span>): number of data objects returned in the response</div>
+                                    <div><span class="schema-object">results</span> (<span class="schema-datatype">array[dict]</span>): [see data object reference(s) for schema specifications]</div>
+                                </div>
+                                
+                                <pre>
+{
+    "total": 3,
+    "subtotal": 3,
+    "results": [
+        {
+            "downloads": [{"tif": "http://gstore.unm.edu/apps/rgis/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/treslagunasfire2013_1.original.tif"}],
+            "lastupdate": "20140325",
+            "uuid": "233adca8-5131-4ca1-aac1-669f6be4c530",
+            "taxonomy": "geoimage",
+            "description": "2013 Tres Lagunas Post Fire, 1",
+            "metadata": [
+                {"FGDC-STD-012-2002": {
+                    "xml": "http://gstore.unm.edu/apps/rgis/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/metadata/FGDC-STD-012-2002.xml",
+                    "html": "http://gstore.unm.edu/apps/rgis/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/metadata/FGDC-STD-012-2002.html"
+                }},
+                {"ISO-19115:2003": {
+                    "xml": "http://gstore.unm.edu/apps/rgis/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/metadata/ISO-19115:2003.xml",
+                    "html": "http://gstore.unm.edu/apps/rgis/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/metadata/ISO-19115:2003.html"
+                }},
+                {
+                    "ISO-19119:WMS": {"xml": "http://gstore.unm.edu/apps/rgis/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/metadata/ISO-19119:WMS.xml"},
+                    "ISO-19119:WCS": {"xml": "http://gstore.unm.edu/apps/rgis/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/metadata/ISO-19119:WCS.xml"}
+                }
+            ],
+            "metadata-modified": {"all": "2014-03-26T03:56:16Z"},
+            "spatial": {
+                "epsg": 26913,
+                "bbox": [
+                    -105.719133333,
+                    35.7587972222,
+                    -105.697138889,
+                    35.7738111111
+                ]
+            },
+            "services": [
+                {"wms": "http://gstore.unm.edu/apps/rgis/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/services/ogc/wms?SERVICE=wms&REQUEST=GetCapabilities&VERSION=1.1.1"},
+                {"wcs": "http://gstore.unm.edu/apps/rgis/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/services/ogc/wcs?SERVICE=wcs&REQUEST=GetCapabilities&VERSION=1.1.2"}
+            ],
+            "preview": "http://gstore.unm.edu/apps/rgis/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/mapper",
+            "type": "dataset",
+            "id": 367375,
+            "categories": [{
+                "subtheme": "2013 Wildfire Data",
+                "theme": "Digital Orthophotography",
+                "groupname": "Tres Lagunas - Post Fire"
+            }],
+            "name": "treslagunasfire2013_1"
+        },
+        {
+            "downloads": [{"zip": "http://gstore.unm.edu/apps/rgis/datasets/c32e7830-4ee0-4624-8b9c-c386cad3cff4/nm_usfws_lcc.original.zip"}],
+            "lastupdate": "20140128",
+            "uuid": "c32e7830-4ee0-4624-8b9c-c386cad3cff4",
+            "taxonomy": "file",
+            "description": "Landscape Conservative Cooperatives for New Mexico",
+            "metadata-modified": {"all": "2014-01-29T03:01:31Z"},
+            "spatial": {
+                "epsg": 4326,
+                "bbox": [
+                    -109.050183,
+                    31.332177,
+                    -103.001973,
+                    37.000299
+                ]
+            },
+            "services": [],
+            "metadata": [
+                {"FGDC-STD-001-1998": {
+                    "xml": "http://gstore.unm.edu/apps/rgis/datasets/c32e7830-4ee0-4624-8b9c-c386cad3cff4/metadata/FGDC-STD-001-1998.xml",
+                    "html": "http://gstore.unm.edu/apps/rgis/datasets/c32e7830-4ee0-4624-8b9c-c386cad3cff4/metadata/FGDC-STD-001-1998.html"
+                }},
+                {"ISO-19115:2003": {
+                    "xml": "http://gstore.unm.edu/apps/rgis/datasets/c32e7830-4ee0-4624-8b9c-c386cad3cff4/metadata/ISO-19115:2003.xml",
+                    "html": "http://gstore.unm.edu/apps/rgis/datasets/c32e7830-4ee0-4624-8b9c-c386cad3cff4/metadata/ISO-19115:2003.html"
+                }},
+                {"ISO-19110": {"xml": "http://gstore.unm.edu/apps/rgis/datasets/c32e7830-4ee0-4624-8b9c-c386cad3cff4/metadata/ISO-19110.xml"}}
+            ],
+            "type": "dataset",
+            "id": 354872,
+            "categories": [{
+                "subtheme": "General",
+                "theme": "Boundaries",
+                "groupname": "New Mexico"
+            }],
+            "name": "nm_usfws_lcc"
+        },
+        {
+            "downloads": [{
+                "shp": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/scan_201402_2015.derived.shp",
+                "zip": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/scan_201402_2015.original.zip",
+                "gml": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/scan_201402_2015.derived.gml",
+                "kml": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/scan_201402_2015.derived.kml",
+                "geojson": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/scan_201402_2015.derived.geojson",
+                "json": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/scan_201402_2015.derived.json",
+                "csv": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/scan_201402_2015.derived.csv",
+                "xls": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/scan_201402_2015.derived.xls"
+            }],
+            "lastupdate": "20140303",
+            "uuid": "bf9e4928-d76c-4973-addd-b3efa96c70c5",
+            "taxonomy": "vector",
+            "description": "SCAN Adams Ranch, NM (Feb, 2014)",
+            "valid_dates": {
+                "start": "20140201",
+                "end": "20140301"
+            },
+            "metadata": [
+                {"FGDC-STD-001-1998": {
+                    "xml": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/metadata/FGDC-STD-001-1998.xml",
+                    "html": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/metadata/FGDC-STD-001-1998.html"
+                }},
+                {"ISO-19115:2003": {
+                    "xml": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/metadata/ISO-19115:2003.xml",
+                    "html": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/metadata/ISO-19115:2003.html"
+                }},
+                {
+                    "ISO-19119:WMS": {"xml": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/metadata/ISO-19119:WMS.xml"},
+                    "ISO-19119:WFS": {"xml": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/metadata/ISO-19119:WFS.xml"}
+                },
+                {"ISO-19110": {"xml": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/metadata/ISO-19110.xml"}}
+            ],
+            "metadata-modified": {"all": "2014-03-03T23:40:37Z"},
+            "spatial": {
+                "epsg": 4269,
+                "bbox": [
+                    -105.416666667,
+                    34.25,
+                    -105.416666667,
+                    34.25
+                ]
+            },
+            "services": [
+                {"wms": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/services/ogc/wms?SERVICE=wms&REQUEST=GetCapabilities&VERSION=1.1.1"},
+                {"wfs": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/services/ogc/wfs?SERVICE=wfs&REQUEST=GetCapabilities&VERSION=1.0.0"}
+            ],
+            "preview": "http://gstore.unm.edu/apps/rgis/datasets/bf9e4928-d76c-4973-addd-b3efa96c70c5/mapper",
+            "type": "dataset",
+            "id": 363331,
+            "categories": [{
+                "subtheme": "SCAN",
+                "theme": "Climate",
+                "groupname": "New Mexico"
+            }],
+            "name": "scan_201402_2015"
+        }
+    ]
+}
+
+                                </pre>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+
+                <li id="search-collections">
+                    <div>
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/search/collection/{uuid}/datasets.{ext}</span>
+                                <span class="http-name">Search for datasets within a collection</span>
+                            </h3>
+                        </div>
+                        <div class="http-options">
+                            <p></p>
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                    <tr>
+                                        <td>uuid</td>
+                                        <td>Collection identifier</td>
+                                        <td>uuid</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>ext</td>
+                                        <td>Response format</td>
+                                        <td>string</td>
+                                        <td>json</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <p>Note: the collection filters are the same as the data object search filters. See <a href="#search-objects">Search for data objects</a> for more information.</p>
+
+                            <h5>Examples</h5>
+                            <p>Coming soon.</p>
+
+                       </div>
+                        
+                    </div>
+                </li>
+                
+                <li id="search-categories">
+                    <div>
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/search/categories.json</span>
+                                <span class="http-name">Return category facets</span>
+                            </h3>
+                        </div>
+                        <div class="http-options">
+                            <p>Return the facets available at the specified level and description.</p>
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                        <th>Required</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>node</td>
+                                        <td>Facet definition</td>
+                                        <td>string</td>
+                                        <td></td>
+                                        <td>F</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p class="bg-callouts bg-warning">Encode spaces as <kbd>+</kbd> if providing a phrase for the node parameter.</p>
+                            <p class="bg-callouts bg-warning">Separate the theme, subtheme, groupname terms (in that order) with <kbd>__|__</kbd> for the node parameter.</p>
+
+                            <h5>Examples</h5>
+                            <p>Return all root facets for RGIS:</p>
+                            <p class="example">/apps/<span class="route-highlight">rgis</span>/search/categories.json</p>
+
+                            <p>Return any child facets for Socioeconomic Data in RGIS:</p>
+                            <p class="example">/apps/<span class="route-highlight">rgis</span>/search/categories.json?node=Socioeconomic+Data</p>
+
+                            <p>Return any child facets for Boundaries/General in RGIS:</p>
+                            <p class="example">/apps/<span class="route-highlight">rgis</span>/search/categories.json?node=Boundaries__|__General</p>
+
+                            <h4>Response</h4>
+                            <div>
+                                <h5>Schema</h5>
+                                <div class="schema-block">
+                                    <div><span class="schema-object">total</span> (<span class="schema-datatype">integer</span>): number number of facet elements returned</div>
+                                    <div><span class="schema-object">results</span> (<span class="schema-datatype">array[dict]</span>): 
+                                        <div class="schema-nested-object">
+                                            <div><span class="schema-object">text</span> (<span class="schema-datatype">string</span>): facet name</div>
+                                            <div><span class="schema-object">leaf</span> (<span class="schema-datatype">boolean</span>): indicates facet order; if true, the facet has no sub-facets</div>
+                                            <div><span class="schema-object">id</span> (<span class="schema-datatype">string</span>): facet hierarchy</div>
+                                            <div><span class="schema-object">cls</span> (<span class="schema-datatype">string</span>): </div>
+                                        </div>
+                                    </div>
+                                </div>
+            
+                            
+                                <p>Response for any higher order facet (will contain children):</p>
+                                <pre>
+{
+    "total": 14,
+    "results": [
+        {
+            "text": "American Community Survey (ACS) - Tabular",
+            "leaf": false,
+            "id": "Socioeconomic Data__|__American Community Survey (ACS) - Tabular"
+        },
+        {
+            "text": "Annual City Data",
+            "leaf": false,
+            "id": "Socioeconomic Data__|__Annual City Data"
+        }
+    ]
+}
+                                </pre>
+
+                                <p>Response for lowest order facet (no children):</p>
+                                <pre>
+{
+    "total": 11,
+    "results": [
+        {
+            "text": "Accommodation and Food Services",
+            "leaf": true,
+            "id": "Socioeconomic Data__|__Economic Census 2002__|__Accommodation and Food Services",
+            "cls": "folder"
+        },
+        {
+            "text": "Administrative & Support & Waste Management & Remediation Service",
+            "leaf": true,
+            "id": "Socioeconomic Data__|__Economic Census 2002__|__Administrative & Support & Waste Management & Remediation Service",
+            "cls": "folder"
+        }
+    ]
+}
+                                </pre>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+                <li id="search-geolookups">
+                    <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/search/{geolookup}.json</span>
+                                <span class="http-name">Search geospatial lookups</span>
+                            </h3>
+                        </div>
+                        <div class="http-options">
+                            <p>Search one of the supported geospatial lookup sets (USGS quad names, GNIS placenames, etc) for bounding box 
+                            identification. Supports the data object spatial searches.
+                            </p>
+                            <p>Note: occasionally USGS quad names change. Whenever possible, the set is updated to reflect those changes.</p>
+                            <p>Note: this service is limited to New Mexico.</p>
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                    <tr>
+                                        <td>geolookup</td>
+                                        <td>Geospatial lookup set</td>
+                                        <td>string</td>
+                                        <td>nm_quads, nm_gnis, nm_counties</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                        <th>Required</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>limit</td>
+                                        <td>Number of data objects to return</td>
+                                        <td>integer</td>
+                                        <td></td>
+                                        <td>F (defaults to 20)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>offset</td>
+                                        <td>Start of result set</td>
+                                        <td>integer</td>
+                                        <td></td>
+                                        <td>F (defaults to 0)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>dir</td>
+                                        <td>Sort order of the result set</td>
+                                        <td>string</td>
+                                        <td>ASC or DESC</td>
+                                        <td>F (defaults to DESC)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>query</td>
+                                        <td>Keyword search</td>
+                                        <td>string</td>
+                                        <td></td>
+                                        <td>F (encode spaces as "+")</td>
+                                    </tr>
+                                    <tr>
+                                        <td>epsg</td>
+                                        <td>EPSG code for the result set bounding boxes.</td>
+                                        <td>integer</td>
+                                        <td></td>
+                                        <td>F (defaults to WGS84)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p class="bg-callouts bg-warning">Encode spaces as <kbd>+</kbd> if providing a phrase for the query parameter.</p>
+
+                            <h5>Examples</h5>
+                            <p>Return the first 20 USGS quads containing "Clovis" in any alias for RGIS:</p>
+                            <p class="example">/apps/<span class="route-highlight">rgis</span>/search/<span class="route-highlight">nm_quads</span>.json?query=clovis&limit=20</p>
+
+                            <h4>Response</h4>
+                            <div>
+                                <h5>Schema</h5>
+                                <div class="schema-block">
+                                    <div><span class="schema-object">results</span> (<span class="schema-datatype">array[dict]</span>): 
+                                        <div class="schema-nested-object">
+                                            <div><span class="schema-object">box</span> (<span class="schema-datatype">array[double]</span>): bounding box coordinates as minx, miny, maxx, maxy</div>
+                                            <div><span class="schema-object">text</span> (<span class="schema-datatype">string</span>): object name</div>
+                                        </div>
+                                    </div>
+                                </div>
+            
+                            
+                                <p>Response for a quad name search:</p>
+                                <pre>
+{"results": [
+    {
+        "box": [
+            -106.375,
+            32.75,
+            -106.25,
+            32.875
+        ],
+        "text": "Heart of the Sands - 32106-G3"
+    },
+    {
+        "box": [
+            -106.375,
+            32.8749961853027,
+            -106.25,
+            33.0000038146973
+        ],
+        "text": "Heart of the Sands NE - 32106-H3"
+    }
+]}
+                                </pre>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+    </div>
+    <footer >
+        <div class="container">
+            <div class="col-sm-6">
+                <p><a href="http://edac.unm.edu">Earth Data Analysis Center</a> &#169; 2014</p>
+                <p><a href="mailto:gstore@edac.unm.edu">gstore[at]edac.unm.edu</a></p>
+                <p><a href="../tos.html">Terms of Service</a></p>
+            </div>
+            <div class="col-sm-6">
+                <img src="../images/EDAC-Banner1_2.png">
+            </div>
+            
+        </div>
+    </footer>
+
+</body>
+</html>

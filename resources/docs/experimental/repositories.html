@@ -1,0 +1,354 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+    <title>GSToRE V3 API | Experimental - Repositories</title>
+    <link href="../bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
+    <link href="../docs.css" rel="stylesheet" media="screen">
+
+</head>
+<body>
+    <div id="wrap">
+<div class="navbar navbar-inverse" role="navigation">
+        <div class="container">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="../index.html">GSToRE V3</a>
+            </div>
+            <div class="collapse navbar-collapse">
+                <ul class="nav navbar-nav">
+                    <li><a href="../stable.html">Stable</a></li>
+                    <li class="active"><a href="#">Experimental</a></li>
+                    <li><a href="../architecture.html">Architecture</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container docs">
+        <div class="row">
+            <h1>Repositories</h1>
+            <p>The repository API is intended as a precursor to CSW services and to support data object registration in external repositories. 
+            Some or all of an application's data holdings can be included. In addition, the documentation standard preferred for use in registering 
+            the data in a repository can be specified for the application and repository. For example, App A could provide ISO-19115 for DATA.gov but
+            EML for DataONE.
+            </p>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12 col-no-padding">
+                <ul>
+                    <li id="list-repos">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/repositories.json</span>
+                                <span class="http-name">Get supported repositories for application</span>
+                            </h3>
+                        </div>
+
+                        <div class="http-options">
+                            <p>Get a list of external repositories available for this application.</p>
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <p>None</p>
+
+                            <h5>Examples</h5>
+                            <p>View the list of supported repositories for RGIS data objects:</p>
+                            <p class="example">/apps/<span class="route-highlight">rgis</span>/repositories.json</p>
+
+                            <h4>Response</h4>
+                            <div>
+                                <h5>JSON Schema</h5>
+                                <div class="schema-block">
+                                    <div><span class="schema-object">{repository}</span> (<span class="schema-datatype">dict</span>): 
+                                        <div class="schema-nested-object">
+                                            <div><span class="schema-object">url</span> (<span class="schema-datatype">string</span>): URL for the repository</div>
+                                            <div><span class="schema-object">description</span> (<span class="schema-datatype">string</span>): brief description of the repository</div>
+                                            <div><span class="schema-object">standards</span> (<span class="schema-datatype">array(string)</span>): list of supported documentation standards</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <pre>
+{"DATA.gov": {
+    "url": "http://www.data.gov/",
+    "description": null,
+    "standards": ["ISO-19115:2003"]
+}}
+                                </pre>
+                            </div>
+                        </div>
+                    </li>
+                    <li id="identify-repo">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/repository/{repo}.json</span>
+                                <span class="http-name">Get the repository description</span>
+                            </h3>
+                        </div>
+
+                        <div class="http-options">
+                            <p>Return the repository description.</p>
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                    <tr>
+                                        <td>repo</td>
+                                        <td>Repository alias</td>
+                                        <td>string</td>
+                                        <td></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <p>None</p>
+
+                            <h5>Examples</h5>
+                            <p>Get the description for the GEOSS repository for the ELSEWeb application:</p>
+                            <p class="example">/apps/<span class="route-highlight">elseweb</span>/repository/<span class="route-highlight">GEOSS</span>.json</p>
+
+                            <h4>Response</h4>
+                            <div>
+                                <h5>JSON Schema</h5>
+                                <div class="schema-block">
+                                    <div><span class="schema-object">url</span> (<span class="schema-datatype">string</span>): URL for the repository</div>
+                                    <div><span class="schema-object">description</span> (<span class="schema-datatype">string</span>): brief description of the repository</div>
+                                    <div><span class="schema-object">standards</span> (<span class="schema-datatype">array(string)</span>): list of supported documentation standards</div>
+                                    <div><span class="schema-object">uuid</span> (<span class="schema-datatype">string</span>): identifier</div>
+                                    <div><span class="schema-object">name</span> (<span class="schema-datatype">string</span>): name</div>
+                                </div>
+                                <pre>
+{
+    "url": "http://www.earthobservations.org/gci_gci.shtml",
+    "description": null,
+    "standards": ["ISO-19119"],
+    "uuid": "7b0ca48c-3303-41c0-b5d7-e64a34a37115",
+    "name": "GEOSS"
+}                        
+                                </pre>
+                            </div>
+                           
+                        </div>
+                    </li>
+
+                    <li id="search-repo">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/repository/{uuid}/{doctypes}/{standard}.{ext}</span>
+                                <span class="http-name">Search repository by documentation standard</span>
+                            </h3>
+                        </div>
+
+                        <div class="http-options">
+                            <p>Returns a list of data objects available to this repository and documentation representation.</p>
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                    <tr>
+                                        <td>uuid</td>
+                                        <td>Repository identifier</td>
+                                        <td>uuid</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>doctypes</td>
+                                        <td>Data object types</td>
+                                        <td>string</td>
+                                        <td>datasets, collections, tileindexes (as comma-delimited list)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>standard</td>
+                                        <td>Documentation standard</td>
+                                        <td>string</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>ext</td>
+                                        <td>Format</td>
+                                        <td>string</td>
+                                        <td>json</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                        <th>Required</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>limit</td>
+                                        <td></td>
+                                        <td>integer</td>
+                                        <td></td>
+                                        <td>F (defaults to 20)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>offset</td>
+                                        <td></td>
+                                        <td>integer</td>
+                                        <td></td>
+                                        <td>F (defaults to 0)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>changed</td>
+                                        <td>Filter by the date the documentation was changed for a data object</td>
+                                        <td>string</td>
+                                        <td>{before|after}:yyyyMMdd</td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>added</td>
+                                        <td>Filter by the date the documentation was added for a data object</td>
+                                        <td>string</td>
+                                        <td>{before|after}:yyyyMMdd</td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>changedOrAdded</td>
+                                        <td>Filter by the date the documentation was changed or added for a data object</td>
+                                        <td>string</td>
+                                        <td>{before|after}:yyyyMMdd</td>
+                                        <td>F</td>
+                                    </tr>
+                                    <tr>
+                                        <td>changedAndAdded</td>
+                                        <td>Filter by the date the documentation was changed for a data object or the date a documentation record was added for a data object</td>
+                                        <td>string</td>
+                                        <td>{before|after}:yyyyMMdd</td>
+                                        <td>F</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p>Note: including both the changed and added query parameters is effectively an AND filter. Use the combined changedAndAdded to filter based on the same 
+                            datetime and order.
+                            </p>
+
+                            <h5>Examples</h5>
+                            <p>Return the most recently added or modified documentation records for datasets in the ELSEWeb GEOSS repository:</p>
+                            <p class="example">/apps/<span class="route-highlight">elseweb</span>/repository/<span class="route-highlight">GEOSS</span>/<span class="route-highlight">datasets</span>/<span class="route-highlight">ISO-19119</span>.<span class="route-highlight">json</span></p>
+
+                            <p>Return the last 10 documentation records that were added or modified after March 1, 2014, for datasets in the ELSEWeb GEOSS repository:</p>
+                            <p class="example">/apps/<span class="route-highlight">elseweb</span>/repository/<span class="route-highlight">GEOSS</span>/<span class="route-highlight">datasets</span>/<span class="route-highlight">ISO-19119</span>.<span class="route-highlight">json</span>?changedOrAdded=after:20140301&limit=10</p>
+
+                            <h4>Response</h4>
+                            <div>
+                                <h5>JSON Schema</h5>
+                                <div class="schema-block">
+                                    <div><span class="schema-object">total</span> (<span class="schema-datatype">integer</span>): number of data objects possible</div>
+                                    <div><span class="schema-object">results</span> (<span class="schema-datatype">array(dict)</span>): 
+                                        <div class="schema-nested-object">
+                                            <div><span class="schema-object">url</span> (<span class="schema-datatype">string</span>): URL for the documentation representation</div>
+                                            <div><span class="schema-object">date_added</span> (<span class="schema-datatype">timestamp</span>): timestamp (yyyyMMdd) documentation added to the object</div>
+                                            <div><span class="schema-object">date_changed</span> (<span class="schema-datatype">timestamp</span>): timestamp (yyyyMMdd) object's documentation was modified</div>
+                                            <div><span class="schema-object">{doctype}</span> (<span class="schema-datatype">uuid</span>): object identifier (key as the data object type: dataset, collection, etc)</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <pre>
+{
+    "total": 6656,
+    "results": [
+        {
+            "url": "http://----------------/apps/elseweb/datasets/a14f6223-a394-47dd-9b0f-8a32dbc41364/metadata/ISO-19119.xml",
+            "date_added": "20130419",
+            "date_modified": "20130419",
+            "dataset": "a14f6223-a394-47dd-9b0f-8a32dbc41364"
+        },
+        {
+            "url": "http://----------------/apps/elseweb/datasets/93aefd99-cab9-4ee3-a87f-a37036a0064b/metadata/ISO-19119.xml",
+            "date_added": "20130419",
+            "date_modified": "20130419",
+            "dataset": "93aefd99-cab9-4ee3-a87f-a37036a0064b"
+        }
+    ]
+}
+                                </pre>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+
+    
+    </div>
+    <footer >
+        <div class="container">
+            <div class="col-sm-6">
+                <p><a href="http://edac.unm.edu">Earth Data Analysis Center</a> &#169; 2014</p>
+                <p><a href="mailto:gstore@edac.unm.edu">gstore[at]edac.unm.edu</a></p>
+                <p><a href="../tos.html">Terms of Service</a></p>
+            </div>
+            <div class="col-sm-6">
+                <img src="../images/EDAC-Banner1_2.png">
+            </div>
+            
+        </div>
+    </footer>
+
+</body>
+</html>

@@ -1,0 +1,287 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+    <title>GSToRE V3 API | Experimental - Collections</title>
+    <link href="../bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
+    <link href="../docs.css" rel="stylesheet" media="screen">
+
+</head>
+<body>
+    <div id="wrap">
+<div class="navbar navbar-inverse" role="navigation">
+        <div class="container">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="../index.html">GSToRE V3</a>
+            </div>
+            <div class="collapse navbar-collapse">
+                <ul class="nav navbar-nav">
+                    <li><a href="../stable.html">Stable</a></li>
+                    <li class="active"><a href="#">Experimental</a></li>
+                    <li><a href="../architecture.html">Architecture</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container docs">
+        <div class="row">
+            <h1>Collections</h1>
+
+            <p></p>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12 col-no-padding">
+                <ul>
+                    <li id="description">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/collections/{uuid}/services.json</span>
+                                <span class="http-name">Get collection description</span>
+                            </h3>
+                        </div>
+
+                        <div class="http-options">
+                            <p>Retrieve the collection service description. This contains information regarding the services available, the documentation options, and the dataset set.</p>
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                    <tr>
+                                        <td>uuid</td>
+                                        <td>Collection identifier</td>
+                                        <td>uuid</td>
+                                        <td></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <p>Coming soon.</p>
+
+                            <h5>Examples</h5>
+                            <p>Coming soon.</p>
+
+                            <h4>Response</h4>
+                            <p>Coming soon.</p>
+                        </div>
+                    </li>
+                    
+                    <li id="metadata">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/collections/{uuid}/metadata/{standard}.{ext}</span>
+                                <span class="http-name">Download collection documentation</span>
+                            </h3>
+                        </div>
+
+                        <div class="http-options">
+                            <p>Download the documentation for the specified collection.</p>
+                            <p>Currently, GSToRE includes support only for ISO-19115:DS (Data Series) records for collection documentation. </p>
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                    <tr>
+                                        <td>uuid</td>
+                                        <td>Collection identifier</td>
+                                        <td>uuid</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>standard</td>
+                                        <td>Documentation standard</td>
+                                        <td>string</td>
+                                        <td>ISO-19115:DS</td>
+                                    </tr>
+                                    <tr>
+                                        <td>ext</td>
+                                        <td>Documentation format</td>
+                                        <td>string</td>
+                                        <td>xml</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <p>Coming soon.</p>
+
+                            <h5>Examples</h5>
+                            <p>Coming soon.</p>
+
+                            <h4>Response</h4>
+                            <p>Coming soon.</p>
+                        </div>
+                    </li>    
+                    
+                    <li id="footprint">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/collections/{uuid}/footprint.{ext}</span>
+                                <span class="http-name">Get the collection's footprint</span>
+                            </h3>
+                        </div>
+
+                        <div class="http-options">
+                            <p>Get the collection's footprint as one of the supported spatial formats.</p>
+                            <p>Coming soon.</p>
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                    <tr>
+                                        <td>uuid</td>
+                                        <td>Collection identifier</td>
+                                        <td>uuid</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>ext</td>
+                                        <td>format</td>
+                                        <td>string</td>
+                                        <td>kml, geojson, gml</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <p>Coming soon.</p>
+
+                            <h5>Examples</h5>
+                            <p>Coming soon.</p>
+
+                            <h4>Response</h4>
+                            <p>Coming soon.</p>
+                        </div>
+                    </li>
+
+                    <li id="tileindex">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/collections/{uuid}/services/ogc/{wxs}</span>
+                                <span class="http-name">Access WxS service</span>
+                            </h3>
+                        </div>
+
+                        <div class="http-options">
+                            <p>Access the collection data via WxS services. Service availability depends on the types of data included in the collection and is
+                            limited to those collections containing raster and/or vector datasets. As such, a collection's WxS may have multiple layers, including tile index layers.</p>
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                    <tr>
+                                        <td>uuid</td>
+                                        <td>Collection identifier</td>
+                                        <td>uuid</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>wxs</td>
+                                        <td>OGC Service Type</td>
+                                        <td>string</td>
+                                        <td>wms, wfs, wcs</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <p>GSToRE uses MapServer to provide OGC services. Please see <a href="http://mapserver.org/documentation.html">MapServer</a> for more information regarding the required query parameters and their definitions.
+                            </p>
+                            <p>To identify which OGC services are supported for a given collection, please refer to the collection's service response (<a href="#description">Get collection description</a>). This information can also be found in the collection's documentation (<a href="#metadata">Download collection documentation</a>).</p>
+
+                            <h5>Examples</h5>
+                            <p>Coming soon.</p>
+
+                            <h4>Response</h4>
+                            <p>The structure of the response varies depending on the OGC service and query parameters selected. </p>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+
+    
+    </div>
+    <footer >
+        <div class="container">
+            <div class="col-sm-6">
+                <p><a href="http://edac.unm.edu">Earth Data Analysis Center</a> &#169; 2014</p>
+                <p><a href="mailto:gstore@edac.unm.edu">gstore[at]edac.unm.edu</a></p>
+                <p><a href="../tos.html">Terms of Service</a></p>
+            </div>
+            <div class="col-sm-6">
+                <img src="../images/EDAC-Banner1_2.png">
+            </div>
+            
+        </div>
+    </footer>
+
+</body>
+</html>

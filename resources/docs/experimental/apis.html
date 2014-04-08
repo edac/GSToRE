@@ -1,0 +1,197 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+    <title>GSToRE V3 API | Experimental - Integrated APIs</title>
+    <link href="../bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
+    <link href="../docs.css" rel="stylesheet" media="screen">
+
+</head>
+<body>
+    <div id="wrap">
+<div class="navbar navbar-inverse" role="navigation">
+        <div class="container">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="../index.html">GSToRE V3</a>
+            </div>
+            <div class="collapse navbar-collapse">
+                <ul class="nav navbar-nav">
+                    <li><a href="../stable.html">Stable</a></li>
+                    <li class="active"><a href="#">Experimental</a></li>
+                    <li><a href="../architecture.html">Architecture</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container docs">
+        <div class="row">
+            <h1>Integrated APIs</h1>
+
+            <p></p>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12 col-no-padding">
+                <ul>
+                    <li id="dataone">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/dataone/v1/</span>
+                                <span class="http-name">DataONE API</span>
+                            </h3>
+                        </div>
+
+                        <div class="http-options">
+                            <p>Access to the integrated DataONE Tier 1 member node.</p>
+                            <p>See the DataONE Tier 1 member node documentation for supported options.</p>
+
+                            <h4>Request Parameters</h4>
+                            <p>See the DataONE Tier 1 member node documentation for supported options.</p>
+
+                            <h5>Query Parameters</h5>
+                            <p>See the DataONE Tier 1 member node documentation for supported options.</p>
+
+                            <h5>Examples</h5>
+                            <p>Coming soon.</p>
+
+                            <h4>Response</h4>
+                            <p>See the DataONE Tier 1 member node documentation for supported options.</p>
+                        </div>
+                    </li>
+
+                    <li id="cuahsi">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/{odm}/REST/waterml_{version}.svc/{method}</span>
+                                <span class="http-name">CUAHSI REST API</span>
+                            </h3>
+                        </div>
+
+                        <div class="http-options">
+                            <p>Access to the integrated CUAHSI REST waterML services.</p>
+                            <p>Coming soon.</p>
+
+                            <h4>Request Parameters</h4>
+                            <p>Coming soon.</p>
+
+                            <h5>Query Parameters</h5>
+                            <p>Coming soon.</p>
+
+                            <h5>Examples</h5>
+                            <p>Coming soon.</p>
+
+                            <h4>Response</h4>
+                            <p>Coming soon.</p>
+                        </div>
+                    </li>
+
+                    <li id="controlled-vocabs">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/vocabs</span>
+                                <span class="http-name">Get controlled vocabularies</span>
+                            </h3>
+                        </div>
+
+                        <div class="http-options">
+                            <p>Get the list of controlled vocabularies supported for the application.</p>
+                            <p>Coming soon.</p>
+
+                            <h4>Request Parameters</h4>
+                            <p>Coming soon.</p>
+
+                            <h5>Query Parameters</h5>
+                            <p>Coming soon.</p>
+
+                            <h5>Examples</h5>
+                            <p>Coming soon.</p>
+
+                            <h4>Response</h4>
+                            <h5>Example</h5>
+                            <pre>
+[
+    {
+        "url": "http://gstore.unm.edu/apps/rgis/vocabs/qualitycontrollevels.json",
+        "name": "qualitycontrollevels"
+    },
+    {
+        "url": "http://gstore.unm.edu/apps/rgis/vocabs/parametersources.json",
+        "name": "parametersources"
+    }
+]
+                            </pre>
+                        </div>
+                    </li>
+                    <li id="controlled-vocabs-list">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/vocabs/{vocab}.{ext}</span>
+                                <span class="http-name">Get controlled vocabulary values</span>
+                            </h3>
+                        </div>
+
+                        <div class="http-options">
+                            <p>Get values for a specific controlled vocabulary</p>
+                            <p>Coming soon.</p>
+
+                            <h4>Request Parameters</h4>
+                            <p>Coming soon.</p>
+
+                            <h5>Query Parameters</h5>
+                            <p>Coming soon.</p>
+
+                            <h5>Examples</h5>
+                            <p>Coming soon.</p>
+
+                            <h4>Response</h4>
+                            <h5>Example</h5>
+                            <pre>
+[
+    {
+        "term": "Water depth, averaged",
+        "description": "Water depth averaged over a channel cross-section or water body. Averaging method to be specified in methods.",
+        "id": "6ddb4e54-3969-485f-86bd-6e574a3bd9b4"
+    },
+    {
+        "term": "Wind direction",
+        "description": "Wind direction",
+        "id": "ccdd2cda-62a6-4e98-9246-3b10f488658f"
+    },
+    {
+        "term": "Wind speed",
+        "description": "Wind speed",
+        "id": "317a30ef-4470-49a4-987e-0f8f20f59972"
+    }
+]
+                            </pre>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    
+
+    
+    </div>
+    <footer >
+        <div class="container">
+            <div class="col-sm-6">
+                <p><a href="http://edac.unm.edu">Earth Data Analysis Center</a> &#169; 2014</p>
+                <p><a href="mailto:gstore@edac.unm.edu">gstore[at]edac.unm.edu</a></p>
+                <p><a href="../tos.html">Terms of Service</a></p>
+            </div>
+            <div class="col-sm-6">
+                <img src="../images/EDAC-Banner1_2.png">
+            </div>
+            
+        </div>
+    </footer>
+
+</body>
+</html>

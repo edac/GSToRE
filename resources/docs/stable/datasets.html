@@ -1,0 +1,468 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+    <title>GSToRE V3 API | Stable - Datasets</title>
+    <link href="../bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
+    <link href="../docs.css" rel="stylesheet" media="screen">
+
+</head>
+<body>
+    <div id="wrap">
+        <div class="navbar navbar-inverse" role="navigation">
+            <div class="container">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="../index.html">GSToRE V3</a>
+                </div>
+                <div class="collapse navbar-collapse">
+                    <ul class="nav navbar-nav">
+                        <li class="active"><a href="#">Stable</a></li>
+                        <li><a href="../experimental.html">Experimental</a></li>
+                        <li><a href="../architecture.html">Architecture</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="container docs">
+            <div class="row">
+                <h1>Datasets</h1>
+
+                <p></p>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-12 col-no-padding">
+                    <ul>
+                        <li id="services">
+                            <div class="http-definition">
+                                <h3>
+                                    <span class="http-method">GET</span>
+                                    <span class="http-path">/apps/{app}/datasets/{uuid}/services.json</span>
+                                    <span class="http-name">Get dataset description</span>
+                                </h3>
+                            </div>
+                            <div class="http-options">
+                                <p>Retrieve the dataset service description. This contains information regarding the
+                                type of dataset, the services available, and the download options.
+                                </p>
+
+
+                                <h4>Request Parameters</h4>
+                                <h5>Route Parameters</h5>
+                                <table class="params">
+                                    <thead>
+                                        <tr>
+                                            <th>Parameter</th>
+                                            <th>Description</th>
+                                            <th>Type</th>
+                                            <th>Options</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>app</td>
+                                            <td>Application alias</td>
+                                            <td>string</td>
+                                            <td>rgis, epscor, elseweb</td>
+                                        </tr>
+                                        <tr>
+                                            <td>uuid</td>
+                                            <td>Dataset identifier</td>
+                                            <td>uuid</td>
+                                            <td></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <h5>Query Parameters</h5>
+                                <p>None</p>
+
+
+                                <h5>Examples</h5>
+                                <p>View the service description for the <strong>2013 Tres Lagunas Post Fire, 10</strong> dataset:</p>
+                                <p class="example">/apps/<span class="route-highlight">rgis</span>/datasets/<span class="route-highlight">43db7a5d-67ec-4635-aef6-97131bf390cb</span>/services.json</p>
+
+                                <h4>Response</h4>
+                                <div>
+                                    <h5>Schema</h5>
+                                    <div class="schema-block">
+                                        <div><span class="schema-object">id</span> (<span class="schema-datatype">integer</span>): identifier</div>
+                                        <div><span class="schema-object">uuid</span> (<span class="schema-datatype">string</span>): identifier</div>
+                                        <div><span class="schema-object">name</span> (<span class="schema-datatype">string</span>): base name</div>
+                                        <div><span class="schema-object">description</span> (<span class="schema-datatype">string</span>): title</div>
+                                        <div><span class="schema-object">availability</span> (<span class="schema-datatype">boolean</span>): if False, the underlying data is unavailable for download, streaming access or OGC service access. </div>
+                                        <div><span class="schema-object">lastupdate</span> (<span class="schema-datatype">date</span>): (yyyyMMdd) date published</div>
+                                        <div><span class="schema-object">type</span> (<span class="schema-datatype">string</span>): object type</div>
+                                        <div><span class="schema-object">taxonomy</span> (<span class="schema-datatype">string</span>): dataset type (geoimage or vector or file or table)</div>
+                                        <p class="bg-callouts bg-warning">"geoimage" refers to a raster dataset.</p>
+                                        <div><span class="schema-object">categories</span> (<span class="schema-datatype">array[dict]</span>): 
+                                            <div class="schema-nested-object">
+                                                <div><span class="schema-object">theme</span> (<span class="schema-datatype">string</span>): theme (root)</div>
+                                                <div><span class="schema-object">subtheme</span> (<span class="schema-datatype">string</span>): subtheme (level 1)</div>
+                                                <div><span class="schema-object">groupname</span> (<span class="schema-datatype">string</span>): groupname (level 2)</div>
+                                            </div>
+                                        </div>
+
+                                        <div><span class="schema-object">downloads</span> (<span class="schema-datatype">array[dict]</span>): 
+                                            <div class="schema-nested-object">
+                                                <div><span class="schema-object">{format}</span> (<span class="schema-datatype">string</span>): URL for the zipped download for the format</div>
+                                                <p class="bg-callouts bg-warning">The keys referenced by {format} are the list of supported data formats for this dataset.</p>
+                                            </div>
+                                        </div>
+
+                                        <div><span class="schema-object">services</span> (<span class="schema-datatype">array[dict]</span>): 
+                                            <div class="schema-nested-object">
+                                                <div><span class="schema-object">{service}</span> (<span class="schema-datatype">string</span>): URL for the OGC service GetCapabilities request</div>
+                                                <p class="bg-callouts bg-warning">The keys referenced by {service} are the list of supported OGC services for this dataset (wms, wcs, or wfs).</p>
+                                            </div>
+                                        </div>
+
+                                        <div><span class="schema-object">metadata</span> (<span class="schema-datatype">array[dict]</span>): 
+                                            <div class="schema-nested-object">
+                                                <div><span class="schema-object">{standard}</span> (<span class="schema-datatype">dict</span>):
+                                                    <div class="schema-nested-object">
+                                                        <div><span class="schema-object">{format}</span> (<span class="schema-datatype">string</span>): URL for the documentation for the standard and format specified</div>
+                                                        
+                                                    </div>
+                                                    <p class="bg-callouts bg-warning">The keys referenced by {format} are the list of supported documentation formats for the standard.</p>
+                                                    <p class="bg-callouts bg-warning">The keys referenced by {standard} are the list of supported documentation standards for this dataset.</p>
+                                                </div>
+                                            </div>
+                                            
+                                            
+                                        </div>
+                                        <div><span class="schema-object">metadata-modified</span> (<span class="schema-datatype">dict</span>): 
+                                            <div class="schema-nested-object">
+                                                <div><span class="schema-object">{standard}</span> (<span class="schema-datatype">date</span>): (yyyy-MM-ddTHH:MM:SSZ) date, in UTC, the source documentation was modified </div>
+                                                <p class="bg-callouts bg-warning">The keys referenced by {standard} are the list of supported documentation standards for this dataset. In most cases, this key will be "all" to indicate that the modifications made to the source documentation are reflected in all documentation representations.</p>
+                                            </div>
+                                        </div>
+                                        <div><span class="schema-object">spatial</span> (<span class="schema-datatype">dict</span>): 
+                                            <div class="schema-nested-object">
+                                                <div><span class="schema-object">epsg</span> (<span class="schema-datatype">integer</span>): EPSG code of the original data source</div>
+                                                <div><span class="schema-object">bbox</span> (<span class="schema-datatype">array[double]</span>): bounding box in WGS84 as minx, miny, maxx, maxy</div>
+                                                <p class="bg-callouts bg-warning">Unless otherwise noted, vector datasets generated by the GSToRE platform are in WGS84 (EPSG:4326). The EPSG code referenced here refers only to the source data (the ZIP format).</p>
+                                            </div>
+                                        </div>
+                                        <div><span class="schema-object">prov</span> (<span class="schema-datatype">dict</span>): 
+                                            <div class="schema-nested-object">
+                                                <div><span class="schema-object">ontology</span> (<span class="schema-datatype">dict</span>):
+                                                    <div class="schema-nested-object">
+                                                        <div><span class="schema-object">traces</span> (<span class="schema-datatype">dict</span>):
+                                                            <div><span class="schema-object">format</span> (<span class="schema-datatype">string</span>): URL to provenance trace</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div><span class="schema-object">preview</span> (<span class="schema-datatype">string</span>): URL to the GSToRE-hosted preview request.</div>
+                                        <p class="bg-callouts bg-danger">This service will be deprecated shortly.</p>
+                                        
+                                    </div>
+
+                                    <p>Response for a raster dataset:</p>
+                                    <pre>
+    {
+        "downloads": [{"tif": "http://gstore.unm.edu/apps/epscor/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/treslagunasfire2013_1.original.tif"}],
+        "lastupdate": "20140325",
+        "uuid": "233adca8-5131-4ca1-aac1-669f6be4c530",
+        "taxonomy": "geoimage",
+        "description": "2013 Tres Lagunas Post Fire, 1",
+        "metadata": [
+            {"FGDC-STD-012-2002": {
+                "xml": "http://gstore.unm.edu/apps/epscor/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/metadata/FGDC-STD-012-2002.xml",
+                "html": "http://gstore.unm.edu/apps/epscor/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/metadata/FGDC-STD-012-2002.html"
+            }},
+            {"ISO-19115:2003": {
+                "xml": "http://gstore.unm.edu/apps/epscor/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/metadata/ISO-19115:2003.xml",
+                "html": "http://gstore.unm.edu/apps/epscor/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/metadata/ISO-19115:2003.html"
+            }},
+            {
+                "ISO-19119:WMS": {"xml": "http://gstore.unm.edu/apps/epscor/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/metadata/ISO-19119:WMS.xml"},
+                "ISO-19119:WCS": {"xml": "http://gstore.unm.edu/apps/epscor/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/metadata/ISO-19119:WCS.xml"}
+            }
+        ],
+        "metadata-modified": {"all": "2014-03-26T03:56:16Z"},
+        "spatial": {
+            "epsg": 26913,
+            "bbox": [
+                -105.719133333,
+                35.7587972222,
+                -105.697138889,
+                35.7738111111
+            ]
+        },
+        "services": [
+            {"wms": "http://gstore.unm.edu/apps/epscor/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/services/ogc/wms?SERVICE=wms&REQUEST=GetCapabilities&VERSION=1.1.1"},
+            {"wcs": "http://gstore.unm.edu/apps/epscor/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/services/ogc/wcs?SERVICE=wcs&REQUEST=GetCapabilities&VERSION=1.1.2"}
+        ],
+        "preview": "http://gstore.unm.edu/apps/epscor/datasets/233adca8-5131-4ca1-aac1-669f6be4c530/mapper",
+        "type": "dataset",
+        "id": 367375,
+        "categories": [{
+            "subtheme": "2013 Wildfire Data",
+            "theme": "Digital Orthophotography",
+            "groupname": "Tres Lagunas - Post Fire"
+        }],
+        "name": "treslagunasfire2013_1"
+    }
+                                    </pre>
+                                </div>
+                            </div>
+
+                    </li>
+
+                    <li id="streaming">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/datasets/{uuid}/dataset.{ext}</span>
+                                <span class="http-name">Streaming dataset request</span>
+                            </h3>
+                        </div>
+                        <div class="http-options">
+                            <p>This request is only available for vector and table datasets and is limited to text-based outputs, for example CSV or KML.</p>
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                    <tr>
+                                        <td>uuid</td>
+                                        <td>Dataset identifier</td>
+                                        <td>uuid</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>ext</td>
+                                        <td>Data format</td>
+                                        <td>string</td>
+                                        <td>CSV, JSON, GeoJSON, KML, GML</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <p>Coming soon.</p>
+
+
+                            <h5>Examples</h5>
+                            <p>Stream the RGIS dataset <strong>SCAN Alcalde, NM (Mar, 2014)</strong> as a KML file:</p>
+                            <p class="example">/apps/<span class="route-highlight">rgis</span>/datasets/<span class="route-highlight">b6b22969-dfa9-41e5-a836-c483b099c8f7</span>/dataset.<span class="route-highlight">kml</span></p>
+
+                            <h4>Response</h4>
+                            <p>The structure of the response depends on the format requested, the filters of the request and the structure of 
+                            the dataset.</p>
+                        </div>
+                    </li>
+
+                    <li id="downloads">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/datasets/{uuid}/{basename}.{set}.{ext}</span>
+                                <span class="http-name">Download dataset</span>
+                            </h3>
+                        </div>
+                        <div class="http-options">
+                            <p></p>
+
+                            <p>Some datasets are hosted on external sites or, if the format is "html", are external sites. In those instances, 
+                            the request redirects you to the external location. The options available through the query parameters are not available for those
+                            datasets, nor are any GSToRE-generated documentation files included with the response.
+                            </p>
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                    <tr>
+                                        <td>uuid</td>
+                                        <td>Dataset identifier</td>
+                                        <td>uuid</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>basename</td>
+                                        <td>Dataset name</td>
+                                        <td>string</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>set</td>
+                                        <td></td>
+                                        <td>string</td>
+                                        <td>original or derived</td>
+                                    </tr>
+                                    <tr>
+                                        <td>ext</td>
+                                        <td>Data format</td>
+                                        <td>string</td>
+                                        <td>any supported format for the dataset</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <table class="params">
+                                    <thead>
+                                        <tr>
+                                            <th>Parameter</th>
+                                            <th>Description</th>
+                                            <th>Type</th>
+                                            <th>Options</th>
+                                            <th>Required</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>ignore-cache</td>
+                                            <td>Generate a new download</td>
+                                            <td>boolean</td>
+                                            <td></td>
+                                            <td>F (defaults to False)</td>
+                                        </tr>
+                                        <tr>
+                                            <td>standard</td>
+                                            <td>Specify a specific documentation standard to be included in the zip file.</td>
+                                            <td>string</td>
+                                            <td></td>
+                                            <td>F (defaults to the preferred metadata standard of the application specified)</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+
+                            <h5>Examples</h5>
+                            <p>Download the zip file for the GeoTIFF for <strong>AZ Barth Well, US Topo 2011</strong> dataset:</p>
+                            <p class="example">/apps/<span class="route-highlight">rgis</span>/datasets/<span class="route-highlight">bb5350f9-64ba-4198-8274-eb11f3813955</span>/<span class="route-highlight">AZ_Barth_Well_20111125_TM_geo</span>.<span class="route-highlight">original</span>.<span class="route-highlight">tif</span></p>
+
+                            <p>Download the zip file for the GSToRE-generated KML for <strong>NM Gross Receipts January - June 2011</strong> dataset:</p>
+                            <p class="example">/apps/<span class="route-highlight">rgis</span>/datasets/<span class="route-highlight">0acbf4fd-d2ab-4216-9c48-803418166003</span>/<span class="route-highlight">nmgrossreceipts_jan_jun2011</span>.<span class="route-highlight">derived</span>.<span class="route-highlight">kml</span></p>
+
+                            <h4>Response</h4>
+                            <p>The structure of the response depends on the format requested, the filters of the request and the structure of 
+                            the dataset.</p>
+                        </div>
+                    </li>
+
+                    <li id="metadata">
+                        <div class="http-definition">
+                            <h3>
+                                <span class="http-method">GET</span>
+                                <span class="http-path">/apps/{app}/datasets/{uuid}/metadata/{standard}.{ext}</span>
+                                <span class="http-name">Download dataset documentation</span>
+                            </h3>
+                        </div>
+                        <div class="http-options">
+
+                            <p>Download the documentation for the specified dataset.</p>
+                            <p>GSTORE includes support for FGDC-STD-001-1998 (file or vector) or FGDC-STD-012-2002 (raster), ISO-19115:2003, ISO-19119, and ISO-19110 standards. ISO-19119 is only available for those datasets with web services; ISO-19110 only for vector or tabular datasets. Check the dataset service description for the complete listing of metadata options for a dataset.</p>
+
+                            <h4>Request Parameters</h4>
+                            <h5>Route Parameters</h5>
+                            <table class="params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>app</td>
+                                        <td>Application alias</td>
+                                        <td>string</td>
+                                        <td>rgis, epscor, elseweb</td>
+                                    </tr>
+                                    <tr>
+                                        <td>uuid</td>
+                                        <td>Dataset identifier</td>
+                                        <td>uuid</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>standard</td>
+                                        <td>Documentation standard</td>
+                                        <td>string</td>
+                                        <td>any supported documentation standard</td>
+                                    </tr>
+                                    <tr>
+                                        <td>ext</td>
+                                        <td>Documentation format</td>
+                                        <td>string</td>
+                                        <td>xml or html (not all formats available for all standards)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Query Parameters</h5>
+                            <p>None</p>
+
+
+                            <h5>Examples</h5>
+                            <p>Download the zip file for the GeoTIFF for <strong>AZ Barth Well, US Topo 2011</strong> dataset:</p>
+                            <p class="example">/apps/<span class="route-highlight">rgis</span>/datasets/<span class="route-highlight">bb5350f9-64ba-4198-8274-eb11f3813955</span>/<span class="route-highlight">AZ_Barth_Well_20111125_TM_geo</span>.<span class="route-highlight">original</span>.<span class="route-highlight">tif</span></p>
+
+                            <p>Download the zip file for the GSToRE-generated KML for <strong>NM Gross Receipts January - June 2011</strong> dataset:</p>
+                            <p class="example">/apps/<span class="route-highlight">rgis</span>/datasets/<span class="route-highlight">0acbf4fd-d2ab-4216-9c48-803418166003</span>/<span class="route-highlight">nmgrossreceipts_jan_jun2011</span>.<span class="route-highlight">derived</span>.<span class="route-highlight">kml</span></p>
+
+                            <h4>Response</h4>
+                            <p>The structure of the response varies by standard and format. </p>
+                        </div>
+                    </li>
+                   
+                    </ul>
+                </div>
+            </div>
+        
+        
+        </div>
+    </div>
+    <footer >
+        <div class="container">
+            <div class="col-sm-6">
+                <p><a href="http://edac.unm.edu">Earth Data Analysis Center</a> &#169; 2014</p>
+                <p><a href="mailto:gstore@edac.unm.edu">gstore[at]edac.unm.edu</a></p>
+                <p><a href="../tos.html">Terms of Service</a></p>
+            </div>
+            <div class="col-sm-6">
+                <img src="../images/EDAC-Banner1_2.png">
+            </div>
+            
+        </div>
+    </footer>
+
+</body>
+</html>
