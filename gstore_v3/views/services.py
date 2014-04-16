@@ -3,7 +3,7 @@ from pyramid.response import Response
 
 from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPBadRequest, HTTPServerError
 
-import os 
+import os, sys
 from email.parser import Parser 
 from email.message import Message
 from urlparse import urlparse
@@ -54,54 +54,12 @@ ecw test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ef4c8cdc-bec4-43aa-8f
 '''
 wcs methods to deal with oddness out of mapserver getcoverage response
 ''' 
-#parse the multipart response
-def parse_wcs_response(content, content_type):
-    '''
-    if the format requested is ascii grid, mapserver returns the ascii grid and the geotiff
-    in the multipart response. but that's data that doesn't need to be returned to the client
-    so we're repacking the response to just include the ascii grid and the header info
-    '''
-    boundary = 'wcs'
-    parser = Parser()
-    parts = parser.parsestr("Content-type:%s\n\n%s" % (content_type, content.rstrip("--%s--\n\n" % (boundary)))).get_payload()
-    new_parts = []
-    for p in parts:
-        if not isGeotiff(p.get_content_type()):
-            new_parts.append([p.get_payload(), p.items()])
-    return pack_multipart(new_parts, boundary)
-    
+
 #check for the geotiff chunk    
 def isGeotiff(content_type):
     return content_type.split(';')[0].lower() in 'image/tiff'
-    
-#repack the response with only the parts we like
-def pack_multipart(parts, boundary):
-    '''
-    for the ascii grid response, we need to repack everything that's not a tiff (seriously mapserver, why do you do that?)
 
-    based off eoxserver: http://eoxserver.org/browser/trunk/eoxserver/core/util/multiparttools.py
-    '''
-    boundary = '--%s' % boundary
-    new_packet = []
-    for data, header in parts:
-        chunk = '%s' % boundary
-        
-        #repack the header
-        for key, value in header:
-            chunk += '\n%s: %s' % (key, value)
-
-        chunk += '\n\n'
-        
-        #and the data
-        chunk += data
-
-        #add to the set
-        new_packet.append(chunk)
-
-    new_packet.append('%s--' % boundary)
-    return '\n'.join(new_packet)
-
-
+#dammit freaking wcs 1.0.0 
 def parse_tiff_response(content, content_type):
     '''
     this strips out just the tiff and returns the image 
@@ -110,8 +68,11 @@ def parse_tiff_response(content, content_type):
     parser = Parser()
     parts = parser.parsestr("Content-type:%s\n\n%s" % (content_type, content.rstrip("--wcs--\n\n"))).get_payload()
     for p in parts:
-        if isGeotiff(p.get_content_type()):
-            return p.get_payload(), p.items()
+        try:
+            if isGeotiff(p.get_content_type()):
+                return p.get_payload(), p.items()
+        except:
+            raise 
     return None, None
 '''
 end wcs section
@@ -166,22 +127,23 @@ def getType(geomtype):
 #get the layer obj by taxonomy (for now)
 #the bbox should be reprojected to the originnal epsg before this
 def getLayer(d, src, dataloc, bbox, metadata_description={}):
+    valid_basename = 'g_' + d.basename if d.basename[0] in '0123456789' else d.basename
+
     layer = mapscript.layerObj()
-    layer.name = d.basename
+    layer.name = valid_basename
     layer.status = mapscript.MS_ON
 
     layer.data = dataloc
-    layer.dump = mapscript.MS_TRUE
 
-    layer.setExtent(bbox[0], bbox[1], bbox[2], bbox[3])
-    
+    layer.setExtent(bbox[0], bbox[1], bbox[2], bbox[3]) 
 
-    layer.metadata.set('layer_title', d.basename)
-    layer.metadata.set('ows_abstract', d.description)
+    layer.metadata.set('layer_title', valid_basename)
+#    layer.metadata.set('ows_abstract', d.description)
     layer.metadata.set('ows_keywordlist', '') #TODO: something
     layer.metadata.set('legend_display', 'yes')
     layer.metadata.set('wms_encoding', 'UTF-8')
-    layer.metadata.set('ows_title', d.basename)
+    layer.metadata.set('ows_title', d.description)
+#    layer.metadata.set('ows_name', d.basename)
 
     if metadata_description:
         service = metadata_description['service']
@@ -205,16 +167,23 @@ def getLayer(d, src, dataloc, bbox, metadata_description={}):
         layer.metadata.set('ows_srs', 'epsg:4326')
         layer.metadata.set('base_layer', 'no')
         layer.metadata.set('wms_encoding', 'UTF-8')
-        layer.metadata.set('wms_title', d.basename)
+        layer.metadata.set('wfs_encoding', 'UTF-8')
+        layer.metadata.set('wms_title', valid_basename)
         layer.metadata.set('gml_include_items', 'all')
+        layer.metadata.set('wms_include_items', 'all')
         layer.metadata.set('gml_featureid', 'FID') 
 
         #add the class (and the style)
         cls = mapscript.classObj()
-        #cls.name = 'Everything'
+        cls.name = 'Basic'
         cls.insertStyle(style)
 
         layer.insertClass(cls)
+
+        #add the template (generic) for the vector getfeatureinfo
+        #WHICH IS DOING NOTHING
+        layer.template = metadata_description['template_path'] + '/' + 'generic_vector.txt'
+
     elif d.taxonomy == 'geoimage':
         #TODO: possibly add accurate units based on the epsg code
         #TODO: check on the wcs_formats list & compare to outputformats - ARE THE NAMES CORRECT?
@@ -227,16 +196,17 @@ def getLayer(d, src, dataloc, bbox, metadata_description={}):
         layer.metadata.set('time_sensitive', 'no')
         layer.metadata.set('raster_selected', 'yes')
         layer.metadata.set('static', 'no')
-        layer.metadata.set('annotation_name', '%s: %s' % (d.basename, d.dateadded))
-        layer.metadata.set('wcs_label', 'imagery_wcs_%s' % (d.basename))
-        layer.metadata.set('wcs_formats', 'GTiff GEOTIFF_16')
+        layer.metadata.set('annotation_name', '%s: %s' % (valid_basename, d.dateadded))
+        layer.metadata.set('wcs_label', valid_basename)
+        layer.metadata.set('wcs_formats', 'GEOTIFF_16')
+  
         #TODO: change the native format - not everything is a geotiff now
-        #TODO: change the native format - not everything is a geotiff now
-        layer.metadata.set('wcs_nativeformat', 'GTiff')
-        layer.metadata.set('wcs_rangeset_name', d.basename)
+        #layer.metadata.set('wcs_nativeformat', 'GTiff')
+        layer.metadata.set('wcs_rangeset_name', valid_basename)
         layer.metadata.set('wcs_rangeset_label', d.description)
-        
+        layer.metadata.set('wcs_enable_request', '*')
 
+        
         '''
         for the dems:
         CLASS
@@ -247,6 +217,8 @@ def getLayer(d, src, dataloc, bbox, metadata_description={}):
             END
         END
         '''
+
+    
 
     #check for any mapfile settings
     #TODO: refactor this to make it nicer (woof)
@@ -262,6 +234,11 @@ def getLayer(d, src, dataloc, bbox, metadata_description={}):
                 #add the wcs nullvalue flag
                 nodata = mapsettings.settings['WCS-NODATA']
                 layer.metadata.set('wcs_rangeset_nullvalue', nodata)
+
+            other_flags = mapsettings.get_flags()
+            for k, v in other_flags.iteritems():
+                if k == 'FORMATS':
+                    layer.metadata.set('wcs_formats', v)
 
             mapclasses = mapsettings.classes if mapsettings.classes else None    
 
@@ -314,7 +291,7 @@ def set_contact_metadata(m):
     m.web.metadata.set('ows_address', 'Earth Data Analysis Center, MSC01 1110, 1 University of New Mexico')
     m.web.metadata.set('ows_contactvoicetelephone', '(505) 277-3622')
     m.web.metadata.set('ows_contactfacsimiletelephone', '(505) 277-3614')
-    m.web.metadata.set('ows_contactelectronicmailaddress', 'devteam@edac.unm.edu')
+    m.web.metadata.set('ows_contactelectronicmailaddress', 'gstore@edac.unm.edu')
     m.web.metadata.set('ows_addresstype', 'Mailing address')
     m.web.metadata.set('ows_hoursofservice', '9-5 MST, M-F')
     m.web.metadata.set('ows_role', 'data provider')
@@ -352,14 +329,18 @@ def get_outputformat(fmt):
         of.setExtension('gif')
         of.setMimetype('image/gif')
         of.imagemode = mapscript.MS_IMAGEMODE_PC256
-    elif fmt == 'tif':
+    elif fmt == 'tif' or fmt == 'GEOTIFF_16':
+        #for integer rasters
         of = mapscript.outputFormatObj('GDAL/GTiff', 'GEOTIFF_16')
         of.setExtension('tif')
         of.setMimetype('image/tiff')
-
-        #TODO: check on float32 vs. int16
-        #of.imagemode = mapscript.MS_IMAGEMODE_FLOAT32
         of.imagemode = mapscript.MS_IMAGEMODE_INT16
+    elif fmt == 'tif32' or fmt == 'GEOTIFF_FLOAT32':
+        #for the floating point rasters like landsat img
+        of = mapscript.outputFormatObj('GDAL/GTiff', 'GEOTIFF_FLOAT32')
+        of.setExtension('tif')
+        of.setMimetype('image/tiff')
+        of.imagemode = mapscript.MS_IMAGEMODE_FLOAT32
     elif fmt == 'aaigrid':
         of = mapscript.outputFormatObj('GDAL/AAIGRID', 'AAIGRID')
         of.setExtension('grd')
@@ -370,111 +351,81 @@ def get_outputformat(fmt):
         of = None
 
     return of
-    
-'''
-generic-ish mapserver response method
-'''
+
+
 def generateService(mapfile, params, mapname=''):
-    #do all of the actual response here after the mapscript map 
-    #has been read/built
-    #should work with png or image/png as format
+    """Return the Mapserver CGI response based on any mapfile
+
+    Supports WMS, WFS, WCS.
+    If mapserver error, dumps the XML response
+
+    Magic methods: 
+        GetTiffCoverage (strip out the tiff from the multipart mime response)
+        GetMapFile (generate the mapfile to cache or, with param "show=", will display
+            mapfile in browser)
+
+    Args:
+        mapfile (mapscript.mapObj): the generated mapfile
+        params (dict): the query parameters from the request, normalized to lowercase
+        mapname (string, optional): name of the mapfile if GetMapFile
+
+    Returns:
+        response (Response): The mapserver CGI output. This can include errors from mapserver!
+
+    Raises:
+        HTTPNotFound: Requires something in the params dict and that there's a REQUEST key
+        HTTPServerError: Returns 500 server error if the error is with gstore or a generated mapserver error
+
+    """
 
     #create the request
     request_type = params['request'] if 'request' in params else ''
-
     if not request_type and params:    
         return HTTPNotFound()
-
     request_type = request_type.lower()  
+
+    mapscript.msIO_installStdoutToBuffer()
     req = mapscript.OWSRequest()
 
-    '''
-    http://129.24.63.66/gstore_v3/apps/rgis/datasets/a427563f-3c7e-44a2-8b35-68ce2a78001a/services/ogc/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=mod10a1_a2002210.fractional_snow_cover&FORMAT=PNG&SRS=EPSG:4326&BBOX=-107.93,34.96,-104.99,38.53&WIDTH=256&HEIGHT=256
-
-    '''
-
-    #for the wcs tiff coverage tester ONLY because we want the mapserver wcs response
+    #reset to run the standard getcoverage request against the cgi
     if request_type == 'gettiffcoverage':
         params['request'] = 'getcoverage'
 
     #set up the params
-    keys = params.keys()
-    for k in keys:
+    for k, v in params.iteritems():
         #this seems bad. for many reasons bad. but it decodes stuff
-        val = urllib2.unquote(urllib2.unquote(params[k]).decode('unicode_escape')) 
+        val = urllib2.unquote(urllib2.unquote(v).decode('unicode_escape')) 
         req.setParameter(k.upper(), val)
 
-    fmt = params['format'] if 'format' in params else 'PNG'
+    #for the bots
+    header={'X-Robots-Tag': 'noindex'}
 
-    #now check the service type: capabilities, map, mapfile (for internal use)
     try:
-        if request_type in ['getcapabilities', 'describecoverage', 'describelayer', 'getstyles', 'describefeaturetype', 'getfeature']:
-            #all of the xml/text responses
-            mapscript.msIO_installStdoutToBuffer()
-            mapfile.OWSDispatch(req)
-            content_type = mapscript.msIO_stripStdoutBufferContentType()
-            content = mapscript.msIO_getStdoutBufferBytes()
-
-            if 'xml' in content_type:
-                content_type = 'application/xml'            
-            return Response(content, content_type=content_type, headers={'X-Robots-Tag': 'noindex'})
-        elif request_type in ['getmap', 'getlegendgraphic']:     
-            #any image response  
-            if request_type == 'getmap':
-                mapfile.loadOWSParameters(req)
-                img = Image.open(StringIO(mapfile.draw().getBytes()))
-            else:
-                img = Image.open(StringIO(mapfile.drawLegend().getBytes())) 
-            
-            buffer = StringIO()
-            
-            image_type = get_image_mimetype(fmt)
-            if not image_type:
-                image_type = ('PNG', 'image/png')
-            img.save(buffer, image_type[0])
-            
-            buffer.seek(0)
-            content_type = image_type[1]
-            return Response(buffer.read(), content_type=content_type, headers={'X-Robots-Tag': 'noindex'})
-        elif request_type == 'getmapfile':
-            #that's ours, we just want to save the mapfile to disk
-            #and use the dataset id-source id.map for the filename to make sure it's unique
-            #and make sure there isn't one first (chuck it if there is)
-            mapfile.save(mapname)
-            #TODO: make this some meaningful response (even though it isn't for public consumption)
-
-            output = 'map generated'
+        # check for the special methods (getmapfile, gettiffcoverage)
+        if request_type == 'getmapfile':
+            #TODO: change this to the mapobj to string method in the new mapscript version
+            if not os.path.isfile(mapname):
+                mapfile.save(mapname)
             if 'show' in params:
+                #TODO: this may not be the best idea but it makes for easier debugging 
+                #      and that has never caused anyone grief ever. right.
                 with open(mapname, 'r') as f:
-                    output = f.read()
-                
-            return Response(output, headers={'X-Robots-Tag': 'noindex'})
-        elif request_type in ['getcoverage']:
-            mapscript.msIO_installStdoutToBuffer()
-            mapfile.OWSDispatch(req)
-            content_type = mapscript.msIO_stripStdoutBufferContentType()
-            content = mapscript.msIO_getStdoutBufferBytes()
+                    mr = f.read()
+            else:
+                mr = 'Mapfile generated.'
+            return Response(mr, headers=header)
 
-            #TODO: resolve the ascii grid issue
-            #i don't know quite what's going on with this, but the ascii grid includes the tiff data
-            #in the response from mapserver. so this repacks the mapserver response without the tif
-            #as a new multipart blob-o-stuff
-#            if 'multipart/mixed' in content_type and fmt == 'image/x-aaigrid':
-#                content = parse_wcs_response(content, content_type)
+        # all the other supported mapserver options  
+        # add noindex to all
+        mapfile.OWSDispatch(req)    
+        content_type = mapscript.msIO_stripStdoutBufferContentType()
+        content = mapscript.msIO_getStdoutBufferBytes()  
 
-            return Response(content, content_type=content_type, headers={'X-Robots-Tag': 'noindex'})
-        elif request_type in ['gettiffcoverage']:
-            '''
-            prism example:
-
-            http://129.24.63.115/apps/epscor/datasets/1b063b4f-6368-45f0-87cd-f994cbcd31b7/services/ogc/wcs?SERVICE=WCS&REQUEST=GetTiffCoverage&Version=1.1.0&COVERAGE=us_tmin_1971_2000_05&FORMAT=image/tiff&CRS=EPSG:4326&BBOX=-125.021,24.0625,-66.4792,49.9375&HEIGHT=500&WIDTH=800
-    
-            '''
-
-            mapscript.msIO_installStdoutToBuffer()
-            mapfile.OWSDispatch(req)
-            content_type = mapscript.msIO_stripStdoutBufferContentType()
-            content = mapscript.msIO_getStdoutBufferBytes()
+        if 'xml' in content_type:
+            content_type = 'application/xml'
+          
+        if request_type == 'gettiffcoverage':
+            # strip out the tiff part of the multipart mime
             coverage = str(params['coverage']) if 'coverage' in params else 'output'
             if 'multipart/mixed' in content_type:
                 tiff, headers = parse_tiff_response(content, content_type)
@@ -484,33 +435,49 @@ def generateService(mapfile, params, mapname=''):
                     if h[0].lower() not in ['content-disposition']:
                         output_headers[h[0]] = str(h[1])
                 output_headers['Content-disposition'] = 'attachment; filename=%s.tif' % (coverage)
-                output_headers['X-Robots-Tag'] = 'noindex'
+                output_headers = dict(header.items() + output_headers.items())
                 return Response(tiff, headers=output_headers)
 
-            #probably an error. neat.
-            return Response(content, content_type=content_type, headers={'X-Robots-Tag': 'noindex'})
-        else:
-            return HTTPNotFound('Invalid OGC request')
+        #TODO: i am not sure these are the best filters for the clusterf*** of wcs stupidity.
+        if request_type == 'getcoverage' and params['version'] != '1.0.0':
+            #get the correct headers from the response
+            output_headers = {}
+            output_headers['Content-ID'] = 'coverage/out.tif'
+            output_headers['Content-Description'] = 'coverage data'
+            output_headers['content-transfer-encoding'] = 'binary'
+            content_type = "multipart/mixed; boundary=wcs"          
+            header = dict(header.items() + output_headers.items())
+        elif request_type == 'getcoverage' and params['version'] == '1.0.0':
+            header.update({'content-transfer-encoding': 'binary'})
+
+        #TODO: also not sure about the setting of headers for all the services/versions
+        # BUT wfs seems to be working, getlegendgraphic is working, errors are working, wms is working
+        #normal processing applies   
+        header.update({'Content-Type': content_type})
+        return Response(content, content_type=content_type, headers=header)
+
     except Exception as err:
-        #TODO: catch just the mapserver errors?
-        #let's try this for what's probably a bad set of params by service+request type
-        return HTTPBadRequest(err)
-        #return HTTPBadRequest()
+        #these shouldn't be mapserver errors at this point, but some gstore problem
+        return HTTPServerError(err)
 
-    
-'''
-services:
-wms
-wfs
-wcs
-
-getmapfile (for testing/checking purposes)
-'''
 
 #/apps/{app}/{type}/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/services/{service_type}/{service}
 @view_config(route_name='services', match_param='type=datasets')
 def datasets(request):
-    #return Response()
+    """Generate the dataset mapserver service
+
+    Dynamically builds the mapfile and sends to generateService
+
+    Args:
+
+    Returns:
+        response (Response): returns the result of the generateService method   
+
+    Raises:
+        HTTPNotFound: requires acitve, unembargoed spatial dataset
+        HTTPServerError: likely propagated 500 error from generateService
+
+    """
 
     app = request.matchdict['app']
     dataset_id = request.matchdict['id']
@@ -519,7 +486,7 @@ def datasets(request):
 
     #get the query params because we like those
     params = normalize_params(request.params)
-
+        
     #and get the type (if not there assume capabilities but really that should fail)
     ogc_req = params.get('request', 'GetCapabilities')
 
@@ -541,11 +508,11 @@ def datasets(request):
     #get some config stuff
     mappath = request.registry.settings['MAPS_PATH']
     tmppath = request.registry.settings['TEMP_PATH']
+    templatepath = request.registry.settings['MAP_TEMPLATE_PATH']
     srid = request.registry.settings['SRID']
     xslt_path = request.registry.settings['XSLT_PATH']
     base_url = request.registry.settings['BALANCER_URL']
    
-
     supported_standards = d.get_standards(request)
 
     req_app = DBSession.query(GstoreApp).filter(GstoreApp.route_key==app.lower()).first()
@@ -565,13 +532,18 @@ def datasets(request):
         mcoll = request.registry.settings['mongo_collection']
         mongo_uri = gMongoUri(mconn, mcoll)
 
-        metadata_info = {'app': app, 'base_url': base_url, 'standard': std, "xslt_path": xslt_path + '/xslts', 'validate': False, 'request': request}
+        metadata_info = {'app': app, 
+            'base_url': base_url, 
+            'standard': std, 
+            'xslt_path': xslt_path + '/xslts', 
+            'validate': False, 
+            'request': request
+        }
     else:
         fmtpath = ''
         mongo_uri = None
         metadata_info = None
 
-    #TODO: revise for new build_vector params (metadata!!!!)    
     mapsrc, srcloc = d.get_mapsource(fmtpath, mongo_uri, int(srid), metadata_info) # the source obj, the file path
 
     #need both for a raster, but just the file path for the vector (we made it!)
@@ -579,14 +551,11 @@ def datasets(request):
         return HTTPNotFound()
 
 
-    #NOTE: skipping tilecache and just running with wms services here
-    #maybe it's for the tile cache
+    #NOTE: the wms_tiles has been deprecated but some older bots? still ping it
     service = 'wms' if service == 'wms_tiles' else service
 
     #get dataset BBOX from decimal
     bbox = [float(b) for b in d.box]
-
-    #let's make sure the mapfile hasn't been cached already (dataset id.source id.map)
 
     #fake the mapsrc info for the dynamic vector data files
     if mapsrc:
@@ -598,6 +567,8 @@ def datasets(request):
     #get the mapfile 
     if os.path.isfile('%s/%s.%s.map' % (mappath, d.uuid, mapsrc_uuid)):
         #just read the mapfile and carry on
+        #NOTE: do not assume that these files are permanent in any way
+        #      this is temporary storage for testing basically
         m = mapscript.mapObj('%s/%s.%s.map' % (mappath, d.uuid, mapsrc_uuid))
     else: 
         #need to make a new mapfile
@@ -627,50 +598,47 @@ def datasets(request):
         m.setExtent(bbox[0], bbox[1], bbox[2], bbox[3])
         m.imagecolor.setRGB(255, 255, 255)
         m.setImageType('png24')
-        #TODO: set from the default tile size unless there's a parameter, then use that
         m.setSize(600, 600)
+
+        valid_basename = 'g_' + d.basename if d.basename[0] in '0123456789' else d.basename
 
         if 'epsg:4326' in init_proj:
             m.units = mapscript.MS_DD
             
-        #TODO: set a good name for the data (remember how it appears in arc/qgis) and also, not all rgis
-        m.name = '%s_Dataset' % (app.upper())
+        m.name = valid_basename
 
         m.setProjection(init_proj)
 
         #add some metadata
         srs_list = request.registry.settings['OGC_SRS'].split(',')
         m.web.metadata.set('ows_srs', build_supported_srs(d.orig_epsg, srs_list))
-        #m.web.metadata.set('wms_srs', 'EPSG:4326 EPSG:4269 EPSG:4267 EPSG:26913 EPSG:26912 EPSG:26914 EPSG:26713 EPSG:26712 EPSG:26714')
 
-        #enable the ogc services
-        m.web.metadata.set('ows_enable_request', "*")
+        #enable the ogc services (except for getfeatureinfo for the rasters)
+        ows_requests = '*' if d.taxonomy.lower() != 'geoimage' else '* !getFeatureInfo'
+        m.web.metadata.set('ows_enable_request', ows_requests)
 
-        #TODO: again, pick a decent name here
-        m.web.metadata.set('ows_name', 'imagery_wms_%s' % (d.basename))
+        m.web.metadata.set('ows_name', '%s' % (valid_basename))
         m.web.metadata.set('wms_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wms' % (base_url, app, d.uuid))
 
         #wcs getcapabilities needs this tag
         m.web.metadata.set('ows_service_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wms' % (base_url, app, d.uuid))
-        m.web.metadata.set('ows_abstract', 'WMS Service for %s dataset %s' % (app, d.description))
+        m.web.metadata.set('ows_abstract', '%s Service for %s dataset %s (%s)' % (service.upper(), app.upper(), d.description, d.uuid))
 
         m.web.metadata.set('wms_formatlist', 'image/png,image/gif,image/jpeg')
         m.web.metadata.set('wms_format', 'image/png')
-        m.web.metadata.set('ows_keywordlist', '%s, New Mexico' % (app))
+        m.web.metadata.set('ows_keywordlist', '%s, New Mexico' % (app.upper()))
 
         #TODO: check on this
         m.web.metadata.set('wms_server_version', '1.3.0')
 
-        #TODO: still more better names  
-        m.web.metadata.set('ows_title', '%s Dataset (%s)' % (app, d.uuid))
+        m.web.metadata.set('ows_title', valid_basename)
 
         if d.taxonomy == 'geoimage':
             m.web.metadata.set('wcs_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wcs' % (base_url, app, d.uuid))
-            m.web.metadata.set('wcs_label', 'imagery_wcs_%s' % (d.basename))
-            m.web.metadata.set('wcs_name', 'imagery_wcs_%s' % (d.basename))
+            m.web.metadata.set('wcs_label', valid_basename)
+            m.web.metadata.set('wcs_name', valid_basename)
         if d.taxonomy == 'vector':
             m.web.metadata.set('wfs_onlineresource', '%s/apps/%s/datasets/%s/services/ogc/wfs' % (base_url, app, d.uuid))
-
 
         #add the edac info
         set_contact_metadata(m) 
@@ -679,29 +647,34 @@ def datasets(request):
         m.mappath = mappath
         m.web.imageurl = tmppath
         m.web.imagepath = tmppath
-        #TODO: set up real templates (this doesn't even exist)
-        m.web.template = tmppath + '/client.html'
+        m.web.template = templatepath + '/client.html'
 
         #NOTE: no query format, legend format or browse format in mapscript
 
         #add the supported output formats
-        #add an outputformat (start with png for kicks)
-        of = get_outputformat('png')
-        m.appendOutputFormat(of)
-
-        #and the gif
-        of = get_outputformat('gif')
-        m.appendOutputFormat(of)
-
-        #and the jpeg
-        of = get_outputformat('jpg')
-        m.appendOutputFormat(of)
-        
-        if service == 'wcs':
-            #add geotif and ascii grid
-            of = get_outputformat('tif')
+        #TODO: change this to include the formats for the WCS correctly
+        output_formats = ['png', 'gif', 'jpg']
+        for output_format in output_formats:
+            of = get_outputformat(output_format)
             m.appendOutputFormat(of)
-            #TODO: turn this back on once the fraky weird ascii issue is resolved 
+        
+        mapsettings = mapsrc.map_settings[0] if mapsrc and mapsrc.map_settings else None
+
+        additional_formats = []
+        if mapsettings:
+            flags = mapsettings.get_flags()
+            if 'FORMATS' in flags:
+                additional_formats += flags['FORMATS'].split(',')
+        if service == 'wcs' and not additional_formats:
+            #just add the 16bit integer as the default
+            additional_formats.append('tif')
+            
+        for additional_format in additional_formats:
+            of = get_outputformat(additional_format)
+            m.appendOutputFormat(of)
+
+            
+            #TODO: turn this back on once the freaky weird ascii issue is resolved 
             '''
             the services to test with
             > curl --globoff "http://129.24.63.109/gstore_v3/apps/rgis/datasets/0f3ca80c-2d50-4a33-8df8-c80ff9e94588/services/ogc/wcs?VERSION=1.1.2&SERVICE=WCS&REQUEST=GetCoverage&COVERAGE=mod10a1_a2002193.fractional_snow_cover&CRS=EPSG:4326&FORMAT=image/tiff&HEIGHT=500&WIDTH=500&BBOX=-107.930153271352,34.9674233731823,-104.994718803013,38.5334870384629" > wcs_ae
@@ -728,43 +701,36 @@ def datasets(request):
             symbol.setPoints(line)
             symbol.sizex = 1
             symbol.sizey = 1
-            #required to write it to the mapfile
-            #if ogc_req == 'getmapfile':
             symbol.inmapfile = mapscript.MS_TRUE
             m.symbolset.appendSymbol(symbol)
-            
-        #add the legend
-        lgd = mapscript.legendObj()
-        lgd.imagecolor.setRGB(255, 255, 255)
-        lgd.keysizex = 22
-        lgd.keysizey = 12
-        lgd.keyspacingx = 2
-        lgd.keyspacingy = 7
-        lgd.position = mapscript.MS_LL
-        lgd.postlabelcache = mapscript.MS_TRUE
-        lgd.status = mapscript.MS_ON
+
+        #add the fontset (arial only)
+        m.setFontSet(templatepath + '/fontset.txt')
+
+        #update the legend
+        m.legend.imagecolor.setRGB(255, 255, 255)
+        m.legend.keysizex = 22
+        m.legend.keysizey = 12
+        m.legend.keyspacingx = 2
+        m.legend.keyspacingy = 7
+        m.legend.position = mapscript.MS_LL
+        m.legend.postlabelcache = mapscript.MS_TRUE
+        m.legend.status = mapscript.MS_ON
         
-        lbl = mapscript.labelObj()
-        lbl.antialias = mapscript.MS_TRUE
-        lbl.font = 'Arial-Normal'
-        lbl.maxsize = 256
-        lbl.minsize = 4
-        lbl.size = 1
-        lbl.type = mapscript.MS_TRUETYPE
-        #deprecated. do the other thing
-        #lbl.backgroundcolor.setRGB(255,255,255)
-        #lbl.backgroundshadowsizex = 2
-        #lbl.backgroundshadowsizey = 2
-        lbl.buffer = 0
-        lbl.color.setRGB(0,0,0)
-        lbl.force = mapscript.MS_FALSE
-        lbl.mindistance = -1
-        lbl.minfeaturesize = -1
-        lbl.offsetx = 0
-        lbl.offsety = 0
-        lbl.partials = mapscript.MS_TRUE
-        lgd.label = lbl
-        m.legend = lgd
+        m.legend.label.antialias = mapscript.MS_TRUE
+        m.legend.label.font = 'Arial'
+        m.legend.label.maxsize = 256
+        m.legend.label.minsize = 4
+        m.legend.label.size = 12
+        m.legend.label.type = mapscript.MS_TRUETYPE
+        m.legend.label.buffer = 0
+        m.legend.label.color.setRGB(0,0,0)
+        m.legend.label.force = mapscript.MS_FALSE
+        m.legend.label.mindistance = -1
+        m.legend.label.minfeaturesize = -1
+        m.legend.label.offsetx = 0
+        m.legend.label.offsety = 0
+        m.legend.label.partials = mapscript.MS_TRUE
         
         #NOTE: no querymap in mapscript!?
 
@@ -778,12 +744,16 @@ def datasets(request):
             metadata_description = {}
         else:
             #now figure out the path for the xml for the chosen standard
-            metadata_description = {'service': service, 'standard': std, 'mimetype': 'text/xml', 'url': '%s%s/metadata/%s.xml' % (base_url, d.uuid, std)}
+            metadata_description = {'service': service, 
+                'standard': std, 
+                'mimetype': 'text/xml', 
+                'url': '%s%s/metadata/%s.xml' % (base_url, d.uuid, std), 
+                'template_path': templatepath #for the vector template location
+            }
         layer = getLayer(d, mapsrc, srcloc, bbox, metadata_description)
 
         #what the. i don't even. why is it adding an invalid tileitem?
-        if layer.tileitem:
-            layertileitem = ''
+        #layer.tileitem = ''
         m.insertLayer(layer)
 
     #post the results
@@ -833,6 +803,7 @@ def clip_tileindex(request):
         
     mappath = request.registry.settings['MAPS_PATH']
     tmppath = request.registry.settings['TEMP_PATH']
+    templatepath = request.registry.settings['MAP_TEMPLATE_PATH']
     srid = request.registry.settings['SRID']
 
     data_path = request.registry.settings['BASE_DATA_PATH'] + '/tileindexes/%s' % tile.uuid
@@ -854,7 +825,8 @@ def clip_tileindex(request):
             "datapath": data_path,
             "base_url": load_balancer,
             "app": app,
-            "srid_list": srid_list
+            "srid_list": srid_list,
+            "templatepath": templatepath
         }
         m = build_tileindex_mapfile(tile, init_params, params)
 
@@ -921,6 +893,7 @@ http://129.24.63.115/apps/rgis/tileindexes/e305d3ed-9db2-4895-8a35-bde79150e272/
         
     mappath = request.registry.settings['MAPS_PATH']
     tmppath = request.registry.settings['TEMP_PATH']
+    templatepath = request.registry.settings['MAP_TEMPLATE_PATH']
     srid = request.registry.settings['SRID']
 
     data_path = request.registry.settings['BASE_DATA_PATH'] + '/tileindexes/%s' % tile.uuid
@@ -943,7 +916,8 @@ http://129.24.63.115/apps/rgis/tileindexes/e305d3ed-9db2-4895-8a35-bde79150e272/
             "datapath": data_path,
             "base_url": load_balancer,
             "app": app,
-            "srid_list": srid_list
+            "srid_list": srid_list,
+            "templatepath": templatepath
         }
         m = build_tileindex_mapfile(tile, init_params, params)
         
@@ -1015,7 +989,7 @@ def build_tileindex_mapfile(tile, init_params, params):
     m.web.imageurl = init_params['tmppath']
     m.web.imagepath = init_params['tmppath']
     #TODO: set up real templates (this doesn't even exist)
-    m.web.template = init_params['tmppath'] + '/client.html'
+    m.web.template = init_params['templatepath'] + '/client.html'
 
     #add the output formats
     of = get_outputformat('png')

@@ -159,6 +159,8 @@ class MapfileSetting(Base):
     classes = relationship('MapfileClass', secondary='gstoredata.mapfile_settings_classes')
     styles = relationship('MapfileStyle', secondary='gstoredata.mapfile_settings_styles')
 
+    _processing_keys = ['LUT', 'BANDS', 'COLOR_MATCH_THRESHOLD', 'DITHER', 'LOAD_FULL_RES_IMAGE', 'LOAD_WHOLE_IMAGE', 'OVERSAMPLE_RATIO', 'RESAMPLE', 'SCALE']
+
 #    def __init__(self, source_id, values):
 #        self.source_id = source_id
 #        #value = {'key': 'value', 'key': 'value'}
@@ -174,16 +176,30 @@ class MapfileSetting(Base):
     def get_processing(self):
         #return the mapfile processing directives from the hstore
         #the keys list may need to be updated based on future needs. this list is for RASTER data
-        keys = ['LUT', 'BANDS', 'COLOR_MATCH_THRESHOLD', 'DITHER', 'LOAD_FULL_RES_IMAGE', 'LOAD_WHOLE_IMAGE', 'OVERSAMPLE_RATIO', 'RESAMPLE', 'SCALE']
-        
         if not self.settings:
             return []
 
         directives = []    
-        for key in keys:
+        for key in self._processing_keys:
             if key in self.settings:
                 directives.append('%s=%s' % (key, self.settings[key]))
         return directives
+
+    def get_flags(self):
+        '''
+        return any non-processing directive flags 
+        as a new dict so we can do other things (ie not just
+        add the string as a PROCESSING flag)
+        '''
+        if not self.settings:
+            return []
+
+        directives = {}    
+        for k, v in self.settings.iteritems():
+            if k not in self._processing_keys:
+                directives.update({k: v})
+        return directives
+        
 
 class MapfileClass(Base):
     __table__ = Table('mapfile_classes', Base.metadata,
