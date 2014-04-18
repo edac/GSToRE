@@ -11,13 +11,11 @@ from urlparse import urlparse
 import urllib2
 import json
 
-#make we sure we have pil
 import Image
 import mapscript
 from cStringIO import StringIO
 
 from ..models import DBSession
-#from the generic model loader (like meta from gstore v2)
 from ..models.datasets import (
     Dataset,
     )
@@ -25,46 +23,44 @@ from ..models.sources import MapfileStyle
 from ..models.apps import GstoreApp
 
 from ..lib.database import *
-#from ..lib.spatial import tilecache_service
 from ..lib.utils import get_image_mimetype, normalize_params
 from ..lib.spatial import *
 from ..lib.mongo import gMongoUri
 
 
-'''
-INSTALLING PIL for the virtualenv (http://justalittlebrain.wordpress.com/2011/08/21/installing-pil-in-virtualenv-in-ubuntu/)
->sudo apt-get build-dep python-imaging
->sudo ln -s /usr/lib/x86_64-linux-gnu/libfreetype.so /usr/lib/
->sudo ln -s /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/
->sudo ln -s /usr/lib/x86_64-linux-gnu/libjpeg.so /usr/lib/
-from the active virtualenv
->bin/easy_install PIL
-'''
-
-'''
-ogc
-
-ecw test: http://129.24.63.66/gstore_v3/apps/rgis/datasets/ef4c8cdc-bec4-43aa-8f2d-3046057e3335/services/ogc/wms?REQUEST=GetMap&SERVICE=WMS&VERSION=1.1.1&LAYERS=t20nr08e34&BBOX=-109.050173,31.332172,-103.001964,37.000293
-
-'''
 #TODO: refactor the mapfile generation part (see the awkwardness of the point symbol)
 #TODO: REFACTOR LIKE ALL OF IT for "let's just keep bolting stuff on" reasons
 #TODO: enjoy
 
-'''
-wcs methods to deal with oddness out of mapserver getcoverage response
-''' 
-
-#check for the geotiff chunk    
+  
 def isGeotiff(content_type):
+    """check for the geotiff chunk
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     return content_type.split(';')[0].lower() in 'image/tiff'
 
-#dammit freaking wcs 1.0.0 
 def parse_tiff_response(content, content_type):
-    '''
+    """
+
     this strips out just the tiff and returns the image 
     JUST FOR TESTING THE WCS because the clients are sketchy at best
-    '''
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+
     parser = Parser()
     parts = parser.parsestr("Content-type:%s\n\n%s" % (content_type, content.rstrip("--wcs--\n\n"))).get_payload()
     for p in parts:
@@ -74,13 +70,21 @@ def parse_tiff_response(content, content_type):
         except:
             raise 
     return None, None
-'''
-end wcs section
-'''
 
-#so, neat trick, the order of the srs matters for wcs.describecoverage
-#this rebuilds the list so that the check_srs (the dataset srs, for example) is listed once and is listed first
 def build_supported_srs(check_srs, supported_srs):
+    """
+
+    so, neat trick, the order of the srs matters for wcs.describecoverage
+    this rebuilds the list so that the check_srs (the dataset srs, for example) is listed once and is listed first
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     if not supported_srs:
         return ''
     if check_srs:
@@ -90,8 +94,17 @@ def build_supported_srs(check_srs, supported_srs):
 
 
 #TODO: REVISE FOR SLDs, RASTER BAND INFO, ETC
-#default syle objs
 def getStyle(geomtype):
+    """default syle objs
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     s = mapscript.styleObj()
     #s.symbol = symbol
     if geomtype.upper() in ['POLYGON', 'MULTIPOLYGON', '3D POLYGON']:
@@ -115,8 +128,18 @@ def getStyle(geomtype):
 
     return s
 
-#convert geomtype to layer type
+
 def getType(geomtype):
+    """convert geomtype to layer type
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     if geomtype.upper() in ['MULTIPOLYGON', 'POLYGON', '3D POLYGON']:
         return mapscript.MS_LAYER_POLYGON
     elif geomtype.upper() in ['LINESTRING', 'LINE', '3D LINESTRING']:
@@ -124,9 +147,21 @@ def getType(geomtype):
     else:
         return mapscript.MS_LAYER_POINT
 
-#get the layer obj by taxonomy (for now)
-#the bbox should be reprojected to the originnal epsg before this
+
 def getLayer(d, src, dataloc, bbox, metadata_description={}):
+    """
+
+    get the layer obj by taxonomy (for now)
+    the bbox should be reprojected to the originnal epsg before this
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     valid_basename = 'g_' + d.basename if d.basename[0] in '0123456789' else d.basename
 
     layer = mapscript.layerObj()
@@ -138,7 +173,7 @@ def getLayer(d, src, dataloc, bbox, metadata_description={}):
     layer.setExtent(bbox[0], bbox[1], bbox[2], bbox[3]) 
 
     layer.metadata.set('layer_title', valid_basename)
-#    layer.metadata.set('ows_abstract', d.description)
+    layer.metadata.set('ows_abstract', d.description)
     layer.metadata.set('ows_keywordlist', '') #TODO: something
     layer.metadata.set('legend_display', 'yes')
     layer.metadata.set('wms_encoding', 'UTF-8')
@@ -206,20 +241,6 @@ def getLayer(d, src, dataloc, bbox, metadata_description={}):
         layer.metadata.set('wcs_rangeset_label', d.description)
         layer.metadata.set('wcs_enable_request', '*')
 
-        
-        '''
-        for the dems:
-        CLASS
-            STYLE
-                COLORRANGE 0 0 0 255 255 255
-                DATARANGE -100 3000
-                RANGEITEM "[pixel]"
-            END
-        END
-        '''
-
-    
-
     #check for any mapfile settings
     #TODO: refactor this to make it nicer (woof)
     #TODO: how does this handle vector classes? whoops, it doesn't.
@@ -282,8 +303,18 @@ def getLayer(d, src, dataloc, bbox, metadata_description={}):
     layer.close()   
     return layer
 
-#set the default contact info for edac
+#TODO: change this to some config set-up
 def set_contact_metadata(m):
+    """set the default contact info for edac
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     m.web.metadata.set('ows_contactperson', 'GStore Support')
     m.web.metadata.set('ows_contactposition', 'technical support')
     m.web.metadata.set('ows_contactinstructions', 'phone or email')
@@ -303,9 +334,17 @@ def set_contact_metadata(m):
     m.web.metadata.set('ows_city', 'Albuquerque')  
     m.web.metadata.set('ows_postcode', '87131')
 
-#the supported outputformats
 def get_outputformat(fmt):
-    #return the configured outputformat obj
+    """return the configured outputformat obj
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     if fmt == 'png':
         of = mapscript.outputFormatObj('AGG/PNG', 'png')
         of.setExtension('png')
@@ -408,7 +447,7 @@ def generateService(mapfile, params, mapname=''):
                 mapfile.save(mapname)
             if 'show' in params:
                 #TODO: this may not be the best idea but it makes for easier debugging 
-                #      and that has never caused anyone grief ever. right.
+                #      and that has never caused anyone grief ever. 
                 with open(mapname, 'r') as f:
                     mr = f.read()
             else:
@@ -439,6 +478,8 @@ def generateService(mapfile, params, mapname=''):
                 return Response(tiff, headers=output_headers)
 
         #TODO: i am not sure these are the best filters for the clusterf*** of wcs stupidity.
+        #      meaning, i think the switch from image/tiff to multipart mime is 1.1.0 so a little sketchy here
+        #      but nothing is hitting 1.1.0 services for reasons we don't know
         if request_type == 'getcoverage' and params['version'] != '1.0.0':
             #get the correct headers from the response
             output_headers = {}
@@ -461,7 +502,6 @@ def generateService(mapfile, params, mapname=''):
         return HTTPServerError(err)
 
 
-#/apps/{app}/{type}/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/services/{service_type}/{service}
 @view_config(route_name='services', match_param='type=datasets')
 def datasets(request):
     """Generate the dataset mapserver service
@@ -483,6 +523,9 @@ def datasets(request):
     dataset_id = request.matchdict['id']
     service_type = request.matchdict['service_type']
     service = request.matchdict['service']
+
+    if not request.params:
+        return HTTPBadRequest('Invalid parameters')
 
     #get the query params because we like those
     params = normalize_params(request.params)
@@ -675,12 +718,7 @@ def datasets(request):
 
             
             #TODO: turn this back on once the freaky weird ascii issue is resolved 
-            '''
-            the services to test with
-            > curl --globoff "http://129.24.63.109/gstore_v3/apps/rgis/datasets/0f3ca80c-2d50-4a33-8df8-c80ff9e94588/services/ogc/wcs?VERSION=1.1.2&SERVICE=WCS&REQUEST=GetCoverage&COVERAGE=mod10a1_a2002193.fractional_snow_cover&CRS=EPSG:4326&FORMAT=image/tiff&HEIGHT=500&WIDTH=500&BBOX=-107.930153271352,34.9674233731823,-104.994718803013,38.5334870384629" > wcs_ae
 
-            > curl --globoff "http://129.24.63.109/gstore_v3/apps/rgis/datasets/0f3ca80c-2d50-4a33-8df8-c80ff9e94588/services/ogc/wcs?VERSION=1.1.2&SERVICE=WCS&REQUEST=GetCoverage&COVERAGE=mod10a1_a2002193.fractional_snow_cover&CRS=EPSG:4326&FORMAT=image/x-aaigrid&HEIGHT=500&WIDTH=500&BBOX=-107.930153271352,34.9674233731823,-104.994718803013,38.5334870384629&RangeSubset=mod10a1_a2002193.fractional_snow_cover:bilinear[bands[1]]" > wcs_af
-            '''
 #            of = get_outputformat('aaigrid')
 #            m.appendOutputFormat(of)
         #elif service == 'wfs':
@@ -752,21 +790,19 @@ def datasets(request):
             }
         layer = getLayer(d, mapsrc, srcloc, bbox, metadata_description)
 
-        #what the. i don't even. why is it adding an invalid tileitem?
+        #what the. i don't even. why is it adding an invalid tileitem? and it doesn't stop
         #layer.tileitem = ''
         m.insertLayer(layer)
 
     #post the results
     mapname = '%s/%s.%s.map' % (mappath, d.uuid, mapsrc_uuid)
-
-    #to check the bands:
-    #http://129.24.63.66/gstore_v3/apps/rgis/datasets/539117d6-bcce-4f16-b237-23591b353da1/services/ogc/wms?REQUEST=GetMap&SERVICE=WMS&VERSION=1.1.1&LAYERS=m_3110406_ne_13_1_20110512&BBOX=-104.316358581,31.9342908128,-104.246085056,32.0032463898
     
     return generateService(m, params, mapname)
 
 @view_config(route_name='services', match_param=('type=tileindexes','service_type=gstore','service=clip'))
 def clip_tileindex(request):
-    '''
+    """
+
     the magic of clip and zip
 
     from the ecws
@@ -782,8 +818,19 @@ def clip_tileindex(request):
     TODO: time
 
     we will just make some assumptions about the layer name (it's just the one)
+
+    > curl --globoff "http://mysite.com/wsgiapp/apps/myapp/datasets/0f3ca80c-2d50-4a33-8df8-c80ff9e94588/services/ogc/wcs?VERSION=1.1.2&SERVICE=WCS&REQUEST=GetCoverage&COVERAGE=coverage&CRS=EPSG:4326&FORMAT=image/tiff&HEIGHT=500&WIDTH=500&BBOX=-107.930153271352,34.9674233731823,-104.994718803013,38.5334870384629" > wcs_ae
+
+    msWCSGetCoverageDomain(): WCS server error. RASTER Layer with no DATA statement and no WCS virtual dataset metadata. Tileindexed raster layers not supported for WCS without virtual dataset metadata (cm->extent, wcs_res, wcs_size).
+
+    Notes:
+        
+    Args:
+        
+    Returns:
     
-    '''
+    Raises:
+    """
 
     tile_id = request.matchdict['id']
     app = request.matchdict['app']
@@ -830,10 +877,6 @@ def clip_tileindex(request):
         }
         m = build_tileindex_mapfile(tile, init_params, params)
 
-#> curl --globoff "http://129.24.63.109/gstore_v3/apps/rgis/datasets/0f3ca80c-2d50-4a33-8df8-c80ff9e94588/services/ogc/wcs?VERSION=1.1.2&SERVICE=WCS&REQUEST=GetCoverage&COVERAGE=mod10a1_a2002193.fractional_snow_cover&CRS=EPSG:4326&FORMAT=image/tiff&HEIGHT=500&WIDTH=500&BBOX=-107.930153271352,34.9674233731823,-104.994718803013,38.5334870384629" > wcs_ae
-
-#msWCSGetCoverageDomain(): WCS server error. RASTER Layer with no DATA statement and no WCS virtual dataset metadata. Tileindexed raster layers not supported for WCS without virtual dataset metadata (cm->extent, wcs_res, wcs_size).
-
     #set up the wcs getcoverage (tiff part only)
     params['request'] = 'GetTiffCoverage'
     params['service'] = 'wcs'
@@ -841,27 +884,24 @@ def clip_tileindex(request):
     params['coverage'] = ','.join([tile.basename + '_%s' % e for e in tile.epsgs])
     params['format'] = 'image/tiff'
 
-    #return Response(json.dumps({'params': params}))
 
-    #get the response object
-    rsp =  generateService(m, params, mapname)
-
-#    #check that the mimetype is geotiff (or what we expect it to be)
-#    if rsp.content_type != 'image/tiff':
-#        return HTTPServerError(rsp.content_type)
-
-#    # get the tiff (as a string)
-#    tif = rsp.body
-
-
-    #build
-
-    return rsp
+    return generateService(m, params, mapname)
 
 
 #TODO: add apps to the tile indexes?
 @view_config(route_name='services', match_param=('type=tileindexes', 'service_type=ogc'))
 def tileindexes(request):
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+
     '''
     build a tile index wms service based on the tile index view
 
@@ -876,6 +916,9 @@ http://129.24.63.115/apps/rgis/tileindexes/e305d3ed-9db2-4895-8a35-bde79150e272/
     app = request.matchdict['app']
     service_type = request.matchdict['service_type']
     service = request.matchdict['service']
+
+    if not request.params:
+        return HTTPBadRequest('Invalid parameters')
 
     params = normalize_params(request.params)
 
@@ -925,6 +968,18 @@ http://129.24.63.115/apps/rgis/tileindexes/e305d3ed-9db2-4895-8a35-bde79150e272/
 
 
 def build_tileindex_mapfile(tile, init_params, params):
+
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+    
     '''
     this is mildly stupid
     see TODOs
@@ -1055,6 +1110,17 @@ def build_tileindex_mapfile(tile, init_params, params):
 
 @view_config(route_name='services', match_param='type=collections')
 def collections(request):
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+
     '''
     build a tile index wms service based on the spatial datasets in a collection   
 
@@ -1079,6 +1145,16 @@ def collections(request):
 #run the base layers for the mapper
 @view_config(route_name='base_services')
 def base_services(request):
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
 
     service = request.matchdict['service']
     app = request.matchdict['app']
@@ -1118,6 +1194,18 @@ mapper
 #      shows up immediately and the callback is triggered. wacky.
 @view_config(route_name='mapper', renderer='mapper.mako')
 def mapper(request):
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+
+    
     #build the dict
     dataset_id = request.matchdict['id']
     app = request.matchdict['app']
