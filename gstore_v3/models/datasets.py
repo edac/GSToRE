@@ -44,15 +44,16 @@ from xml.sax.saxutils import escape
 #this is bad and is just for the metadata right now
 from pyramid.threadlocal import get_current_registry
 
-
-'''
-gstoredata.datasets
-'''
-#TODO: set up the schema for the engine (or metadata, somewhere) but 
-#      check first - not required for 10, for example
-
-#could autoload but there's a lot of old junk in there that we don't really care about
 class Dataset(Base):
+    """
+
+    Note:
+        could autoload but there's a lot of old junk in there that we don't really care about
+
+    Attributes:
+        
+    """
+
     __table__ = Table('datasets', Base.metadata,
         Column('id', Integer, primary_key=True),
         Column('description', String(200)),
@@ -82,7 +83,7 @@ class Dataset(Base):
         Column('license_id', Integer, ForeignKey('gstoredata.licenses.id')),
         Column('date_published', TIMESTAMP),
         Column('uuid', UUID), # we aren't setting this in postgres anymore
-        schema='gstoredata' #THIS IS KEY
+        schema='gstoredata'
     ) 
 
     #categories
@@ -131,6 +132,16 @@ class Dataset(Base):
     data_objects = relationship('DataoneDataObject', backref='datasets')
       
     def __init__(self, description):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         self.description = description
 
         #TODO: generate the uuid for this on create (but overwrite for the tristate sharing datasets, so remember that)
@@ -139,9 +150,21 @@ class Dataset(Base):
     def __repr__(self):
         return '<Dataset (%s, %s)>' % (self.description, self.uuid)
 
-    #get the available formats for the dataset
-    #use the excluded_formats & the taxonomy_list defaults to get the actual supported formats
+        
     def get_formats(self, req=None):
+        """
+
+        get the available formats for the dataset
+        use the excluded_formats & the taxonomy_list defaults to get the actual supported formats
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         if not self.is_available:
             return []
 
@@ -154,8 +177,6 @@ class Dataset(Base):
         if not lst:
             return None
         lst = lst.split(',')
-                    
-        #lst = get_all_formats(req)
         
         exc_lst = self.excluded_formats
 
@@ -163,8 +184,17 @@ class Dataset(Base):
         fmts = [i for i in lst if i not in exc_lst]
         return fmts
 
-    #get the supported web services for the dataset
     def get_services(self, req=None):
+        """get the supported web services for the dataset
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         if not self.is_available:
             return []
 
@@ -177,15 +207,23 @@ class Dataset(Base):
             return None    
         lst = lst.split(',')
 
-        #lst = get_all_services(req)
         exc_lst = self.excluded_services
 
         #get all from one not in the other
         svcs = [i for i in lst if i not in exc_lst]
         return svcs
 
-    #get the list of supported metadata standards for the dataset
     def get_standards(self, req=None):
+        """get the list of supported metadata standards for the dataset
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         if not self.is_available:
             return []
 
@@ -202,6 +240,18 @@ class Dataset(Base):
         return [i for i in lst if i not in exc_lst]
 
     def get_repositories(self):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+
+    
         '''
         get repos by app - 
 
@@ -219,17 +269,31 @@ class Dataset(Base):
         
         return repos
 
-    #return a source by set & extension for this dataset
-    #default to active sources only
+
     def get_source(self, aset, extension, active=True):
+        """
+        return a source by set & extension for this dataset
+        default to active sources only
+
+        
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+        
         src = [s for s in self.sources if s.extension == extension and s.set == aset and s.active == active]
         return src[0] if src else None
 
-
-    #get the source location (path) for the mapfile
-    #return the source id (for the mapfile) and the data filepath
     def get_mapsource(self, fmtpath='', mongo_uri=None, srid=4326, metadata_info=None):
-        '''
+        """
+
+        get the source location (path) for the mapfile
+        return the source id (for the mapfile) and the data filepat
+
         if file:
             return null
             
@@ -243,8 +307,14 @@ class Dataset(Base):
             if shp in formats, get shp
             build shp
 
-        '''
-
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         if self.taxonomy in ['file', 'table', 'service']:
             return None, None
         elif self.taxonomy == 'geoimage':
@@ -310,16 +380,20 @@ class Dataset(Base):
         #and there's nothing left
         return None, None
 
-    #build the dict for the full service description
-    #see the service view, search v3 results
+    
     def get_full_service_dict(self, base_url, req, app):
-#        #update the url
-#        base_url += str(self.uuid)
+        """
+        build the dict for the full service description
+        see the service view, search v3 results
 
-
-        ##TODO: need to escape the description text - this:
-        #1935 15' Quad #217 Aerial Photo Mosaic Index - AZ
-        #returns a result but doesn't parse
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
     
         results = {'type': 'dataset', 'id': self.id, 'uuid': self.uuid, 'description': self.description, 
                 'lastupdate': self.dateadded.strftime('%Y%m%d'), 'name': self.basename, 'taxonomy': self.taxonomy,
@@ -373,7 +447,7 @@ class Dataset(Base):
 
             #combine the links (don't change url) with downloads (build url)
             qp = '' if self.is_cacheable else '?ignore_cache=True'
-            dlds = [{s[1]: base_url + build_dataset_url(app, self.uuid, self.basename, s[0], s[1]) + qp for s in dlds}] if dlds else []  #'%s/%s.%s.%s%s' % (base_url, self.basename, s[0], s[1], qp)
+            dlds = [{s[1]: base_url + build_dataset_url(app, self.uuid, self.basename, s[0], s[1]) + qp for s in dlds}] if dlds else [] 
             dlds = links + dlds
 
             #update the wxs services to have the more complete url (version, request, service)
@@ -415,8 +489,6 @@ class Dataset(Base):
 
                 mt += std.get_urls(app, 'datasets', base_url, self.uuid, services)
 
-            #'%s/metadata/%s.%s' % (base_url, s, e)
-
             #TODO: add the date modified back in although it doesn't matter per standard (it's all gstore, so it's all the same date)
             #     MAYBE ADD SOME KEY? all: date? to go with fgdc: date, iso: date if not gstore-ified?
             utc = pytz.utc
@@ -430,7 +502,6 @@ class Dataset(Base):
             #TODO: change this to get the standard of the original_metadata if om & xml exists
             #      where the format is ONLY xml
         
-           
             '''
             as {fgdc: {ext: url}}
 
@@ -514,13 +585,21 @@ class Dataset(Base):
 
 
     def get_index_doc(self, req=None):
-        '''
+        """
+
         return the json for the elasticsearch index
 
         NOTE: THIS IS NOT THE METHOD FOR REGISTERING THE DATASET IN THE ES INSTANCE
+            AND ISN'T UP TO DATE
 
-        '''
-
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         fmts = self.get_formats(req)
         svcs = self.get_services(req)
 
@@ -587,11 +666,20 @@ class Dataset(Base):
         
 
     def get_onlinks(self, base_url, req, app):
-        '''
+        """
+
         return a flattened list of online linkages
 
         NOTE: not for dataone
-        '''
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         dct = self.get_full_service_dict(base_url, req, app)
         
         services = dct['services'] if dct['services'] else []
@@ -607,7 +695,8 @@ class Dataset(Base):
         return services + downloads + metadatas
 
     def get_distribution_links(self, base_url, req, app):
-        '''
+        """
+
         return a dictionary of download links with file types and sizes
         ordered by our preferred formats by taxonomy 
 
@@ -619,9 +708,15 @@ class Dataset(Base):
           format is the first match in the preferred list found in the supported formats
           so we have canonical and everything else
         - pack the links up with type and size
-        
-        ''' 
 
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         #TODO: maybe cache this? or something
         dct = self.get_full_service_dict(base_url, req, app)
         #as {fmt: link}
@@ -677,15 +772,23 @@ class Dataset(Base):
         
         
     def estimate_filesize(self, format):
-        '''
+        """
+
         VECTOR ONLY 
         estimate the filesize based on geomtype, record/feature counts and number of attributes
 
         THIS IS NOT REMOTELY ACCURATE - we'd need something like the average size of the geometry WKB and the length of the fields (i.e. text field that is 50chars 
         vs 1000chars) to start to come close, but that might be very expensive. also those estimates will change based on the format where the kml could be 600mb
         and the geojson 300mb for the same dataset.
-        '''           
 
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         if self.taxonomy != 'vector':
             return -99
 
@@ -728,10 +831,19 @@ class Dataset(Base):
 
 
     def write_metadata(self, output_location, out_standard, out_format, metadata_info={}):
-        ''' 
+        """
+
         park the metadata (based on the standard and format) on disk
         if the standard isn't in the supported formats, or not original_metadata and no gstore format, bail
-        '''
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
 
         supported_standards = self.get_standards()
         if out_standard not in supported_standards:
@@ -780,13 +892,23 @@ class Dataset(Base):
         #done
         return True
 
-
         
     #TODO: add a vector cache directory check + mkdir method
 
 
     #build an excel file for the data
     def build_excel(self, basepath, mongo_uri, metadata_info):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+        
         style = xlwt.easyxf('font: name Times New Roman, color-index black, bold on', num_format_str='#,##0.00')
         workbook = xlwt.Workbook()
         sheetname = self.basename[0:29]
@@ -849,14 +971,16 @@ class Dataset(Base):
             files.append(metadata_file)
                     
         output = create_zip(os.path.join(basepath, '%s_xls.zip' % (self.basename)), files)
-        
+
+        #still stupid
         return (0, 'success')
 
 
 
     #TODO: refactor for the two streams (stream_vector & stream_text)
     def stream_vector(self, format, basepath, mongo_uri, epsg, metadata_info):
-        '''
+        """
+
         THIS IS THE COMPRESSED FILE GENERATOR - output is a zip file with data file(s) and metadata file
         
         optimization to speed up the file generation, especially for large vector datasets  
@@ -867,8 +991,17 @@ class Dataset(Base):
 
         then grab the metadata and pack everything as a zip for delivery
         and copy all of the files to the formats cache for mapserver, etc
-        '''
 
+        Notes:
+            in some cases, this triggers a memory leak in ogr2ogr or at least
+            something that ramps up the memory untilt he app becomes unresponsive
+
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         #check the base location
         if os.path.abspath(basepath) != basepath or not os.path.isdir(basepath):
             return (1, 'invalid base path')
@@ -930,11 +1063,19 @@ class Dataset(Base):
         return (0, 'success')
 
     def stream_text(self, fmt, base_url, mongo_uri, epsg):
-        '''
+        """'
+        
         THIS IS THE PLAIN, UNCOMPRESSED, UNDOCUMENTED TEXT DATA STREAM
         csv, json, geojson, kml, gml
 
-        '''
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         #get the vectors
         gm = gMongo(mongo_uri)
         vectors = gm.query({'d.id': self.id})
@@ -944,10 +1085,10 @@ class Dataset(Base):
 
         fields = [{"name": f.name, "type": f.ogr_type, "len": f.ogr_width} for f in self.attributes]
 
-        if 'obs' in records[0]['datavalues'][0]:
+        if [a for a in records[0]['datavalues'] if a[0] == 'observed']:
             #this is not a good plan but we don't have the flag for "dataset contains observation timestamp" today
             #and it's as a string for now
-            fields.append({"name": "observed", "type": 4, "len": 20})
+            fields.append({"name": u"observed", "type": 4, "len": 20})
 
         if fmt == 'kml':
             streamer = KmlStreamer(fields)
@@ -973,10 +1114,16 @@ class Dataset(Base):
         return tmp_file
 
     def convert_doc_to_record(self, doc, epsg, geometry_format, is_spatial=True):
-        '''
-        take the mongo doc and convert to a record for streaming
+        """take the mongo doc and convert to a record for streaming
 
-        '''        
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """    
         #deal with the fid v rid (must be one or the other from the doc)
         record_id = doc['f']['id'] if 'f' in doc else doc['r']['id'] if 'r' in doc else ''
         if not record_id:
@@ -1006,15 +1153,29 @@ class Dataset(Base):
         datavalues = [(a['name'], convert_by_ogrtype(a['val'], ogr.OFTString, geometry_format) if isinstance(a['val'], str) or isinstance(a['val'], unicode) else a['val']) for a in atts]
 
         #append the observed timestamp
-        datavalues.append(('observed', observed))
+        datavalues.append((u'observed', observed))
 
         return {"id": int(record_id), "geom": geom_repr, "datavalues": datavalues}
 
     def move_vectors(self, to_mongo_uri, from_mongo_uri):
-        '''
+        """
+
         move docs from one collection to the other (as defined by the mongo_uri collection)
         for a dataset
-        '''
+
+        so switch from embargoed to public (vectors) data or active to inactive data
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+
+        #TODO: add a check to make sure that the #docs 
+        #      from the source is the #docs in the sink
 
         #get the vectors
         from_gm = gMongo(from_mongo_uri)

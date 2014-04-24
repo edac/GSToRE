@@ -22,12 +22,19 @@ from ..lib.es_indexer import DatasetIndexer
 from ..lib.spatial_streamer import *
 
 
-'''
-datasets
-'''
 #TODO: add dataset statistics view - min/max per attribute, histogram info, etc
 
 def return_fileresponse(output, mimetype, filename):
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     fr = FileResponse(output, content_type=mimetype)
     fr.content_disposition = 'attachment; filename=%s' % filename
 
@@ -46,10 +53,18 @@ def return_fileresponse(output, mimetype, filename):
     fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/')
     return fr
 
-
-#@view_config(route_name='zip_dataset')
 @view_config(route_name='dataset')
 def dataset(request):
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     #use the original dataset_id structure 
     #or the new dataset uuid structure
 
@@ -103,8 +118,6 @@ def dataset(request):
     xslt_path = request.registry.settings['XSLT_PATH']
     fmtpath = request.registry.settings['FORMATS_PATH']
     tmppath = request.registry.settings['TEMP_PATH']
-    #base_url = '%s/apps/%s/datasets/' % (request.registry.settings['BALANCER_URL'], app)
-
     base_url = request.registry.settings['BALANCER_URL']
     
     #check for a requested metadata standard
@@ -212,7 +225,7 @@ def dataset(request):
 
 @view_config(route_name='dataset_streaming')
 def stream_dataset(request):
-    '''
+    """
     stream dataset as json, kml, csv, geojson, gml
     for improved access options (pull in json for a table on a webpage, etc)
     BUT only for vector datasets
@@ -220,9 +233,15 @@ def stream_dataset(request):
     params:
         bbox (return features intersecting box)
         datetime (return features within time range (sensor data, etc))
-        
-    '''
 
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     app = request.matchdict['app']
     dataset_id = request.matchdict['id']
     format = request.matchdict['ext']
@@ -264,7 +283,7 @@ def stream_dataset(request):
 
     fields = [{"name": f.name, "type": f.ogr_type, "len": f.ogr_width} for f in d.attributes]
 
-    if 'obs' in records[0]['datavalues'][0]:
+    if [a for a in records[0]['datavalues'] if a[0] == 'observed']:
         #this is not a good plan but we don't have the flag for "dataset contains observation timestamp" today
         #and it's as a string for now
         fields.append({"name": "observed", "type": 4, "len": 20})
@@ -294,14 +313,24 @@ def stream_dataset(request):
     return response
    
 
+#TODO: try prettyjson format in latest pyramid. this just scares people
 #TODO: add params for including styles with output (so render from gstore for niceness or just deliver html structure for epscor/rgis, etc)
-#@view_config(route_name='dataset_services', renderer='json')
 @view_config(route_name='dataset_services', renderer='dataset.mako')
-#@view_config(route_name='dataset_services', match_param="ext=json", renderer='prettyjson')
 def services(request):
-    #return .json (or whatever) with all services for dataset defined 
-    #i.e. links to the ogc services, links to the downloads, etc
-    #same format as stuff from search request?
+    """
+
+    return .json (or whatever) with all services for dataset defined 
+    i.e. links to the ogc services, links to the downloads, etc
+    same format as stuff from search request?
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
 
     app = request.matchdict['app']
     dataset_id = request.matchdict['id']
@@ -334,7 +363,6 @@ def services(request):
     '''
     
     load_balancer = request.registry.settings['BALANCER_URL']
-    #base_url = '%s/apps/%s/datasets/' % (load_balancer, app)
 
     rsp = d.get_full_service_dict(load_balancer, request, app)
 
@@ -350,7 +378,8 @@ def services(request):
 
 @view_config(route_name='dataset_statistics')
 def statistics(request):
-    '''
+    """
+
     return some dataset-level stats:
 
     vector:
@@ -364,16 +393,33 @@ def statistics(request):
 
 
     in part to help with classification (although that requires sld support)
-    '''
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     return Response()
 
 @view_config(route_name='dataset_indexer', renderer='json')
 def indexer(request):
-    '''
+    """
+
     return the document for the elasticsearch index
 
     THIS IS NOT really for production but intersecting everything to get a list of quads will explode the database
-    '''
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
 
     app = request.matchdict['app']
     dataset_id = request.matchdict['id']
@@ -407,13 +453,8 @@ dataset maintenance
 '''
 @view_config(route_name='add_dataset', request_method='POST')
 def add_dataset(request):
-    app = request.matchdict['app']
+    """
 
-    #generate uuid here, not through postgres - need to use 
-    #outside uuids for data replication (nv/id data as local dataset with pointer to their files)
-
-
-    '''
     we are skipping the file upload - no one wanted to do that (or no one wanted it to post to ibrix)
     so maybe add it again later if it comes up, but we're starting with the basic json post functionality
 
@@ -470,7 +511,18 @@ def add_dataset(request):
         }
     }
 
-    '''
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+    app = request.matchdict['app']
+
+    #generate uuid here, not through postgres - need to use 
+    #outside uuids for data replication (nv/id data as local dataset with pointer to their files)
 
     #TODO: finish the settings insert (class & style)
 
@@ -658,7 +710,6 @@ def add_dataset(request):
         #this should be the unique project name
         p = DBSession.query(Project).filter(Project.name==project).first()
         if p:
-            #new_dataset.project_id = p.id
             new_dataset.projects.append(p)
 
     #TODO: add the publication date
@@ -701,6 +752,18 @@ def add_dataset(request):
 #TODO: change this back to PUT and figure out why pycurl hung up on it.
 @view_config(route_name='update_dataset', request_method='POST')
 def update_dataset(request):
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+
+    
     '''
     add version value
     activate/deactivate
@@ -1032,13 +1095,22 @@ def update_dataset(request):
 
 @view_config(route_name='update_dataset_index', request_method='POST')
 def update_dataset_index(request):
-    '''
+    """
+
     just update the es index doc in place (not updating/inserting anything to postgres)
 
     for postgres database changes that need to be mapped to es but weren't changed through the update dataset route
 
     url?elements=key1,key2,key3
-    '''
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     dataset_id = request.matchdict['id']
     d = get_dataset(dataset_id)
     if not d:

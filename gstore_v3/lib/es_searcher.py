@@ -10,24 +10,43 @@ import json
 from requests.auth import HTTPBasicAuth
 
 class EsSearcher():
-    '''
-    basic es search object 
+    """ElasticSearch search api access
 
-    should handle the cross-doctype searches
-    but only to return the gstore _ids (uuids)
-    '''
+    Note:
+        See EsIndexer for indexing access.
+        
+    Attributes:
+        query_data (dict): search filters for the ES POST request
+        results (dict): request response
+        dfmt (str): basic date format
+        srid (int): default spatial ref for the bbox filter
+        default_limit (int): defaults to 14
+        default_offset (int): defaults to 0
+        default_fields (list): list of field names to include in the response (defaults to _id, our uuids, only)
+    """
+    
+    query_data = {} 
+    results = {} 
 
-    query_data = {} #dict for the POST
-    results = {} #request response
-
-    dfmt = '%Y-%m-%d' #for the es search
+    dfmt = '%Y-%m-%d'
     srid = 4326
     default_limit = 15
     default_offset = 0
-    default_fields = ["_id"] #in case we want to override the search response
+    default_fields = ["_id"] 
     
     def __init__(self, es_description):
-        #{"host": "http://129.24.63.18:9200/", "index": "gstore_a", "type": "dataset"} where type can be a comma-delim string of doctypes
+        """set up the elasticsearch POST url
+
+        Notes:
+            "type" in the es_description can be a comma-delimited list of objects types (datasets,collections)
+            
+        Args:
+            es_description (dict): host, index, type, user, password
+                    
+        Returns:
+        
+        Raises:
+        """
         self.es_description = es_description 
 
         self.es_url = es_description['host'] + es_description['index'] + '/' + es_description['type'] + '/_search'
@@ -38,31 +57,65 @@ class EsSearcher():
         return '<EsSearcher (%s)>' % (self.es_url)
 
     def get_query(self):
-        '''
-        for testing the structure of the es post data
-        '''
+        """return the search filters 
+
+        Notes:
+            For testing purposes
+            
+        Args:
+                    
+        Returns:
+            (dict): the search filters
+        
+        Raises:
+        """
         return self.query_data
 
     def get_result_total(self):
-        '''
-        this isn't the number of things in the result set, this it total number of things possible for the query 
-        if you ignore the limit/offset
-        '''
+        """return the number of objects returned by the filter
+
+        Notes:
+            
+        Args:
+                    
+        Returns:
+            (int): the total number of objects found for the filter(s)
+        
+        Raises:
+        """ 
         return self.results['hits']['total'] if 'hits' in self.results else 0
 
     def get_result_ids(self):
-        '''
-        return the (_id, _type) tuple as a list
-        '''
+        """return the _id and object type for the result set
+
+        Notes:
+            Used to generate the output from the object models (services description)
+            
+        Args:
+                    
+        Returns:
+            (list): list of tuples (_id, _type)
+        
+        Raises:
+        """
         if not self.results:
             return []        
         
         return [(i['_id'], i['_type']) for i in self.results['hits']['hits']]
 
     def search(self):
-        '''
-        execute the es request
-        '''
+        """execute the es request
+
+        Notes:
+            
+        Args:
+                    
+        Returns:
+            (json): the json response from elasticsearch
+        
+        Raises:
+            Exception: returns the es error if the status code isn't 200
+        """
 
         results = requests.post(self.es_url, data=json.dumps(self.query_data), auth=(self.user, self.password))
         if results.status_code != 200:
@@ -71,14 +124,22 @@ class EsSearcher():
 
         self.results = results.json()
         
-        #return the json
         return self.results
 
     def parse_basic_query(self, app, query_params, exclude_fields=[]):
-        '''
-        build the json POST 
+        """build the search filter dict 
+
+        Notes:
+            
+        Args:
+            app (str): the app key alias
+            query_params (dict): the query params from the gstore search request
+            exclude_fields (list, optional): list of fields to use for MISSING query (see collections)
+                    
+        Returns:
         
-        '''
+        Raises:
+        """
         #pagination
         limit = int(query_params['limit']) if 'limit' in query_params else self.default_limit
         offset = int(query_params['offset']) if 'offset' in query_params else self.default_offset
@@ -178,15 +239,14 @@ class EsSearcher():
             spatial_search = True
 
         if start_added_date or end_added_date:
-            range_query = self.build_date_filter('date_added', start_added_date, end_added_date)
+            range_query = self.build_simple_date_filter('date_added', start_added_date, end_added_date)
             if range_query:
                 ands.append(range_query)
 
         if start_valid_date or end_valid_date:
-            #TODO: this is not the right element name for the indexes
-            range_query = self.build_date_filter('valid_dates', start_valid_date, end_valid_date)
+            range_query = self.build_date_filter('valid_start', start_valid_date, 'valid_end', end_valid_date)
             if range_query:
-                ands.append(range_query)
+                ands += range_query
 
         if exclude_fields:
             #lazy man's handling of give me all collections (no collections in mapping) or any dataset not in a collection (in collection, has collections list in mapping)
@@ -224,9 +284,20 @@ class EsSearcher():
 
     #TODO: change this to handle the new hierarchy
     def extract_category(self, query_params):
-        '''
-        deal with the category triplet
-        '''
+        """parse the category triplet for the search 
+
+        Notes:
+            
+        Args:
+            query_params (dict): the query params from the gstore search request
+                    
+        Returns:
+            theme (str): the theme
+            subtheme (str): the subtheme
+            groupname (str): the groupname
+        
+        Raises:
+        """
         theme = query_params['theme'].replace('+', ' ') if 'theme' in query_params else ''
         subtheme = query_params['subtheme'].replace('+', ' ') if 'subtheme' in query_params else ''
         groupname = query_params['groupname'].replace('+', ' ') if 'groupname' in query_params else ''
@@ -236,14 +307,22 @@ class EsSearcher():
     '''
     build helpers
     '''
-    def build_date_filter(self, element, start_date, end_date):
-        '''
-        search options:
+    def build_simple_date_filter(self, element, start_date, end_date):
+        """build a date filter for an element (single date element unparsed only)
 
-            greater than or equal date
-            less than equal date
-            between two dates
-        '''
+        Notes:
+            greater than equal, less than equal, between
+            
+        Args:
+            element (str): name of the element for the date range filter
+            start_date (str): date string a yyyy-MM-dd
+            end_date (str): date string a yyyy-MM-dd
+                    
+        Returns:
+            (dict): a range filter element
+        
+        Raises:
+        """
         if not start_date and not end_date:
             return {}
 
@@ -257,11 +336,41 @@ class EsSearcher():
             
         return {"range": {element: range_query}}
 
+    def build_date_filter(self, start_element, start_date, end_element, end_date):
+        '''build the more complete, cross-element date filter
+        '''
+        if not start_date and not end_date:
+            return {}
+
+        range_query = []
+        if start_date and not end_date:
+            range_query.append({"range": {"%s.date" % start_element: {"gte": start_date.strftime(self.dfmt)}}})
+        if not start_date and end_date:
+            range_query.append({"range": {"%s.date" % end_element: {"lte": end_date.strftime(self.dfmt)}}})
+        if start_date and end_date:
+            range_query = [
+                {"range": {"%s.date" % start_element: {"gte": start_date.strftime(self.dfmt)}}},
+                {"range": {"%s.date" % end_element: {"lte": end_date.strftime(self.dfmt)}}}
+            ]
+        
+        return range_query
 
     def build_geoshape_filter(self, box, epsg):
-        '''
-        the georel sorting is not handled here, just the geo_shape builder
-        '''
+        """build a geometry filter for the location element 
+
+        Notes:
+            the geo relevance scoring is handling in the main search parser
+            
+        Args:
+            box (str): bbox as minx,miny,maxx,maxy string
+            epsg (str): epsg code
+                    
+        Returns:
+            geo_shape (dict): a geoshape filter element
+            search_area (float): area of the geometry (for the rescorer)
+        
+        Raises:
+        """
 
         epsg = int(epsg) if epsg else self.srid
 
@@ -289,10 +398,37 @@ class EsSearcher():
         return geo_shape, search_area
 
     def build_keyword_filter(self, keywords, elements):
-        '''
-        elements is expandable to deal with the abstract, etc
-        '''
+        """build a keyword filter for ORs across one or more elements 
+
+        Notes:
+            
+        Args:
+            keywords (str): the keyword string (phrase, etc)
+            elements (list): list of elements to include in the search
+                    
+        Returns:
+            (dict): an OR filter element
+        
+        Raises:
+        """
         ors = [{"query": {"match": {element: {"query": keywords, "operator": "and"}}}} for element in elements]
+
+        #TODO: add the wildcard search:
+        '''
+        {
+            "sort": [{"title_search": {"order": "desc"}}],
+            "fields": ["_id"],
+            "query": {"filtered": {"filter": {"and": [
+                {"term": {"applications": "rgis"}},
+                {"term": {"embargo": false}},
+                {"term": {"active": true}},
+                {"query": {"wildcard": {"title_search":"Surfa*"}}}
+                
+            ]}}},
+            "from": 0,
+            "size": 15
+        }
+        '''
         
         return {
             "query": {
@@ -305,22 +441,29 @@ class EsSearcher():
         }
 
 
-#basic search extended for the datasets within a collection search
 class CollectionWithinSearcher(EsSearcher):
-    '''
-    extend the basic search with the collection element
+    """Additional ES search capability for "search within collection" 
 
-    note: just use the dataset doctype when instantiating the search, don't include the exclude_fields array (or at least not the collections field), 
-    and then include update method between parse basic and search:    
-        searcher.parse_basic_query
-        searcher.update_collection_filter
-        searcher.search
-    '''
+    Note:
+        Use the dataset doctype when instantiating.
+        Don't include the exclude_fields (or leave out collections)
+
+        Execute update_collection_filter between parsing the query and executing the search
+        
+    Attributes:
+    """
     def update_collection_filter(self, collection_uuid):
-        '''
-        the basic searcher can handle the dataset-only search (just limit it to the dataset type)
-        but we need to include collection specific bits, namely the collection uuid in the collections array
-        '''
+        """add a filter to include the collection uuid to search within 
+
+        Notes:
+            
+        Args:
+            collection_uuid (str): the collection uuid to search within
+                    
+        Returns:
+        
+        Raises:
+        """
 
         if not self.query_data:
             return ''
@@ -347,7 +490,7 @@ class CollectionWithinSearcher(EsSearcher):
 
 '''
 >>> from gstore_v3.lib import es_searcher
->>> ed = {"host": "http://es.sandbox.edac.bldg16:9200/", "index": "gstore", "type": "dataset,collection", "user": "", "password": ""}
+>>> ed = {"host": "http://:/", "index": "", "type": "dataset,collection", "user": "", "password": ""}
 >>> es = es_searcher.EsSearcher(ed)
 >>> es.es_url
 >>> qp = {"query": "modis"}
@@ -358,14 +501,20 @@ class CollectionWithinSearcher(EsSearcher):
 
 #for the repository search (object in repository?)
 class RepositorySearcher(EsSearcher):
-    query_data = {} #dict for the POST
-    results = {} #request response
+    """Additional ES search capability for repository listings 
 
-    dfmt = '%Y-%m-%d' #for the es search
+    Note:
+        
+    Attributes:
+    """
+    query_data = {} 
+    results = {} 
+
+    dfmt = '%Y-%m-%d' 
     srid = 4326
     default_limit = 20
     default_offset = 0
-    default_fields = ["_id"] #in case we want to override the search response
+    default_fields = ["_id"] 
     
     def __init__(self, es_description):
         self.es_description = es_description 
@@ -378,31 +527,65 @@ class RepositorySearcher(EsSearcher):
         return '<RepositorySearcher (%s)>' % (self.es_url)
 
     def get_query(self):
-        '''
-        for testing the structure of the es post data
-        '''
+        """return the search filters 
+
+        Notes:
+            For testing purposes
+            
+        Args:
+                    
+        Returns:
+            (dict): the search filters
+        
+        Raises:
+        """
         return self.query_data
 
     def get_result_total(self):
-        '''
-        this isn't the number of things in the result set, this it total number of things possible for the query 
-        if you ignore the limit/offset
-        '''
+        """return the number of objects returned by the filter
+
+        Notes:
+            
+        Args:
+                    
+        Returns:
+            (int): the total number of objects found for the filter(s)
+        
+        Raises:
+        """ 
         return self.results['hits']['total'] if 'hits' in self.results else 0
 
     def get_result_ids(self):
-        '''
-        return the (_id, _type) tuple as a list
-        '''
+        """return the _id and object type for the result set
+
+        Notes:
+            Used to generate the output from the object models (services description)
+            
+        Args:
+                    
+        Returns:
+            (list): list of tuples (_id, _type)
+        
+        Raises:
+        """
         if not self.results:
             return []        
         
         return [(i['_id'], i['_type']) for i in self.results['hits']['hits']]
 
     def search(self):
-        '''
-        execute the es request
-        '''
+        """execute the es request
+
+        Notes:
+            
+        Args:
+                    
+        Returns:
+            (json): the json response from elasticsearch
+        
+        Raises:
+            Exception: returns the es error if the status code isn't 200
+        """
 
         results = requests.post(self.es_url, data=json.dumps(self.query_data), auth=(self.user, self.password))
         if results.status_code != 200:
@@ -415,30 +598,21 @@ class RepositorySearcher(EsSearcher):
         return self.results
 
     def build_basic_search(self, app, repo, standard, query_params={}):
-        '''
-        this is to id the objects in a repo
+        """build the search filter dict 
 
-        {
-	        "query": {
-            	    "filtered": {
-                    	"filter": {
-                        	"nested": {
-                            	"path": "supported_repositories",
-                            "filter": {
-                                	"and": [
-                                    	{"term": {"repos": "GEOSS"}},
-                                    {"term": {"app": "elseweb"}}
-                                ]
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-
-        NOTE: the query_params is not the straight request params obj. it's repacked to be clear about the date search
-        '''
+        Notes:
+            the query_params is not the straight request params obj. it's repacked to be clear about the date search
+            
+        Args:
+            app (str): the app key alias
+            repo (str): the repository alias
+            standard (str): the documentation standard
+            query_params (dict): the query params from the gstore search request
+                    
+        Returns:
+        
+        Raises:
+        """
 
         query_request = {"size": self.default_limit, "from": self.default_offset, "fields": self.default_fields}
 
@@ -536,11 +710,10 @@ class RepositorySearcher(EsSearcher):
         self.query_data = query_request
 
 
+    #TODO: this
     def build_search(self):
-        '''
-        search within a repo?
+        '''search within a repo
         '''
         pass
-
 
         
