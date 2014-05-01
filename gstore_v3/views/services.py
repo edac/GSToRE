@@ -1270,10 +1270,12 @@ def mapper(request):
     wms = [s for s in services if 'WMS' in s['title']]
     wms = wms[0]['text'].replace('GetCapabilities', 'GetMap') if wms else ''
 
-    lyrs = [{'layer': d.basename, 'id': str(d.uuid), 'title': d.description, 'features_attributes': [], 'maxExtent': [float(b) for b in d.box]}]
+    valid_basename = 'g_' + d.basename if d.basename[0] in '0123456789' else d.basename
+
+    lyrs = [{'layer': valid_basename, 'id': str(d.uuid), 'title': d.description, 'features_attributes': [], 'maxExtent': [float(b) for b in d.box]}]
     c.update({'Layers': lyrs, "metadata": metadatas, "services": services, "formats": downloads})
 
-    dsc = {'what': 'dataset', 'title': d.description, 'id': str(d.uuid), 'singleTile': False, 'layers': [d.basename], 'services': services, 'formats': downloads, 'metadata': '', 'taxonomy': d.taxonomy, 'taxonomy_desc': taxonomy, 'wms': wms}
+    dsc = {'what': 'dataset', 'title': d.description, 'id': str(d.uuid), 'singleTile': False, 'layers': [valid_basename], 'services': services, 'formats': downloads, 'metadata': '', 'taxonomy': d.taxonomy, 'taxonomy_desc': taxonomy, 'wms': wms}
 
     c.update({'Description': dsc})
     
