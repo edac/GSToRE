@@ -13,9 +13,7 @@ import json
 import os, shutil, cgi
 from lxml import etree
 
-#from the models init script (BOTH connections)
 from ..models import DBSession, DataoneSession
-#from the generic model loader (like meta from gstore v2)
 from ..models.datasets import (
     Dataset,
     )
@@ -31,9 +29,6 @@ from ..lib.mongo import gMongo, gMongoUri
 
 
 '''
-make sure that the general errors are being posted correctly (404, 500, etc)
-at the app level
-
 see http://mule1.dataone.org/ArchitectureDocs-current/apis/MN_APIs.html
 '''
 
@@ -43,7 +38,12 @@ some presets
 NODE = 'urn:node:EDACGSTORE'
 SUBJECT = 'CN=gstore.unm.edu,DC=dataone,DC=org'
 RIGHTSHOLDER = 'CN=gstore.unm.edu,DC=dataone,DC=org'
-CONTACTSUBJECT = 'CN=gstore.unm.edu,O=Google,C=US,DC=cilogon,DC=org'
+#CONTACTSUBJECT = 'CN=gstore.unm.edu,O=Google,C=US,DC=cilogon,DC=org'
+
+#the string for the dev coordinating node (or maybe staging)
+#CONTACTSUBJECT = 'CN=Dev Team A10142,O=Google,C=US,DC=cilogon,DC=org'
+#the one for produciton
+CONTACTSUBJECT='CN=Soren Scott A11096,O=Google,C=US,DC=cilogon,DC=org'
 NAME = 'EDAC Gstore Repository'
 ALIAS = 'EDACGSTORE'
 DESCRIPTION = "Earth Data Analysis Center's (EDAC) Geographical Storage, Transformation and Retrieval Engine (GSTORE) platform archives data produced by various NM organizations, including NM EPSCoR and RGIS. GSTORE primarily houses GIS and other digital documents relevant to state agencies, local government, and scientific researchers. See RGIS and NM EPSCoR for more information on the scope of data. It currently uses the FGDC metadata standard to describe all of its holdings."
@@ -51,20 +51,51 @@ CN_RESOLVER='https://cn.dataone.org/cn/v1/resolve'
 
 #TODO: add the system metadata date modified trigger to obsoleting step and then add something for actually updating that model
 
-
-
 #convert to the d1 format
 def datetime_to_dataone(dt):
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+    
     fmt = '%Y-%m-%dT%H:%M:%S.%fZ'
     return dt.strftime(fmt)
     
 def datetime_to_http(dt):
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+    
     #TODO: utc to gmt
     #Wed, 16 Dec 2009 13:58:34 GMT
     fmt = '%a, %d %b %Y %H:%M:%S GMT'
     return dt.strftime(fmt)
 
 def dataone_to_datetime(dt):
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+    
     #TODO: deal with more datetime issues (could be gmt or utc, with or without milliseconds)
     '''
     YYYY-MM-DDTHH:MM:SS:mm.fff
@@ -72,9 +103,6 @@ def dataone_to_datetime(dt):
     '''
 
     fmts = ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%S.%f']
-
-    
-    #fmt = '%Y-%m-%dT%H:%M:%S'
     dt = dt.replace('+00:00', '') if '+00:00' in dt else dt
 
     d = None
@@ -82,12 +110,20 @@ def dataone_to_datetime(dt):
         try:
             d = datetime.strptime(dt, fmt)
         except:
-            #d = None
             pass
     return d
 
-#add some validation for the limit/offset - isn't null, is int, is positive
 def is_good_int(s, default):
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     if not s:
         #not provided is okay, we have a default
         return True, default
@@ -105,9 +141,22 @@ def is_good_int(s, default):
     ##not sure what this is, which we could replace with default, but let's fail as a bad request instead
     return False, -99
 
-#this assumes that we care about anything that isn't a uuid? but the d1 tests will always be 404 anyway. i don't get it.
-#and they don't really explain what they expect as far as fails go.
+
 def is_valid_url(url):
+    """
+
+    this assumes that we care about anything that isn't a uuid? but the d1 tests will always be 404 anyway. i don't get it.
+    and they don't really explain what they expect as far as fails go.
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+    
     try:
         url = urllib2.unquote(url.decode('unicode_escape'))
     except:
@@ -115,24 +164,42 @@ def is_valid_url(url):
     return True    
 
 def is_valid_uuid(u):
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+    
     pattern = '^[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}$'
     return match_pattern(pattern, u)
 
-#some generic error handling 
-#that would be nicer if dataone was consistent in their error handling (or their documentation was consistent, i don't know which)
 def return_error(error_type, detail_code, error_code, error_message='', pid=''):  
-    '''
+    """
+
     i am currently just guessing, but there is maybe some conflict in the encoding specified by the xml and the pid handling on the d1 end (in the tester)
     as in, we are sent a unicode pid, but we can't return the unicode in the utf8 xml, so we change the pid encoding to not have the xml fail
     and then the tests fail. 
 
     so we are NOT returning the pid in the error xml for the object/metadata responses to pass the tests
-    '''
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     if error_code == 404 and (error_type == 'object' or error_type == 'metadata'):
         xml = '<?xml version="1.0" encoding="UTF-8"?><error detailCode="%s" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: DOESNTEXIST</description></error>' % (detail_code)
         return Response(xml, content_type='text/xml; charset=UTF-8', status='404')
 
-#removed this because something about the PID (probably the encoding) caused the D1 tester to fail in ways that make no damn sense
+#removed this because something about the PID (probably the encoding) caused the D1 tester to fail in ways that make no sense
 #    elif error_code == 404 and error_type == 'metadata':
 #        xml = '<?xml version="1.0" encoding="UTF-8"?><error detailCode="%s" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: %s</description></error>' % (detail_code, ('%s' % pid).encode('utf-8'))
 
@@ -148,6 +215,17 @@ def return_error(error_type, detail_code, error_code, error_message='', pid=''):
     return Response()
 
 def return_error_head(pid):
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+    
     return [('Content-Type', 'text/xml'), 
                ('DataONE-Exception-Name', 'NotFound'), 
                ('DataONE-Exception-DetailCode', '1380'), 
@@ -157,7 +235,18 @@ def return_error_head(pid):
 '''
 dataone logging in second postgres db because they demand authentication for themselves but we have to just accept every damn thing.
 '''
-def log_entry(identifier, ip, event, useragent='public'):    
+def log_entry(identifier, ip, event, useragent='public'):  
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+
     dlog = DataoneLog(identifier, ip, SUBJECT, event, NODE, useragent)
     try:
         DataoneSession.add(dlog)
@@ -170,21 +259,20 @@ def log_entry(identifier, ip, event, useragent='public'):
 @view_config(route_name='dataone_ping', http_cache=3600)
 @view_config(route_name='dataone_ping_slash', http_cache=3600)
 def ping(request):
-    #curl -v  http://129.24.63.66/gstore_v3/apps/dataone/monitor/ping
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
     
-    #raise notimplemented
-    #raise servicefailure
-    #raise insufficientresources
-    
-    #run a quick test to make sure the db connection is active
+    Raises:
+    """
     try:
         d = get_dataset('61edaf94-2339-4096-9cc0-4bfb79a9c848')
     except:
         return HTTPServerError()
-#   this isn't actually an error. it connected without failure so this is actually okay (especially if that uuid gets junked)        
-#    if not d:
-#        return HTTPServerError()
-
     return Response()
 
 @view_config(route_name='dataone_noversion', renderer='../templates/dataone_node.pt')
@@ -194,33 +282,16 @@ def ping(request):
 @view_config(route_name='dataone_node', renderer='../templates/dataone_node.pt')
 @view_config(route_name='dataone_node_slash', renderer='../templates/dataone_node.pt')
 def dataone(request):
-    '''
-    system metadata about the member node
+    """
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <d1:node xmlns:d1="http://ns.dataone.org/service/types/v1" replicate="true" synchronize="true" type="mn" state="up">
-      <identifier>urn:node:DEMO2</identifier>
-      <name>DEMO2 Metacat Node</name>
-      <description>A DataONE member node implemented in Metacat.</description>
-      <baseURL>https://demo2.test.dataone.org:443/knb/d1/mn</baseURL>
-      <services>
-        <service name="MNRead" version="v1" available="true"/>
-        <service name="MNCore" version="v1" available="true"/>
-      </services>
-      <synchronization>
-        <schedule hour="*" mday="*" min="0/3" mon="*" sec="10" wday="?" year="*"/>
-        <lastHarvested>2012-03-06T14:57:39.851+00:00</lastHarvested>
-        <lastCompleteHarvest>2012-03-06T14:57:39.851+00:00</lastCompleteHarvest>
-      </synchronization>
-      <ping success="true"/>
-      <subject>CN=urn:node:DEMO2, DC=dataone, DC=org</subject>
-      <contactSubject>CN=METACAT1, DC=dataone, DC=org</contactSubject>
-    </d1:node>
-    '''
-
-    #TODO: check the synchronization part 
-    #TODO: check all the other parts, i.e. subject and contact subject and identifier
-
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
 
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/dataone/' % (load_balancer)
@@ -240,36 +311,19 @@ def dataone(request):
     request.response.content_type='text/xml'
     return rsp
 
-
 @view_config(route_name='dataone_log')
 @view_config(route_name='dataone_log_slash')
 def log(request):
-    '''
-    <?xml version="1.0" encoding="UTF-8"?>
-    <d1:log xmlns:d1="http://ns.dataone.org/service/types/v1" count="3" start="0" total="1273">
-      <logEntry>
-        <entryId>1</entryId>
-        <identifier>MNodeTierTests.201260152556757.</identifier>
-        <ipAddress>129.24.0.17</ipAddress>
-        <userAgent>null</userAgent>
-        <subject>CN=testSubmitter,DC=dataone,DC=org</subject>
-        <event>create</event>
-        <dateLogged>2012-02-29T23:25:58.104+00:00</dateLogged>
-        <nodeIdentifier>urn:node:DEMO2</nodeIdentifier>
-      </logEntry>
-      <logEntry>
-        <entryId>2</entryId>
-        <identifier>TierTesting:testObject:RightsHolder_Person.4</identifier>
-        <ipAddress>129.24.0.17</ipAddress>
-        <userAgent>null</userAgent>
-        <subject>CN=testSubmitter,DC=dataone,DC=org</subject>
-        <event>create</event>
-        <dateLogged>2012-02-29T23:26:38.828+00:00</dateLogged>
-        <nodeIdentifier>urn:node:DEMO2</nodeIdentifier>
-      </logEntry>
-    </d1:log>
+    """
 
-    '''
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
 
     #TODO: check on filters again (pidFilter not working??)
 
@@ -286,7 +340,11 @@ def log(request):
     limit = params['count'] if 'count' in params else ''
 
     is_good_offset, offset = is_good_int(offset, 0)
-    is_good_limit, limit = is_good_int(limit, 1000)
+    is_good_limit, limit = is_good_int(limit, 20)
+
+    #just because it's a good int doesn't mean we like it
+    #reset to 20 if greater
+    limit = 20 if limit > 20 else limit
 
     if not is_good_offset or not is_good_limit:
         return return_error('object', 1504, 400)
@@ -342,31 +400,17 @@ def log(request):
 @view_config(route_name='dataone_search', renderer='dataone_search.mako')
 @view_config(route_name='dataone_search_slash', renderer='dataone_search.mako')
 def search(request):
-    '''
-    <?xml version="1.0"?>
-    <ns1:objectList xmlns:ns1="http://ns.dataone.org/service/types/v1" count="5" start="0" total="12">
-      <objectInfo>
-        <identifier>AnserMatrix.htm</identifier>
-        <formatId>eml://ecoinformatics.org/eml-2.0.0</formatId>
-        <checksum algorithm="MD5">0e25cf59d7bd4d57154cc83e0aa32b34</checksum>
-        <dateSysMetadataModified>1970-05-27T06:12:49</dateSysMetadataModified>
-        <size>11048</size>
-      </objectInfo>
+    """
 
-      ...
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
 
-      <objectInfo>
-        <identifier>hdl:10255/dryad.218/mets.xml</identifier>
-        <formatId>eml://ecoinformatics.org/eml-2.0.0</formatId>
-        <checksum algorithm="MD5">65c4e0a9c4ccf37c1e3ecaaa2541e9d5</checksum>
-        <dateSysMetadataModified>1987-01-14T07:09:09</dateSysMetadataModified>
-        <size>2796</size>
-      </objectInfo>
-    </ns1:objectList>
-
-    '''
-
-    #check the encoding
     url = request.path_qs
     good_encoding = is_valid_url(url)
     if good_encoding == False:
@@ -375,14 +419,15 @@ def search(request):
     params = normalize_params(request.params)
     params = decode_params(params)
 
-#    rsp = Response(json.dumps(params, indent=4), content_type='test/json')
-#    return rsp
-
     offset = params.get('start') if 'start' in params else ''
     limit = params.get('count') if 'count' in params else ''
 
     is_good_offset, offset = is_good_int(offset, 0)
-    is_good_limit, limit = is_good_int(limit, 1000)
+    is_good_limit, limit = is_good_int(limit, 20)
+
+    #just because it's a good int doesn't mean we like it
+    #reset to 20 if greater
+    limit = 20 if limit > 20 else limit
 
     if not is_good_offset or not is_good_limit:
         return return_error('object', 1504, 400)
@@ -392,26 +437,8 @@ def search(request):
 
     formatId = params.get('formatid', '')
 
-
     #TODO: add replica status somewhere (but we're not replicating stuff yet)
     replicaStatus = params.get('replicastatus', '')
-
-    #set up the clauses
-    #AND we're going for dataone_uuids NOT obsolete_uuids
-    #so that we're only querying for the most recent obsolete_uuid (we don't care about previous ones here)
-    #and we can return the correct uuid from the core objects anyway
-
-    #this returns a tuple that is... awkward to use
-    #query = DBSession.query(DataoneObsolete.dataone_uuid, func.max(DataoneObsolete.date_changed).group_by(DataoneObsolete.dataone_uuid)
-
-    '''
->>> from gstore_v3.models import *
->>> from sqlalchemy.sql.expression import and_
->>> from datetime import datetime
->>> d = datetime(2012, 8, 14)
->>> search_clauses = [dataone.DataoneSearch.the_date>d, dataone.DataoneSearch.format=='FGDC-STD-001-1998'] 
->>> query = DBSession.query(dataone.DataoneSearch, dataone.DataoneCore).join(dataone.DataoneCore, dataone.DataoneCore.dataone_uuid==dataone.DataoneSearch.the_uuid).filter(and_(*search_clauses)).all()
-    '''
 
     search_clauses = []
 
@@ -423,14 +450,12 @@ def search(request):
             fd = dataone_to_datetime(fromDate)
             if not fd:
                 return return_error('object', 1504, 400)
-            #search_clauses.append(DataoneSearch.most_recent >= fd)
             search_clauses.append(DataoneSearch.object_changed >= fd)
         elif not fromDate and toDate:
             #less than to
             ed = dataone_to_datetime(toDate)
             if not ed:
                 return return_error('object', 1504, 400)
-            #search_clauses.append(DataoneSearch.most_recent < ed)
             search_clauses.append(DataoneSearch.object_changed < ed)
         else:
             #between
@@ -438,7 +463,6 @@ def search(request):
             ed = dataone_to_datetime(toDate)
             if not fd or not ed:
                 return return_error('object', 1504, 400)
-#            search_clauses.append(between(DataoneSearch.most_recent, fd, ed))
             search_clauses.append(between(DataoneSearch.object_changed, fd, ed))
 
     if formatId:
@@ -493,15 +517,16 @@ def search(request):
 @view_config(route_name='dataone_object', request_method='GET')
 @view_config(route_name='dataone_object_slash', request_method='GET')
 def show(request):
-    '''
-    return the file object for this uuid
+    """return the file object for this uuid
 
-    error = 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <error detailCode="1800" errorCode="404" name="NotFound">
-       <description>No system metadata could be found for given PID: DOESNTEXIST</description>
-    </error>
-    '''
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     pid = request.matchdict['pid']
     
     try:
@@ -531,9 +556,9 @@ def show(request):
     return fr
 
 @view_config(route_name='dataone_object', request_method='HEAD')
-#@view_config(route_name='dataone_object_slash', request_method='HEAD')
 def head(request):
-    '''
+    """
+
     d1.method = describe
 
     curl -I http://129.24.63.66/gstore_v3/apps/dataone/object/b45bbf88-0b81-441c-bf9a-590c8ac5f0bf
@@ -555,8 +580,15 @@ def head(request):
     DataONE-Exception-DetailCode: 1380
     DataONE-Exception-Description: The specified object does not exist on this node.
     DataONE-Exception-PID: IDONTEXIST
-    '''
 
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     pid = request.matchdict['pid']
     
     try:
@@ -592,7 +624,6 @@ def head(request):
     file_hash = obsolete.get_hash(algo, obj_path)
     file_size = obsolete.get_size(obj_path)
 
-        
     lst = [('Last-Modified','%s' % (str(datetime_to_http(obsolete.date_changed)))), ('Content-Type', str(mimetype)), ('Content-Length','%s' % (int(file_size)))]
 
     #see misleading mimetype-ness re get_obsoleted_object
@@ -608,50 +639,16 @@ def head(request):
 @view_config(route_name='dataone_meta', renderer='dataone_metadata.mako')
 @view_config(route_name='dataone_meta_slash', renderer='dataone_metadata.mako')
 def metadata(request):
-    '''
-    <?xml version="1.0" encoding="UTF-8"?>
-    <d1:systemMetadata xmlns:d1="http://ns.dataone.org/service/types/v1">
-      <serialVersion>1</serialVersion>
-      <identifier>XYZ332</identifier>
-      <formatId>eml://ecoinformatics.org/eml-2.1.0</formatId>
-      <size>20875</size>
-      <checksum algorithm="MD5">e7451c1775461b13987d7539319ee41f</checksum>
-      <submitter>uid=mbauer,o=NCEAS,dc=ecoinformatics,dc=org</submitter>
-      <rightsHolder>uid=mbauer,o=NCEAS,dc=ecoinformatics,dc=org</rightsHolder>
-      <accessPolicy>
-        <allow>
-          <subject>uid=jdoe,o=NCEAS,dc=ecoinformatics,dc=org</subject>
-          <permission>read</permission>
-          <permission>write</permission>
-          <permission>changePermission</permission>
-        </allow>
-        <allow>
-          <subject>public</subject>
-          <permission>read</permission>
-        </allow>
-        <allow>
-          <subject>uid=nceasadmin,o=NCEAS,dc=ecoinformatics,dc=org</subject>
-          <permission>read</permission>
-          <permission>write</permission>
-          <permission>changePermission</permission>
-        </allow>
-      </accessPolicy>
-      <replicationPolicy replicationAllowed="false"/>
-      <obsoletes>XYZ331</obsoletes>
-      <obsoletedBy>XYZ333</obsoletedBy>
-      <archived>true</archived>
-      <dateUploaded>2008-04-01T23:00:00.000+00:00</dateUploaded>
-      <dateSysMetadataModified>2012-06-26T03:51:25.058+00:00</dateSysMetadataModified>
-      <originMemberNode>urn:node:TEST</originMemberNode>
-      <authoritativeMemberNode>urn:node:TEST</authoritativeMemberNode>
-    </d1:systemMetadata>
+    """
 
-    error = 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <error detailCode="1800" errorCode="404" name="NotFound">
-      <description>No system metadata could be found for given PID: SomeObjectID</description>
-    </error>
-    '''
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     pid = request.matchdict['pid']
     try:
         pid = urllib2.unquote(urllib2.unquote(pid).decode('unicode_escape'))
@@ -692,7 +689,6 @@ def metadata(request):
     replication = "true" if sysmeta.replication_policy else "false"
     sys_date = sysmeta.date_changed
     
-
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/dataone/v1/' % (load_balancer)
 
@@ -703,10 +699,22 @@ def metadata(request):
 
     #use the obsoletedby's date as the system modified date?
 
-    #dates should be from postgres, i.e. in utc
-    rsp = {'pid': pid, 'dateadded': datetime_to_dataone(obj.date_added), 'obj_format': str(formatid), 'file_size': file_size, 
-           'uid': ALIAS, 'o': 'EDAC', 'dc': 'everything', 'org': 'EDAC', 'hash_type': algo,
-           'hash': file_hash, 'metadata_modified': datetime_to_dataone(sys_date), 'mn': NODE, 'obsoletes': obsoletes_uuid, 'obsoletedby': obsoleted_by_uuid, 'replication': replication, 'access_policies': access_policies}
+    #TODO: replace the hardcoded junk with ???
+    rsp = {'pid': pid, 'dateadded': datetime_to_dataone(obj.date_added), 
+            'obj_format': str(formatid), 'file_size': file_size, 
+            'uid': ALIAS, 
+            'o': 'EDAC', 
+            'dc': 'everything', 
+            'org': 'EDAC', 
+            'hash_type': algo,
+            'hash': file_hash, 
+            'metadata_modified': datetime_to_dataone(sys_date), 
+            'mn': NODE, 
+            'obsoletes': obsoletes_uuid, 
+            'obsoletedby': obsoleted_by_uuid, 
+            'replication': replication, 
+            'access_policies': access_policies
+        }
 
     if obsoleted_by:
         rsp.update({"archived": True})
@@ -717,9 +725,16 @@ def metadata(request):
 @view_config(route_name='dataone_checksum')
 @view_config(route_name='dataone_checksum_slash')
 def checksum(request):
-    '''
-    <checksum algorithm="SHA-1">2e01e17467891f7c933dbaa00e1459d23db3fe4f</checksum>
-    '''
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     pid = request.matchdict['pid']
     try:
         pid = urllib2.unquote(urllib2.unquote(pid).decode('unicode_escape'))
@@ -757,15 +772,22 @@ def checksum(request):
 @view_config(route_name='dataone_error', request_method='POST')
 @view_config(route_name='dataone_error_slash', request_method='POST')
 def error(request):
-    '''
+    """
+
     key should be message. no guarantees
 
-    also, they don't use their own stupid error codes
-    '''
+    also, they don't use their own error codes
 
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     message = request.POST['message']
 
-    #welcome to stupid.
     kvps = []
     fs = cgi.FieldStorage(fp=request.environ['wsgi.input'], environ=request.environ, keep_blank_values=1)
     for k in fs.keys():
@@ -782,7 +804,7 @@ def error(request):
     message = [kvp for kvp in kvps if kvp[0] == 'message']
     
     if not message:
-        #this is not the right error, but if it fails, it's their idiotic post so nuts to them
+        #this is not the right error, but if it fails ???
         return return_error('object', 2164, 401)
 
     #just for kicks
@@ -825,11 +847,21 @@ def error(request):
 @view_config(route_name='dataone_replica')
 @view_config(route_name='dataone_replica_slash')
 def replica(request):
-    '''
+    """
+
     log as replica request not just GET
 
-    return file but this means absolutely f*** all as a member node and they can't really explain what replica i would return (or have been storing)
-    '''
+    return file but this means absolutely nothing for us and they can't really 
+    explain what replica i would return (or have been storing) as a tier one node
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
 
     pid = request.matchdict['pid']
     try:
@@ -847,7 +879,6 @@ def replica(request):
         return return_error('object', 2185, 404)
 
     dataone_path = request.registry.settings['DATAONE_PATH']
-
     
     try:
         obsolete, obj_path, mimetype, formatid, formatname = get_obsoleted_object(pid, dataone_path)
@@ -867,7 +898,7 @@ def replica(request):
 
 
 def get_obsoleted_object(pid, dataone_path):
-    '''
+    """
     check the obsoletes table for the object
     get the object
     get the path to the datafile
@@ -875,7 +906,15 @@ def get_obsoleted_object(pid, dataone_path):
 
     
     this is a little roundabout. just... leave it.
-    '''
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     
     obsolete = DBSession.query(DataoneObsolete).filter(DataoneObsolete.uuid==pid).first()
     if not obsolete:
@@ -935,7 +974,8 @@ dataone management methods
 
 @view_config(route_name='dataone_add', request_method='POST', renderer='json')
 def add_object(request):
-    '''
+    """
+
     for data object/science metadata
     {
         'dataset': #id
@@ -952,8 +992,16 @@ def add_object(request):
         'data object'
         'metadata object'
         'format'
-    }   
-    '''
+    }  
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
 
     object_type = request.matchdict['object'].lower()
 
@@ -1134,23 +1182,27 @@ def add_object(request):
 
 @view_config(route_name='dataone_update', request_method='POST')
 def update_object(request):
-    '''
+    """
+
     {
         'identifier': #for the actual object which i don't know how we'll know actually
         'update': {
             'method': # register as dirty
         }
     }
-    '''
 
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     object_type = request.match_dict['object'].lower()
 
     data = request.json_body
 
-    
-
-    
-    
     return ''
 
 
