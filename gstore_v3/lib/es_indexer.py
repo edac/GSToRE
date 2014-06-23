@@ -8,8 +8,6 @@ import json
 
 from requests.auth import HTTPBasicAuth
 
-
-#TODO: POST MAPPING TO PRODUCTION
 '''
 info about the gstore doctypes
 
@@ -188,31 +186,57 @@ at some point they will diverge more - the category structure will change betwee
 
 
 class EsIndexer:
-    '''
-    take:
-        a gstore object
-        a request (to get the formats/services/etc)
-        a list of things to intersect for the facet lists
+    """ElasticSearch index api access
 
-    build the json request for an es doc
+    Each kind of object to search has its own index in ES but the basic mapping
+    for each index is roughly the same. So we can ping anything for title, date added,
+    category, etc, with the same search structure and can build most of the document
+    the same.
 
-    post the doc
+    Example Usage:
+        >>> from gstore_v3.models import *
+        >>> from gstore_v3.lib import es_indexer
+        >>> d = DBSession.query(datasets.Dataset).filter(datasets.Dataset.uuid=='14900f2f-0da4-4811-b612-310cc6ab1ac0').first()
+        >>> ed = {"host": "http://XXXXXX:XXXX/", "index": "myindex", "type": "dataset"}
+        >>> es = es_indexer.EsIndexer(ed, d, request)
+        >>> fti = ["counties"]
+        >>> es.build_document(fti)
 
-    update the doc (mostly dataset status updates)
+        basically take a gstore data object (dataset, collection, tile index, etc),
+        the request (so we can id the supported formats, services, etc) and anything
+        that should be faceted (which is completely unused).
 
-    #for testing:
-    >>> from gstore_v3.models import *
-    >>> from gstore_v3.lib import es_indexer
-    >>> d = DBSession.query(datasets.Dataset).filter(datasets.Dataset.uuid=='14900f2f-0da4-4811-b612-310cc6ab1ac0').first()
-    >>> ed = {"host": "http://es.sandbox.edac.bldg16:9200/", "index": "gstore", "type": "dataset"}
-    >>> es = es_indexer.EsIndexer(ed, d, request)
-    >>> es.es_url
-    'http://129.24.63.18:9200/gstore_a/dataset'
-    >>> fti = ["counties"]
-    >>> es.build_document(fti)
-    '''
+    Note:
+        See EsSearcher for search access.
+        
+    Attributes:
+        es_description (dict): host, index, type, user, password
+        gstore_object (obj): a Dataset, Collection or TileIndex object
+        request (Request): request from the view
+        document (dict): an index document dict (for inserts)
+        partial (dict): a partial index document dict (for updates)
+        uuid (str): the gstore_object uuid
+        
+    """
 
     def __init__(self, es_description, gstore_object, req):
+        """set up the elasticsearch POST url and object
+
+        Notes:
+            It may not have one (tabular data) so defaults to
+            the specified default which is basically the record index.
+
+            "type" in the es_description can be a comma-delimited list of objects types (datasets,collections)
+            
+        Args:
+            es_description (dict): host, index, type, user, password
+            gstore_object (obj): a Dataset, Collection or TileIndex object
+            req (Request): request from the view
+                    
+        Returns:
+        
+        Raises:
+        """
         self.es_description = es_description
 
         self.es_url = es_description['host'] + es_description['index'] + '/' + es_description['type']
@@ -230,11 +254,17 @@ class EsIndexer:
         return '<EsIndexer (%s, %s)>' % (self.es_url, self.uuid)
 
     def put_document(self):
-        '''
-        take the generated document
-        set up the requests PUT
-        and put
-        '''
+        """execute the PUT request to ElasticSearch for INSERTs
+
+        Notes:
+            
+        Args:
+                    
+        Returns:
+        
+        Raises:
+            Exception: if the status code from ES is anything except 201, the insert failed
+        """
 
         if not self.document or not self.uuid:
             return
@@ -248,34 +278,33 @@ class EsIndexer:
             raise Exception('Failed to create document')
 
     def update_document(self, elements_to_update):
-        '''
-        just post some changes to the document?
+        """execute the POST request to ElasticSearch for UPDATEs 
+    
+        Example structure:
+            {
+	            "script": "ctx._source.dataset.active = 'param1'; next thing", 
+	            "params": {
+                    "param1": true
+	            }
+            }
 
-        esp. embargo | active | available
-
-        POST:
-
-        http://129.24.63.18:9200/{index}/{type}/{id}/_update
-
-        {
-	        "script": "ctx._source.dataset.status = 'inactive'; next thing", 
-	        "params": {
-                "param1": value
-	        }
-        }
-
-        indexed:
-            embargo: true/false
-            active: true/false
-            available: true/false
-        '''
+        Notes:
+            This is just for the script-based element updates. For anything more involved than
+            setting a boolean, use the partial doc update.
+            
+        Args:
+                    
+        Returns:
+        
+        Raises:
+            Exception: if the status code from ES is anything except 200, the update failed
+        """
         updates = []
         params = {}
 
         cnt = 1
         for k,v in elements_to_update.iteritems():
             #ctx is es required apparently; fyi: if you don't include the doc type, it will post to the root.
-            #update = 'ctx._source.' + self.es_type + '.' + k + ' = ' + str(v).lower()
             update = 'ctx._source.' + self.es_description['type'] + '.' + k + ' = param_%s' % cnt
             updates.append(update)
             params.update({"param_%s" % cnt: v})
@@ -283,8 +312,6 @@ class EsIndexer:
 
         es_url = self.es_url + '/' + self.uuid + '/_update'
         #concat multiple script bits with ';'
-
-        #return es_url, json.dumps({"script": ';'.join(updates), "params": params})
         
         result = requests.post(es_url, data=json.dumps({"script": ';'.join(updates), "params": params}), auth=(self.user, self.password))
 
@@ -299,29 +326,19 @@ class EsIndexer:
         '''
 
     def update_partial(self):
-        '''
-        to update a partial document (instead of using the script option)
-        better for complex elements
+        """execute the POST request to ElasticSearch for UPDATEs based on partial documents
+
+        Notes:
+            This is just a wrapper (doc>DOCTYPE) for the document dict (matching the mapping
+            of the doctype).
+            
+        Args:
+                    
+        Returns:
         
-        POST:
-
-        http://129.24.63.18:9200/{index}/{type}/{id}/_update
-
-        {
-	        "doc": {
-                "DOCTYPE": {
-                    key: value,
-                    key: value
-                }
-	        }
-        }
-
-        the key/value pairs need to be in the same structure as they would be in the INSERT doc json
-        and should come from the child object's build_partial method
-
-        this just wraps them in the doc>DOCTYPE dict for posting
-        
-        '''   
+        Raises:
+            Exception: if the status code from ES is anything except 200, the update failed
+        """
         if not self.partial:
             raise Exception('No update document')
 
@@ -334,16 +351,24 @@ class EsIndexer:
         if result.status_code != 200:
             raise Exception(result.content)
             
+    #TODO: add a REMOVE ELEMENT option just in case
 
     def build_location(self, box):
-        '''
-        generate the location element for the index (bbox builder, area, etc)
+        """build a bbox element (for the location geometry)
 
-        this is the same for any doctype with a spatial component
-
-        really should have put the area in loc, but whatever
-        '''
-
+        Notes:
+            the original mapping didn't include the area element
+            so it wound up not being nested. sorry.
+            
+        Args:
+            box (string): bbox as a string (of floats) "minx, miny, maxx, maxy"
+                    
+        Returns:
+            area (float): area of the bbox
+            loc (dict): the bbox as Polygon geometry element
+        
+        Raises:
+        """
         loc = {}
 
         bbox = string_to_bbox(box)
@@ -364,49 +389,76 @@ class EsIndexer:
         return area, loc
 
     def build_date_element(self, key, datetime_obj):
+        """build a date element
+
+        Notes:
+            
+        Args:
+            key (string): name of the date element to create
+            datetime_obj (datetime): the datetime to use
+                    
+        Returns:
+            (dict): the generated, complete date element
+        
+        Raises:
+        """
         return {key: {"date": datetime_obj.strftime('%Y-%m-%d'), "year": datetime_obj.year, "month": datetime_obj.month, "day": datetime_obj.day}}
 
 class DatasetIndexer(EsIndexer):
-    '''
-    document builder for the dataset    
-    '''
+    """ElasticSearch index api access for Datasets
+
+    Note:
+        
+        
+    Attributes:
+        
+    """
+
     def build_document(self, facets_to_include):
-        '''
-        take the dataset
+        """build a new dataset doctype document
 
-        get the title
-        get the bbox
-        get the dates
-        get the apps
-        get the collections
-        get the projects
-        get the categories
-        get the services
-        get the formats
-        get the taxonomy ( + geomtype)
-        get the aliases
+        Notes:
+            take the dataset
 
-        get the statuses 
-            embargo: t/f 
-            active: t/f
-            available: t/f
+            get the title
+            get the bbox
+            get the dates
+            get the apps
+            get the collections
+            get the projects
+            get the categories
+            get the services
+            get the formats
+            get the taxonomy ( + geomtype)
+            get the aliases
 
-        get the metadata
-            get the abstract
-            get the keywords?
-            get isotopic
+            get the statuses 
+                embargo: t/f 
+                active: t/f
+                available: t/f
 
-        get the facets to include
-            for each facet
-                intersect the geometries in geolookups (+what)
-                append list (if no list, punt to us?)
+            get the metadata
+                get the abstract
+                get the keywords?
+                get isotopic
 
-        things to add for full faceted search:
-            projects
-            attributes
-            parameters
+            get the facets to include
+                for each facet
+                    intersect the geometries in geolookups (+what)
+                    append list (if no list, punt to us?)
+
+            things to add for full faceted search:
+                projects
+                attributes
+                parameters
             
-        '''
+        Args:
+            facets_to_include (list): list of data to include for facets
+                    
+        Returns:
+        
+        Raises:
+        """
         doc = {}
 
         doc.update({"title": self.gstore_object.description, "title_search": self.gstore_object.description,
@@ -481,18 +533,28 @@ class DatasetIndexer(EsIndexer):
         self.document = {self.es_description['type']: doc}
 
     def build_partial(self, keys_to_update):
-        '''
-        build a dict for data elements to update/add for a partial doc update (see esindexer.update_partial)
+        """build a partial dataset document
 
-        from gstore_v3.models import *
-        from gstore_v3.lib import es_indexer
-        g = DBSession.query(datasets.Dataset).filter(datasets.Dataset.uuid=='0005c365-a09a-475e-a501-8a001882381f').first()
-        ed = {"host": "http://es.sandbox.edac.bldg16:9200/", "index": "gstore", "type": "dataset", "user": "", "password": ""}
-        es = es_indexer.DatasetIndexer(ed, g, request)
-        keys=["keywords", "valid_start", "valid_end", "date_published", "services", "supported_repositories"]
-        new_doc = es.build_partial(keys)
-        '''
+        Example usage:
+            from gstore_v3.models import *
+            from gstore_v3.lib import es_indexer
+            g = DBSession.query(datasets.Dataset).filter(datasets.Dataset.uuid=='0005c365-a09a-475e-a501-8a001882381f').first()
+            ed = {"host": "http://xxxxxxxxx:xxxxxxx/", "index": "myindex", "type": "dataset", "user": "", "password": ""}
+            es = es_indexer.DatasetIndexer(ed, g, request)
+            keys=["keywords", "valid_start", "valid_end", "date_published", "services", "supported_repositories"]
+            new_doc = es.build_partial(keys)
 
+        Notes:
+            The element structures should match those built in the build_document method
+            (which matches the mapping)
+            
+        Args:
+            keys_to_update (list): list of elements to include in the partial doc
+                    
+        Returns:
+        
+        Raises:
+        """
         data_to_update = {}
 
         for key in keys_to_update:
@@ -597,22 +659,61 @@ class DatasetIndexer(EsIndexer):
         self.partial = data_to_update
 
 class CollectionIndexer(EsIndexer):
-    '''
-    and one for the collection
-    '''
-    def build_document(self):
+    """ElasticSearch index api access for Collections
 
+    Note:
+
+    Attributes:
+        
+    """
+    #TODO: add the partial updater
+    
+    def build_document(self):
+        """build a new collection doctype document
+
+        Notes:
+            take the collection
+
+            get the title
+            get the bbox
+            get the dates
+            get the apps
+            get the categories
+            get the taxonomies
+
+            get the statuses 
+                embargo: t/f 
+                active: t/f
+                available: t/f
+
+            get the metadata
+                get the abstract
+                get the keywords?
+                get isotopic
+            
+        Args:
+                    
+        Returns:
+        
+        Raises:
+        """
         doc = {}
 
-        doc.update({"title": self.gstore_object.name, "date_added": self.gstore_object.date_added.strftime('%Y-%m-%d')})
+        doc.update({"title": self.gstore_object.name,
+            "date_added": self.gstore_object.date_added.strftime('%Y-%m-%d')
+        })
+        doc.update({"title_search": self.gstore_object.name})
         doc.update({"applications": self.gstore_object.apps})
 
         #TODO: deal with the services (and add to mapping)
 
-        doc.update({"embargo": self.gstore_object.is_embargoed, "active": not self.gstore_object.is_active, "available": self.gstore_object.is_available})
+        doc.update({"embargo": self.gstore_object.is_embargoed, 
+            "active": self.gstore_object.is_active, 
+            "available": self.gstore_object.is_available
+        })
 
         #TODO: this is a list in collections BUT not in datasets so check on the cross-doctype searching against it
-        doc.update({"taxonomy": self.gstore_object.taxonomy})
+        doc.update({"taxonomy": self.gstore_object.dataset_taxonomies})
 
         isotopic = ''
         abstract = ''
@@ -624,12 +725,23 @@ class CollectionIndexer(EsIndexer):
         #nested category structure
         categories = []
         for category in self.gstore_object.categories:
-            categories.append({"theme": str(category.theme), "subtheme": str(category.subtheme), "groupname": str(category.groupname), "apps": self.gstore_object.apps})
+            categories.append({
+                "theme": str(category.theme), 
+                "subtheme": str(category.subtheme), 
+                "groupname": str(category.groupname), 
+                "apps": self.gstore_object.apps
+            })
         doc.update({"category_facets": categories})
 
         #and the original structure just in case
         cat = self.gstore_object.categories[0]
-        doc.update({"category": {"theme": str(cat.theme), "subtheme": str(cat.subtheme), "groupname": str(cat.groupname), "apps": self.gstore_object.apps}})
+        doc.update({
+            "category": {
+                "theme": str(cat.theme), 
+                "subtheme": str(cat.subtheme), 
+                "groupname": str(cat.groupname), 
+                "apps": self.gstore_object.apps
+        }})
 
         if self.gstore_object.is_spatial:
             #add a box because it is special
@@ -638,53 +750,6 @@ class CollectionIndexer(EsIndexer):
             doc.update({"area": area})
     
         self.document = {self.es_description['type']: doc}
-
-
-
-
-
-
-
-
-
-
-'''
-update doc in place with something more than ==
-
-{
-    "doc": {
-        "dataset": {
-            "valid_start": {
-                "date": "2013-11-12",
-                "year": 2013,
-                "month": 11,
-                "day": 12
-            },
-            "valid_end": {
-                "date": "2013-12-12",
-                "year": 2013,
-                "month": 12,
-                "day": 12
-            },
-            "keywords": ["tree", "playa", "usgs"],
-            "date_published": {
-                "date": "2013-03-02",
-                "year": 2013,
-                "month": 3,
-                "day": 2
-            },
-            "supported_repositories": [{"app": "rgis", "repos": ["GEOSS", "DATA.gov"]}]
-        }
-    }
-}    
-'''
-
-
-
-
-
-
-
 
 
 

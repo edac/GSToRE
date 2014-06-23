@@ -11,9 +11,9 @@ from sqlalchemy.sql import between
 import json
 from datetime import datetime
 
-#from the models init script
+import requests
+
 from ..models import DBSession
-#from the generic model loader (like meta from gstore v2)
 from ..models.datasets import (
     Dataset,
     Category
@@ -27,15 +27,19 @@ from ..lib.utils import *
 from ..lib.database import get_dataset, get_collection
 from ..lib.es_searcher import *
 
-#starting with requests instead - unclear if you can concat query + query_raw to handle the dot field name concats
-#from elasticutils import S, F
 
-import requests
 
-'''
-empty response
-'''
 def return_no_results(ext='json'):
+    """empty response
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     if ext == 'json':
         response = Response(json.dumps({"total": 0, "results": []}))
         response.content_type = 'application/json'
@@ -50,9 +54,16 @@ doctype response
 '''
 #TODO: replace the streamers here with the other streamer? meh, the other json is a different structure so maybe not.
 def generate_search_response(searcher, request, app, limit, base_url, ext, version=3):
-    '''
-    generate the streamer for the search results for doctypes
-    '''
+    """generate the streamer for the search results for doctypes
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     total = searcher.get_result_total()
 
     if total < 1:
@@ -82,23 +93,11 @@ def generate_search_response(searcher, request, app, limit, base_url, ext, versi
 
     return response
 
-'''
-search
-'''
-#return the category tree
 @view_config(route_name='search_categories', renderer='json')
 def search_categories(request):
-    #TODO: allow other formats (kml, etc) 
-    #IT IS POST FROM RGIS FOR SOME REASON
-    #get the starting location for the tree
-    #root OR Census Data OR Census Data__|__2008 TIGER
-    #root OR theme OR theme__|__subtheme
-    app = request.matchdict['app']
+    """return the category tree
 
-    params = normalize_params(request.params)
-    node = params.get('node', '')
 
-    '''
     return distinct themes if no node or if 
         distinct subthemes for theme if node is one chunk
         distinct groupnames for theme + subtheme if node = two chunks (__|__ delimiter)
@@ -123,7 +122,26 @@ def search_categories(request):
     groupname (node=Climate__|__General__|__United%States)
     (what exactly would be the point?)
     {"total": 0, "results": []}
-    '''
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+
+    
+    #TODO: allow other formats (kml, etc) 
+    #IT IS POST FROM RGIS FOR SOME REASON (geoext/ext reasons)
+    #get the starting location for the tree
+    #root OR Census Data OR Census Data__|__2008 TIGER
+    #root OR theme OR theme__|__subtheme
+    app = request.matchdict['app']
+
+    params = normalize_params(request.params)
+    node = params.get('node', '')
 
     #set up the elasticsearch connection
     es_connection = request.registry.settings['es_root']
@@ -267,6 +285,7 @@ def search_categories(request):
     if 'facets' not in data:
         return return_no_results()
 
+    #TODO: get rid of the cls element (not used, kinda stupid)
     facets = data['facets']['categories']['terms']
     resp = {"total": len(facets)}
     rslts = []
@@ -287,7 +306,8 @@ def search_categories(request):
 #search for any of the doctypes in es 
 @view_config(route_name='searches')
 def search_doctypes(request):
-    '''
+    """
+
     PARAMS:
     limit
     offset
@@ -308,7 +328,15 @@ def search_doctypes(request):
     geomtype
 
     /search/datasets.json?query=property&offset=0&sort=lastupdate&dir=desc&limit=15&theme=Boundaries&subtheme=General&groupname=New+Mexico
-    '''
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     ext = request.matchdict['ext']
     app = request.matchdict['app']
 
@@ -355,15 +383,23 @@ def search_doctypes(request):
 
 @view_config(route_name='search_within_collection')
 def search_within_collection(request):
-    '''
+    """
+
     search for datasets within a single collection object
 
     - by date range
     - by bbox
     - by keywords
     - by category?
+
+    Notes:
+        
+    Args:
+        
+    Returns:
     
-    '''
+    Raises:
+    """
 
     app = request.matchdict['app']
     collection_id = request.matchdict['id']
@@ -374,6 +410,12 @@ def search_within_collection(request):
         return HTTPNotFound()
 
     params = normalize_params(request.params)
+
+    #get version (not for querying, just for the output) 
+    version = int(params.get('version')) if 'version' in params else 2
+
+    #and we still like the limit here
+    limit = int(params['limit']) if 'limit' in params else 15
     
     #set up the elasticsearch search object
     searcher = CollectionWithinSearcher(
@@ -404,18 +446,23 @@ def search_within_collection(request):
     
     return generate_search_response(searcher, request,app, limit, base_url, ext, version)
 
-
-#NOTE: we chucked the geolookups structure completely to just keep a cleaner url moving forward.
 @view_config(route_name='searches', match_param="doctypes=nm_quads", renderer='json')
 @view_config(route_name='searches', match_param="doctypes=nm_gnis", renderer='json')
 @view_config(route_name='searches', match_param="doctypes=nm_counties", renderer='json')  
 def search(request):
-    '''
+    """
+
     quad = /search/geolookups.json?query=albuquer&layer=nm_quads&limit=20
     placename = /search/geolookups.json?query=albu&layer=nm_gnis&limit=20
 
-    current working request = http://129.24.63.66/gstore_v3/apps/rgis/search/nm_quads.json?query=albu
-    '''
+    Notes:
+   
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     geolookup = request.matchdict['doctypes']
 
     #pagination
@@ -448,13 +495,23 @@ def search(request):
 
 
 #TODO: finish this
-#return fids for the features that match the params
-#this is NOT the streamer (see views.features)
 @view_config(route_name='search_features', renderer='json')
 def search_features(request):
-    '''
+    """
+
     return a listing of fids that match the filters (for potentially some interface later or as an option to the streamer)
-    '''
+
+    return fids for the features that match the params
+    this is NOT the streamer (see views.features)
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     app = request.matchdict['app']
 
     params = normalize_params(request.params)
@@ -483,11 +540,6 @@ def search_features(request):
     #sort geometry
     box = params.get('box', '')
     epsg = params.get('epsg', '') 
-
-    #TODO: let's add a search by dataset uuid?
-#    dataset_uuids = request.params.get('datasets', '')
-#    dataset_uuids = dataset_uuids.split(',') if dataset_uuids else ''
-    
 
     #category search
     theme = params.get('theme', '')
@@ -538,9 +590,8 @@ def search_features(request):
     shp_fids = []
     shape_clauses = []
     if dataset_ids:
-        #TODO: actually , if it's not bbox related, just push to mongo (it seems quicker with the number of ids)
+        #TODO: actually, if it's not bbox related, just push to mongo (it seems quicker with the number of ids)
         shape_clauses.append(Feature.dataset_id.in_(dataset_ids))
-
 
     if box:
         #or go hit up shapes, bad idea, very bad idea
@@ -565,7 +616,6 @@ def search_features(request):
     shps = DBSession.query(Feature.fid).filter(and_(*shape_clauses))
     shp_fids = [s.fid for s in shps]
 
-    #db.vectors.find({'d.id': {$in: [52208, 52209, 56282, 56350]}}, {'f.id': 1})
     mongo_fids = []
     #TODO: add the attribute part to this (if att.name == x and att.val != null or something)
     #TODO: ADD DATETIME clause builder for before, after, between 
@@ -622,14 +672,30 @@ def search_features(request):
 search output options
 '''    
 class StreamDoctypeJson():
-    '''
-    generate the json output for the search results
-    '''
+    """generate the json output for the search results
 
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     head = '{"total": %s, "subtotal": %s, "results": ['
     tail = ']}'
     
     def __init__(self, app, base_url, request, total, version, subtotal):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         self.app = app
         self.base_url = base_url
         self.request = request
@@ -639,6 +705,16 @@ class StreamDoctypeJson():
         
 
     def yield_set(self, object_tuples, limit):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         yield self.head
 
         cnt = 0
@@ -661,12 +737,23 @@ class StreamDoctypeJson():
 
         #to close the conn and release the postgres locks
         #THE FACTORY DOES NOT WORK WITH THE STREAMING RESPONSES!@#!#$
+        #TODO: see kml note
         DBSession.close()
 
+    #TODO: deprecate this.
     def build_v2(self, object_tuple):
-        '''
+        """
+        
         haha. nope.
-        '''
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
 
         if object_tuple[1] != 'dataset':
             return {}
@@ -677,8 +764,7 @@ class StreamDoctypeJson():
 
         services = d.get_services(request)
         fmts = d.get_formats(request)
-    
-        #TODO: not this REVISE 
+
         tools = [0 for i in range(6)]
         if fmts:
             tools[0] = 1
@@ -695,10 +781,18 @@ class StreamDoctypeJson():
                                 "box": [float(b) for b in d.box] if d.box else [], "lastupdate": d.dateadded.strftime('%d%m%D')[4:], "id": d.id}
         
     def build_v3(self, object_tuple):
-        '''
-        still ridiculous
-        '''
+        """
 
+        still ridiculous
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         o = None
         if object_tuple[1] == 'collection':
             o = get_collection(object_tuple[0])
@@ -711,9 +805,13 @@ class StreamDoctypeJson():
         return o.get_full_service_dict(self.base_url, self.request, self.app)
 
 class StreamDoctypeKml():
-    '''
-    generate the kml output for the search results
-    '''
+    """generate the kml output for the search results
+
+    Notes:
+        
+    Atrributes:
+
+    """
 
     head = """<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://earth.google.com/kml/2.2">\n<Document>"""
 
@@ -735,20 +833,50 @@ class StreamDoctypeKml():
     ]
     
     def __init__(self, app, base_url, fields=[]):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         self.app = app
         self.base_url = base_url
         self.fields = fields #as a list of tuples (name, display)
         self.field_set = self.generate_fields()
 
     def generate_fields(self):
-        '''
+        """
+
         build the field schema for the set of fields
         of course, if it's not the default fields, the builder will be wrong
-        '''
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
         flds = self.fields if self.fields else self.default_fields
         return '<Schema name="searchFields">' + ''.join([self.field_tmpl % {'fieldname': f[0], 'displayname': f[1]} for f in flds]) + '</Schema>'
 
     def yield_set(self, object_tuples, limit):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+        
         yield self.head
 
         cnt = 0
@@ -770,15 +898,25 @@ class StreamDoctypeKml():
 
         #to close the conn and release the postgres locks
         #THE FACTORY DOES NOT WORK WITH THE STREAMING RESPONSES!@#!#$
+        #TODO: except it crashed the other streamer so it may not be necessary here
         DBSession.close()
 
 
     def build_item(self, object_tuple):
-        '''
+        """
+
         get the bits we need for the field set
 
         hooray for consistency
-        '''
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
 
         data = {}
         if object_tuple[1] == 'dataset':
@@ -826,9 +964,16 @@ class StreamDoctypeKml():
 
 
     def build_feature(self, object_data, object_geometry):
-        '''
-        generate the kml chunk
-        '''
+        """generate the kml chunk
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
 
         geom_repr = wkb_to_output(object_geometry, 4326, 'kml')
 

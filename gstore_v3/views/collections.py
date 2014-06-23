@@ -7,14 +7,16 @@ from sqlalchemy.exc import DBAPIError
 from ..models import DBSession
 from ..models.datasets import (
     Dataset,
-    Collection
     )
-
+from ..models.categories import Category
+from ..models.collections import Collection
+from ..models.metadata import CollectionMetadata
 
 from ..lib.utils import *
 from ..lib.spatial import *
 from ..lib.database import *
 from ..lib.spatial_streamer import *
+from ..lib.es_indexer import CollectionIndexer, DatasetIndexer
 
 '''
 collections
@@ -22,9 +24,16 @@ collections
 
 @view_config(route_name='collections', renderer='json')
 def collections(request):
-    '''
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
     
-    '''
+    Raises:
+    """
     
     app = request.matchdict['app']
     collection_id = request.matchdict['id']
@@ -46,10 +55,16 @@ def collections(request):
 
 @view_config(route_name='collection_footprint')
 def generate_footprint(request):
-    '''
-    return the footprint (union) or the bboxes (if reasonable)
-    '''
+    """return the footprint (union) or the bboxes (if reasonable)
 
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     app = request.matchdict['app']
     collection_id = request.matchdict['id']
     format = request.matchdict['ext']
@@ -106,7 +121,8 @@ collection maintenance
 '''
 @view_config(route_name='add_collection', request_method='POST')
 def add_collection(request):
-    '''
+    """
+
     add collection
 
     {
@@ -120,8 +136,15 @@ def add_collection(request):
         embargoed: t/f
         metadata: xml  (gstore only)
     }
-    '''
 
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     app = request.matchdict['app']
     post_data = request.json_body
 
@@ -136,8 +159,13 @@ def add_collection(request):
     standards = post_data['standards'] if 'standards' in post_data else []
     xml = post_data['metadata']
 
-    is_active = bool(post_data['active']) if 'active' in post_data else True
-    is_embargoed = bool(post_data['embargoed']) if 'embargoed' in post_data else False
+    is_active = post_data['active'].lower() == 'true' if 'active' in post_data else True
+    is_embargoed = post_data['embargoed'].lower() == 'true' if 'embargoed' in post_data else False
+    is_available = post_data['available'].lower() == 'true' if 'available' in post_data else True
+
+    has_tileindex = post_data['has_tileindex'].lower() == 'true' if 'has_tileindex' in post_data else False
+    is_spatial = post_data['is_spatial'].lower() == 'true' if 'is_spatial' in post_data else True
+
 
     #TODO: add the tile index flags/descriptors
 
@@ -145,8 +173,11 @@ def add_collection(request):
     new_collection = Collection(title, apps)
     new_collection.is_embargoed = is_embargoed
     new_collection.is_active = is_active
+    new_collection.is_available = is_available
     new_collection.excluded_standards = [s for s in excluded_standards if s not in standards]
     new_collection.description = description
+    new_collection.has_tileindex = has_tileindex
+    new_collection.is_spatial = is_spatial
     
     #add the categories
     for category in categories:
@@ -167,8 +198,8 @@ def add_collection(request):
         return HTTPBadRequest('Not valid GSTORE metadata: %s' % valid)
 
     new_metadata = CollectionMetadata()
-    new_metadata.gstore_metadata = xml
-    new_collection.append(new_metadata)
+    new_metadata.gstore_xml = xml
+    new_collection.gstore_metadata.append(new_metadata)
 
     for dataset in datasets:
         #this is silly, who cares
@@ -184,7 +215,7 @@ def add_collection(request):
         DBSession.refresh(new_collection)
     except Exception as err:
         DBSession.rollback()
-        return HTTPSErverError(err)
+        return HTTPServerError(err)
 
     #once the datasets are added, build the geometries
     new_collection.update_geometries()
@@ -212,26 +243,32 @@ def add_collection(request):
     #update all of the datasets to include the new collection uuid
     #also silly and really needs a better widget
     errors = []
+    es_description.update({"type": "dataset"})
     for dataset in datasets:
         d = DBSession.query(Dataset).filter(Dataset.id==dataset).first()
         if d:
             dataset_indexer = DatasetIndexer(es_description, d, request)
             try:
-                dataset_indexer.update_document({"collections": d.collections})
+                dataset_indexer.build_partial(['collections'])
+                dataset_indexer.update_partial()
             except Exception as ex:
-                errors.append({d.id: ex})
+                errors.append({d.id: str(ex)})
 
-    rsp = {"uuid": str(new_collection.uuid)}
-    if errors:
-        rsp.update({"errors": errors})
-
-    return Response(json.dumps(rsp))
+    return Response(json.dumps({"uuid": str(new_collection.uuid), "errors": errors}))
 
 @view_config(route_name='update_collection', request_method='PUT')
 def update_collection(request):
-    '''
-    modify an existing collection
-    '''
+    """modify an existing collection
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+
     collection_id = request.matchdict['id']
 
     c = get_collection(collection_id)

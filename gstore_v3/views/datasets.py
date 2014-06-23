@@ -929,14 +929,14 @@ def update_dataset(request):
             d.box = box
             d.geom = geom
 
-            area = d.geom.GetArea()
-            if area == 0.:
-                loc = {"type": "Point", "coordinates": [box[0], box[1]]}
-            else:
-                loc = {
-                    "type": "Polygon",
-                    "coordinates": [[[box[0], box[1]], [box[2], box[1]], [box[2], box[3]], [box[0], box[3]], [box[0], box[1]]]]
-                }
+#            area = d.geom.GetArea()
+#            if area == 0.:
+#                loc = {"type": "Point", "coordinates": [box[0], box[1]]}
+#            else:
+#                loc = {
+#                    "type": "Polygon",
+#                    "coordinates": [[[box[0], box[1]], [box[2], box[1]], [box[2], box[3]], [box[0], box[3]], [box[0], box[1]]]]
+#                }
 
             elements_to_update.append("location")
             

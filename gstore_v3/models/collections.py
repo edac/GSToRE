@@ -24,6 +24,13 @@ collections_datasets = Table('collections_datasets', Base.metadata,
 )
 
 class Collection(Base):
+    """
+
+    Note:
+
+    Attributes:
+        
+    """
     __table__ = Table('collections', Base.metadata,
         Column('id', Integer, primary_key=True),
         Column('name', String(50)),
@@ -58,6 +65,18 @@ class Collection(Base):
     gstore_metadata = relationship('CollectionMetadata', backref='collections')
 
     def __init__(self, name, apps):  
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+
+        
         self.name = name
         self.apps = apps
 
@@ -66,21 +85,61 @@ class Collection(Base):
 
 
     def update_geometries(self):
-        ''' 
-        regenerate the bbox, bbox geom and footprint based on the datasets
-        '''
-        DBSession.query(func.gstoredata.generate_collection_geometries(self.id))
+        """regenerate the bbox, bbox geom and footprint based on the datasets
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+        try:
+            DBSession.execute(func.gstoredata.generate_collection_geometries(self.id))
+            DBSession.commit()
+            DBSession.flush()
+            DBSession.refresh(self)
+        except Exception as err:
+            DBSession.rollback()
+            raise err
+
 
     def update_date_range(self):
-        '''
+        """
         update the valid date range based on the min/max dataset valid start/ends
 
         this doesn't need to be a postgres function really, but it is
-        '''
-        DBSession.query(func.gstoredata.generate_collection_daterange(self.id))
 
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+        try:
+            DBSession.execute(func.gstoredata.generate_collection_daterange(self.id))
+            DBSession.commit()
+            DBSession.flush()
+            DBSession.refresh(self)
+        except Exception as err:
+            DBSession.rollback()
+            raise err
 
     def get_standards(self, req=None):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+    
         if not self.is_available:
             return []
 
@@ -97,6 +156,17 @@ class Collection(Base):
         return [i for i in lst if i not in exc_lst]
 
     def get_onlinks(self, base_url, req, app):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+        
         '''
         get the links to the collection metadata, and the tile index service?, and the plain service (replace with html)
         '''
@@ -106,6 +176,17 @@ class Collection(Base):
         return [base_url + build_service_url(app, 'collections', self.uuid)]
 
     def get_dataset_links(self, base_url, req, app):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+        
         '''
         get the info links for each dataset in the collection
         '''
@@ -116,6 +197,17 @@ class Collection(Base):
         return [base_url + build_metadata_url(app, 'datasets', d.uuid, standard, extension) for d in self.datasets if d.inactive == False and d.is_embargoed == False]
 
     def get_full_service_dict(self, base_url, req, app):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+        
         '''
         generate the service json blob
         '''
@@ -127,8 +219,8 @@ class Collection(Base):
             "date_added": self.date_added.strftime('%Y%m%d'),
             "categories": [{"theme": t.theme, "subtheme": t.subtheme, "groupname": t.groupname} for t in self.categories],
             "valid_dates": {
-                "start": self.valid_start.strftime('%Y%m%d'),
-                "end": self.valid_end.strftime('%Y%m%d')
+                "start": self.valid_start.strftime('%Y%m%d') if self.valid_start else "",
+                "end": self.valid_end.strftime('%Y%m%d') if self.valid_end else ""
             }
         }
 
@@ -161,6 +253,17 @@ class Collection(Base):
     
         
     def get_basic_service_dict(self, base_url, req):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+        
         '''
         generate the tiniest blob o' collection data
 
@@ -172,6 +275,17 @@ class Collection(Base):
 
 
     def get_footprint(self, epsg, format):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+        
         '''
         return the footprint of the collection as format and projected (or unprojected) as epsg
         '''
@@ -179,12 +293,34 @@ class Collection(Base):
         return output_geometry
 
     def generate_tileindex(self):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+        
         '''
         build the shapefile index for the spatial-only datasets
         '''
         pass
 
     def write_metadata(self, output_location, out_standard, out_format, metadata_info={}):
+        """
+
+        Notes:
+            
+        Args:
+            
+        Returns:
+        
+        Raises:
+        """
+        
         '''
         build the iso ds record? for a file?
         '''
