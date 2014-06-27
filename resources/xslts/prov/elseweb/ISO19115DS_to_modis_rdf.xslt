@@ -14,7 +14,7 @@
     <!-- removed: xml:base="http://ontology.cybershare.utep.edu/ELSEWeb/edac/publishing/modis/modis.owl" -->
     
     
-    <xsl:import href="remove-namespaces.xsl" />
+    <xsl:import href="../../remove-namespaces.xsl" />
     <xsl:output method="xml" encoding="UTF-8" indent="yes"/>
     
     <xsl:param name="schema-base" select="'http://gstore.unm.edu/elseweb/'"/>
