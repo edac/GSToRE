@@ -929,15 +929,6 @@ def update_dataset(request):
             d.box = box
             d.geom = geom
 
-#            area = d.geom.GetArea()
-#            if area == 0.:
-#                loc = {"type": "Point", "coordinates": [box[0], box[1]]}
-#            else:
-#                loc = {
-#                    "type": "Polygon",
-#                    "coordinates": [[[box[0], box[1]], [box[2], box[1]], [box[2], box[3]], [box[0], box[3]], [box[0], box[1]]]]
-#                }
-
             elements_to_update.append("location")
             
         elif key == 'epsg':
@@ -1006,11 +997,8 @@ def update_dataset(request):
             elements_to_update.append("services")
 
         elif key == 'repositories':
-            services = post_data['repositories']
-            excluded_repositories = get_all_repositories(request)
-            d.excluded_repositories = [s for s in excluded_repositories if s not in repositories]
-
-            elements_to_update.append("repositories")    
+            #TODO: add the app+repo to postgres and update the doc for es
+            pass
         elif key == 'taxonomy':  
             taxo = post_data[key]
 
@@ -1080,6 +1068,7 @@ def update_dataset(request):
         "password": request.registry.settings['es_user'].split(':')[-1]
     } 
 
+    #TODO: don't trigger this if no updates to the index doc
     indexer = DatasetIndexer(es_description, d, request)  
     try:
         indexer.build_partial(elements_to_update)
