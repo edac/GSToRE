@@ -188,6 +188,11 @@
             <xsl:comment>temporary solution for the units</xsl:comment>
             <owl:Class rdf:about="{concat($schema-base-edac, '#Units')}"/>
             
+            <xsl:comment>temporary solution for the land surface temperature data</xsl:comment>
+            <owl:Class rdf:about="{concat($schema-base-edac, '#DaytimeSurfaceTemperature')}"/>
+            <owl:Class rdf:about="{concat($schema-base-edac, '#NighttimeSurfaceTemperature')}"/>
+            <owl:Class rdf:about="{concat($schema-base-edac, '#QualityControl')}"/>
+            
             <xsl:comment>
                 individuals
             </xsl:comment>
@@ -242,7 +247,7 @@
                 
                 <xsl:variable name="generated-by">
                     <!-- i.e. is it in a step with "Source Produced" -->
-                    <xsl:value-of select="$all-steps/LE_ProcessStep[source[@role=concat('#', $source-id) and LI_Source/sourceCitation/CI_Citation/title/CharacterString = 'Source Produced']]/@id"/>
+                    <xsl:value-of select="$all-steps/LE_ProcessStep[source[@href=concat('#', $source-id) and LI_Source/sourceCitation/CI_Citation/title/CharacterString = 'Source Produced']]/@id"/>
                 </xsl:variable>
                 
                 <!-- check for a band identifier -->
@@ -257,14 +262,14 @@
                         <!-- produced by some intermediate step -->
                         <xsl:when test="$generated-by != ''">
                             <xsl:call-template name="get-identifier">
-                                <xsl:with-param name="text" select="$all-steps/LE_ProcessStep[source[@role=concat('#', $source-id) and LI_Source/sourceCitation/CI_Citation/title/CharacterString = 'Source Produced']]/source[LI_Source/sourceCitation/CI_Citation/title/CharacterString = 'Source Produced']/LI_Source/sourceCitation/CI_Citation/alternateTitle/CharacterString"/>
+                                <xsl:with-param name="text" select="$all-steps/LE_ProcessStep[source[@href=concat('#', $source-id) and LI_Source/sourceCitation/CI_Citation/title/CharacterString = 'Source Produced']]/source[LI_Source/sourceCitation/CI_Citation/title/CharacterString = 'Source Produced']/LI_Source/sourceCitation/CI_Citation/alternateTitle/CharacterString"/>
                             </xsl:call-template>
                         </xsl:when>
                         
                         <!-- not produced by a step, but used by a step (i.e. and initial object) -->
-                        <xsl:when test="$generated-by = '' and $all-steps/LE_ProcessStep[source[@role=concat('#', $source-id) and LI_Source/sourceCitation/CI_Citation/title/CharacterString = 'Source Used']]">
+                        <xsl:when test="$generated-by = '' and $all-steps/LE_ProcessStep[source[@href=concat('#', $source-id) and LI_Source/sourceCitation/CI_Citation/title/CharacterString = 'Source Used']]">
                             <xsl:call-template name="get-identifier">
-                                <xsl:with-param name="text" select="$all-steps/LE_ProcessStep[source[@role=concat('#', $source-id) and LI_Source/sourceCitation/CI_Citation/title/CharacterString = 'Source Used']]/source[LI_Source/sourceCitation/CI_Citation/title/CharacterString = 'Source Used']/LI_Source/sourceCitation/CI_Citation/alternateTitle/CharacterString"/>
+                                <xsl:with-param name="text" select="$all-steps/LE_ProcessStep[source[@href=concat('#', $source-id) and LI_Source/sourceCitation/CI_Citation/title/CharacterString = 'Source Used']]/source[LI_Source/sourceCitation/CI_Citation/title/CharacterString = 'Source Used']/LI_Source/sourceCitation/CI_Citation/alternateTitle/CharacterString"/>
                             </xsl:call-template>
                         </xsl:when>
                         
@@ -333,10 +338,6 @@
                             <xsl:value-of select="$band-identifier"/>
                         </elseweb-data:hasBandName>
                     </owl:NamedIndividual>
-                    
-                    <xsl:comment>
-                        this is also maybe tricky if we are relying on the keywords (and we still are)
-                    </xsl:comment>
                     <owl:NamedIndividual rdf:about="{fn:concat($instance, 'entity-', $source-id)}">
                         <xsl:variable name="entity-type" select="identificationInfo/MD_DataIdentification/descriptiveKeywords/MD_Keywords[thesaurusName/CI_Citation/title/CharacterString = 'OBOE']/keyword[1]/CharacterString"/>
                         <rdf:type rdf:resource="{fn:concat($schema-base-edac, '#', $entity-type)}"/>
@@ -413,7 +414,7 @@
                     
                     <!-- any input data objects -->
                     <xsl:for-each select="LE_ProcessStep/source[LI_Source/sourceCitation/CI_Citation/title/CharacterString = 'Source Used']">
-                        <xsl:variable name="role" select="fn:translate(@role, '#', '')"/>
+                        <xsl:variable name="role" select="fn:translate(@href, '#', '')"/>
                         <elseweb-edac:hadInput rdf:resource="{$role}"/>
                         
                         <!-- add the input band if there is one -->
