@@ -514,12 +514,12 @@ class DatasetIndexer(EsIndexer):
         #nested category structure
         categories = []
         for category in self.gstore_object.categories:
-            categories.append({"theme": str(category.theme), "subtheme": str(category.subtheme), "groupname": str(category.groupname), "apps": self.gstore_object.apps_cache})
+            categories.append({"theme": str(category.theme), "subtheme": str(category.subtheme), "groupname": str(category.groupname), "apps": category.apps})
         doc.update({"category_facets": categories})
 
         #and the original structure just in case
         cat = self.gstore_object.categories[0]
-        doc.update({"category": {"theme": str(cat.theme), "subtheme": str(cat.subtheme), "groupname": str(cat.groupname), "apps": self.gstore_object.apps_cache}})
+        doc.update({"category": {"theme": str(cat.theme), "subtheme": str(cat.subtheme), "groupname": str(cat.groupname), "apps": category.apps}})
 
         if self.gstore_object.taxonomy not in ['table']:
             area, loc = self.build_location(self.gstore_object.box)
@@ -634,12 +634,12 @@ class DatasetIndexer(EsIndexer):
                 #nested category structure
                 categories = []
                 for category in self.gstore_object.categories:
-                    categories.append({"theme": str(category.theme), "subtheme": str(category.subtheme), "groupname": str(category.groupname), "apps": self.gstore_object.apps_cache})
+                    categories.append({"theme": str(category.theme), "subtheme": str(category.subtheme), "groupname": str(category.groupname), "apps": category.apps})
                 data_to_update.update({"category_facets": categories})
 
-                #and the original structure just in case
+                #and the original structure just in case IT IS VERY WRONG
                 cat = self.gstore_object.categories[0]
-                data_to_update.update({"category": {"theme": str(cat.theme), "subtheme": str(cat.subtheme), "groupname": str(cat.groupname), "apps": self.gstore_object.apps_cache}})
+                data_to_update.update({"category": {"theme": str(cat.theme), "subtheme": str(cat.subtheme), "groupname": str(cat.groupname), "apps": category.apps}})
                 
             elif key == 'category_hierarchy':
                 #for the 1..3 structure not in place
