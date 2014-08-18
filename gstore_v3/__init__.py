@@ -35,7 +35,7 @@ def any_of(segment_name, *allowed):
         if info['match'][segment_name] in allowed:
             return True
     return predicate
-applist = any_of('app', 'rgis', 'epscor', 'hydroserver', 'epht', 'elseweb', 'tristate')
+applist = any_of('app', 'rgis', 'epscor', 'hydroserver', 'epht', 'elseweb', 'tristate', 'epscor-r4')
 #removed dataone, see route changes below
 
 #check for the dataset type (original vs. derived) for downloads
