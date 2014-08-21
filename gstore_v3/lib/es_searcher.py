@@ -209,12 +209,16 @@ class EsSearcher():
 
         spatial_search = False        
 
-        if theme:
-            ands.append({"query": {"match": {"category.theme": {"query": theme, "operator": "and"}}}})
-        if subtheme:
-            ands.append({"query": {"match": {"category.subtheme": {"query": subtheme, "operator": "and"}}}})
-        if groupname:
-            ands.append({"query": {"match": {"category.groupname": {"query": groupname, "operator": "and"}}}})
+#        if theme:
+#            ands.append({"query": {"match": {"category.theme": {"query": theme, "operator": "and"}}}})
+#        if subtheme:
+#            ands.append({"query": {"match": {"category.subtheme": {"query": subtheme, "operator": "and"}}}})
+#        if groupname:
+#            ands.append({"query": {"match": {"category.groupname": {"query": groupname, "operator": "and"}}}})
+
+        if theme or subtheme or groupname:
+            ands.append(self.build_category_filter(app.lower(), theme, subtheme, groupname))
+
         if format:
             ands.append({"query": {"term": {"formats": format.lower()}}})
         if service:
@@ -307,6 +311,63 @@ class EsSearcher():
     '''
     build helpers
     '''
+    def build_category_filter(self, app, theme, subtheme, groupname):
+        '''
+        using the category_facet set (multiple categories per doctype),
+        build a nested query filter widget using theme + subtheme + groupname + app
+
+        Example:
+        {
+            "query": {
+                "nested": {
+                    "path": "category_facets",
+                    "query": {
+                        "filtered": {
+                            "filter": {
+                                "and": [
+                                    {"term": {"category_facets.apps": "energize"}},
+                                    {"query": {"match": {"category_facets.theme":{ "query": "Climate Change Impacts (RIII)", "operator": "and"}}}},
+                                    {"query": {"match": {"category_facets.subtheme":{ "query": "Ecosystem", "operator": "and"}}}}
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Args:
+            app:
+            theme:
+            subtheme:
+            groupname:
+
+        Returns:
+        '''
+        ands = [{"term": {"category_facets.apps": app}}]
+
+        if theme:
+            ands.append({"query": {"match": {"category_facets.theme":{"query": theme, "operator": "and"}}}})
+        if subtheme:
+            ands.append({"query": {"match": {"category_facets.subtheme":{"query": subtheme, "operator": "and"}}}})
+        if groupname:
+            ands.append({"query": {"match": {"category_facets.groupname":{"query": groupname, "operator": "and"}}}})
+        
+        return {
+            "query": {
+                "nested": {
+                    "path": "category_facets",
+                    "query": {
+                        "filtered": {
+                            "filter": {
+                                "and": ands
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    
     def build_simple_date_filter(self, element, start_date, end_date):
         """build a date filter for an element (single date element unparsed only)
 

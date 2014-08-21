@@ -387,6 +387,7 @@ class Dataset(Base):
         see the service view, search v3 results
 
         Notes:
+            only includes category sets for the request app
             
         Args:
             
@@ -397,7 +398,7 @@ class Dataset(Base):
     
         results = {'type': 'dataset', 'id': self.id, 'uuid': self.uuid, 'description': self.description, 
                 'lastupdate': self.dateadded.strftime('%Y%m%d'), 'name': self.basename, 'taxonomy': self.taxonomy,
-                'categories': [{'theme': t.theme, 'subtheme': t.subtheme, 'groupname': t.groupname} for t in self.categories]}
+                'categories': [{'theme': t.theme, 'subtheme': t.subtheme, 'groupname': t.groupname} for t in self.categories if app in t.apps]}
         if self.box:
             results.update({'spatial': {'bbox': string_to_bbox(self.box), 'epsg': self.orig_epsg}})
             
@@ -1062,6 +1063,7 @@ class Dataset(Base):
 
         return (0, 'success')
 
+    #TODO: i have no idea why the base_url is here
     def stream_text(self, fmt, base_url, mongo_uri, epsg):
         """'
         

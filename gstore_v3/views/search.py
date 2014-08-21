@@ -123,6 +123,8 @@ def search_categories(request):
     (what exactly would be the point?)
     {"total": 0, "results": []}
 
+    doctypes: datasets, collections, etc
+
     Notes:
         
     Args:
@@ -143,11 +145,15 @@ def search_categories(request):
     params = normalize_params(request.params)
     node = params.get('node', '')
 
+    doctypes = params.get('doctypes', 'datasets').split(',')
+    doctypes = ','.join([d[:-1] for d in doctypes])
+    
+
     #set up the elasticsearch connection
     es_connection = request.registry.settings['es_root']
     es_index = request.registry.settings['es_dataset_index']
     #TODO: change this to the combined search options
-    es_type = 'dataset'
+    es_type = doctypes
     es_user = request.registry.settings['es_user'].split(':')[0]
     es_password = request.registry.settings['es_user'].split(':')[-1]
 

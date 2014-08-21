@@ -217,7 +217,7 @@ class Collection(Base):
             "name": self.name,
             "description": self.description,
             "date_added": self.date_added.strftime('%Y%m%d'),
-            "categories": [{"theme": t.theme, "subtheme": t.subtheme, "groupname": t.groupname} for t in self.categories],
+            "categories": [{"theme": t.theme, "subtheme": t.subtheme, "groupname": t.groupname} for t in self.categories if app in t.apps],
             "valid_dates": {
                 "start": self.valid_start.strftime('%Y%m%d') if self.valid_start else "",
                 "end": self.valid_end.strftime('%Y%m%d') if self.valid_end else ""
