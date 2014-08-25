@@ -9,9 +9,7 @@ from sqlalchemy.sql.expression import and_
 import os, json
 from lxml import etree
 
-#from the models init script
 from ..models import DBSession
-#from the generic model loader (like meta from gstore v2)
 from ..models.datasets import (
     Dataset,
     )
@@ -21,19 +19,20 @@ from ..models.apps import GstoreApp
 
 from ..lib.database import *
 
-'''
-standard return metadata as X for a dataset
-
-note: is_available doesn't apply - metadata still accessible
-'''
-
 
 @view_config(route_name='metadata', match_param='datatype=datasets')
 def generate_metadata(request):
-    '''
-    either transform from gstore or just return an unmodified xml blob depending on what the dataset has
-    '''
+    """either transform from gstore or just return an unmodified xml blob depending on what the dataset has
+
+    Notes:
+        
+    Args:
+        
+    Returns:
     
+    Raises:
+    """
+
     app = request.matchdict['app'] #doesn't actually mean anything right now
     dataset_id = request.matchdict['id']
     standard = request.matchdict.get('standard') 
@@ -49,10 +48,7 @@ def generate_metadata(request):
 
     #set up the transformation
     xslt_path = request.registry.settings['XSLT_PATH']
-    #base_url = '%s/apps/%s/datasets/' % (request.registry.settings['BALANCER_URL'], app)
-
     base_url = request.registry.settings['BALANCER_URL']
-
 
     #check for the kind of metadata: gstore (standard + format check) | original (standard & format == xml) | bail
     if d.gstore_metadata:
@@ -97,6 +93,7 @@ def generate_metadata(request):
         
         r = Response(output, content_type=content_type)
         r.headers['X-Robots-Tag'] = 'nofollow'
+        r.headers['Access-Control-Allow-Origin'] = '*'
         return r
 
     elif not d.gstore_metadata and d.original_metadata and format.lower() == 'xml':
@@ -107,6 +104,7 @@ def generate_metadata(request):
 
         r = Response(om[0].original_xml, content_type='application/xml')
         r.headers['X-Robots-Tag'] = 'nofollow'
+        r.headers['Access-Control-Allow-Origin'] = '*'
         return r
 
     #otherwise, who knows, we got nothing.
@@ -141,9 +139,16 @@ def generate_metadata(request):
 
 @view_config(route_name='metadata', match_param='datatype=collections')
 def generate_collection_metadata(request):
-    '''
-    build the collection level metadata (iso ds, not great fgdc)
-    '''
+    """build the collection level metadata (iso ds, not great fgdc)
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
 
     app = request.matchdict['app'] #doesn't actually mean anything right now
     collection_id = request.matchdict['id']
@@ -194,6 +199,7 @@ def generate_collection_metadata(request):
 
         r = Response(output, content_type=content_type)
         r.headers['X-Robots-Tag'] = 'nofollow'
+        r.headers['Access-Control-Allow-Origin'] = '*'
         return r
 
 
@@ -211,4 +217,14 @@ other
 #return a deprecation warning for v1 api requests
 @view_config(route_name='schema')
 def schema(request):
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     return Response('Deprecated. Do not use.')

@@ -4,9 +4,7 @@ from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError
 
 from sqlalchemy.exc import DBAPIError
 
-#from the models init script
 from ..models import DBSession
-#from the generic model loader (like meta from gstore v2)
 from ..models.attributes import (
     Attribute,
     )
@@ -22,11 +20,20 @@ attribute
 '''
 @view_config(route_name='dataset_attributes')
 def attributes(request):
-    '''
+    """
+
     return attributes for a dataset by dataset uuid
 
     name, original name, description, data type (postgis not ogr to make it readable), (nodata, parameter listing if parameter)
-    '''
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
 
     dataset_id = request.matchdict['id']
     format = request.matchdict['ext'] 
@@ -64,15 +71,25 @@ def attributes(request):
                     'sfields': '\n'.join(["""<SimpleField type="%s" name="%s"><displayName>%s</displayName></SimpleField>""" % (k['type'], k['name'], k['name']) for k in kml_flds])
         }
         content_type = 'application/vnd.google-earth.kml+xml'
-    
-    return Response(rsp, content_type=content_type, charset='UTF-8')
+
+    response = Response(rsp, content_type=content_type, charset='UTF-8')
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response
 
 
 @view_config(route_name='attributes', renderer='json')
 def attribute(request):
-    '''
-    return an attribute by its uuid    
-    '''
+    """
+
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
+
     attribute_id = request.matchdict['id']
     format = request.matchdict['ext']
 
@@ -99,7 +116,8 @@ attribute maintenance
 '''
 @view_config(route_name='add_attributes', request_method='POST', renderer='json')
 def attribute_new(request):
-    '''
+    """
+
     add a new set of attributes
     for a dataset
     {   
@@ -119,8 +137,15 @@ def attribute_new(request):
                 },
             ]
     }
-    '''
 
+    Notes:
+        
+    Args:
+        
+    Returns:
+    
+    Raises:
+    """
     #TODO: add the link to a parameter
     #TODO: add the link to a representation (i.e. odm, etc)
 
