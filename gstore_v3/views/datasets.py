@@ -277,7 +277,18 @@ def stream_dataset(request):
 
     is_spatial = False if format in ['json', 'csv'] else True
 
-    vectors = gm.query({'d.id': d.id})
+    #IF THIS IS A PROBLEM, take out everything two the second vectors def and uncomment that.    
+    limit = int(params['limit']) if 'limit' in params else d.record_count + 100
+    offset = int(params['offset']) if 'offset' in params else 0
+    sort = []
+    if 'sort' in params and 'order' in params:
+        #NOTE: this is only going to work for observed AS OBS right now
+        sort = [(params['sort'].lower(), 1 if params['order'] == 'asc' else -1)]
+
+    #add the basic parameters (limit, offset, sort)
+    vectors = gm.query({'d.id': d.id}, None, sort, limit, offset)
+
+#    vectors = gm.query({'d.id': d.id})
     
     records = [d.convert_doc_to_record(vector, epsg, format, is_spatial) for vector in vectors]
 

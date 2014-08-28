@@ -43,7 +43,8 @@ RIGHTSHOLDER = 'CN=gstore.unm.edu,DC=dataone,DC=org'
 #the string for the dev coordinating node (or maybe staging)
 #CONTACTSUBJECT = 'CN=Dev Team A10142,O=Google,C=US,DC=cilogon,DC=org'
 #the one for produciton
-CONTACTSUBJECT='CN=Soren Scott A11096,O=Google,C=US,DC=cilogon,DC=org'
+#CONTACTSUBJECT='CN=Soren Scott A11096,O=Google,C=US,DC=cilogon,DC=org'
+CONTACTSUBJECT='CN=Hays Barrett A13341,O=Google,C=US,DC=cilogon,DC=org'
 NAME = 'EDAC Gstore Repository'
 ALIAS = 'EDACGSTORE'
 DESCRIPTION = "Earth Data Analysis Center's (EDAC) Geographical Storage, Transformation and Retrieval Engine (GSTORE) platform archives data produced by various NM organizations, including NM EPSCoR and RGIS. GSTORE primarily houses GIS and other digital documents relevant to state agencies, local government, and scientific researchers. See RGIS and NM EPSCoR for more information on the scope of data. It currently uses the FGDC metadata standard to describe all of its holdings."
