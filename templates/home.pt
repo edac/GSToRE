@@ -1,0 +1,110 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" xmlns:tal="http://xml.zope.org/namespaces/tal">
+<head>
+    <title>GStore V3 API</title>
+    <link href="docs/bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
+    <link href="docs/docs.css" rel="stylesheet" media="screen">
+
+    <style>
+        /** via http://getbootstrap.com/examples/cover/#**/
+        body {
+            color: #585858;
+            height:100%;
+        }
+        #wrap {
+            display:table;
+            width:100%;
+            height: 100%;
+            min-height:100%;
+        }
+        .wrap-inner {
+            display:table-cell;
+            vertical-align:top;
+        }
+
+        .cover-container {
+          margin-right: auto;
+          margin-left: auto;
+        }
+
+        ul {
+            margin-left:auto;
+            margin-right:auto;
+        }
+
+        ul li {
+            list-style:none;
+            display:inline;
+            margin:0 20px;
+        }
+        ul:after {
+            clear:both;
+        }
+
+        /* Padding for spacing */
+        .inner {
+          padding: 30px;
+            text-align:center;
+        }
+
+        /*
+         * Cover
+         */
+
+        .cover {
+          padding: 0 20px;
+        }
+
+        /*
+         * Affix and center
+         */
+
+        @media (min-width: 768px) {
+          /* Start the vertical centering */
+          .wrap-inner {
+            vertical-align: middle;
+          }
+          /* Handle the widths */
+          .cover-container {
+            width: 100%; /* Must be percentage or pixels for horizontal alignment */
+          }
+        }
+
+        @media (min-width: 992px) {
+          .cover-container {
+            width: 700px;
+          }
+        }
+    </style>
+</head>
+<body>
+    <div id="wrap">
+        <div class="wrap-inner">
+            <div class="cover-container">
+                <div class="inner cover">
+                    <h1>GSToRE</h1>
+                    <p class="lead">Geographic Storage, Transformation and Retrieval Engine Version 3: A data framework for data discovery, delivery and documentation.</p>
+                    <ul>
+                        <li><a class="btn btn-lg btn-default" href="docs/index.html">Learn more</a></li>
+                        <li><a class="btn btn-lg btn-default" href="mailto:gstore@edac.unm.edu">Contact us</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer >
+        <div class="container">
+            <div class="col-sm-6">
+                <p><a href="http://edac.unm.edu">Earth Data Analysis Center</a> &#169; 2014</p>
+                <p><a href="mailto:gstore@edac.unm.edu">gstore[at]edac.unm.edu</a></p>
+                <p><a href="docs/tos.html">Terms of Service</a></p>
+            </div>
+            <div class="col-sm-6">
+                <img src="docs/images/EDAC-Banner1_2.png">
+            </div>
+            
+        </div>
+    </footer>
+</body>
+</html>

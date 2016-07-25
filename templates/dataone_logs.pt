@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<d1:log xmlns:d1="http://ns.dataone.org/service/types/v1" count="${results}" start="${offset}" total="${total}">
+    % for d in docs
+    <logEntry>
+        <identifier>${pid}</identifier>
+    </logEntry>
+    % end for
+    
+</d1:log>
+
