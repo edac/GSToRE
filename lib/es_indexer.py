@@ -15,11 +15,18 @@ dataset mapping:
 {
     "dataset": {
         "properties": {
+            "dataOne_archive": {"type": "boolean"},
+            "embargoDate": {
+                "type": "date",
+                "format": "YYYY-MM-dd"
+		            }
+	        }
+		    },
             "active": {
                 "type": "boolean"
             },
-            "embargo": {
-                "type": "boolean"
+#            "embargo": {
+#                "type": "boolean"
             },
             "available": {
                 "type": "boolean"
@@ -250,6 +257,15 @@ class EsIndexer:
         self.partial = {}
         self.uuid = gstore_object.uuid
 
+	print "\nES_indexer() instantiation"
+	print "Description: %s" % self.es_description
+	print "URL: %s" % self.es_url
+	print "User: %s" % self.user
+	print "Pass: %s" % self.password
+#	print "GStore object:" % self.gstore_object
+	print "Request: %s" % self.request
+	
+
     def __repr__(self):
         return '<EsIndexer (%s, %s)>' % (self.es_url, self.uuid)
 
@@ -459,6 +475,7 @@ class DatasetIndexer(EsIndexer):
         
         Raises:
         """
+	print "\nbuild_document() called from ES_indexer..."
         doc = {}
 
         doc.update({"title": self.gstore_object.description, "title_search": self.gstore_object.description,
@@ -472,6 +489,7 @@ class DatasetIndexer(EsIndexer):
         if self.gstore_object.end_datetime:
             doc.update(self.build_date_element("valid_end", self.gstore_object.end_datetime))
 
+	
         formats = self.gstore_object.get_formats(self.request)
         services = self.gstore_object.get_services(self.request)
         standards = self.gstore_object.get_standards(self.request)
@@ -505,11 +523,15 @@ class DatasetIndexer(EsIndexer):
 
         doc.update({"aliases": self.gstore_object.aliases if self.gstore_object.aliases else []})
 
-        doc.update({"embargo": self.gstore_object.is_embargoed, "active": not self.gstore_object.inactive, "available": self.gstore_object.is_available})
+        doc.update({"is_embargoed": self.gstore_object.is_embargoed, "active": not self.gstore_object.inactive, "available": self.gstore_object.is_available})
 
         doc.update({"taxonomy": self.gstore_object.taxonomy})
         if self.gstore_object.geomtype and self.gstore_object.taxonomy == 'vector':
             doc.update({"geomtype": self.gstore_object.geomtype.lower()})
+
+	#dataOne elements
+	doc.update({"dataOne_archive":self.gstore_object.dataone_archive})
+	doc.update({"releaseDate":self.gstore_object.embargo_release_date.strftime('%Y-%m-%d')})
 
         #nested category structure
         categories = []
@@ -531,6 +553,9 @@ class DatasetIndexer(EsIndexer):
             doc.update({"collections": [str(c.uuid) for c in self.gstore_object.collections]})
 
         self.document = {self.es_description['type']: doc}
+
+	print "\nDocument contents:"
+	print doc
 
     def build_partial(self, keys_to_update):
         """build a partial dataset document

@@ -6,6 +6,7 @@ from gstore_v3.models import Base, DBSession
 from sqlalchemy import func
 
 import json
+import datetime
 
 from requests.auth import HTTPBasicAuth
 
@@ -116,18 +117,24 @@ class EsSearcher():
         Raises:
             Exception: returns the es error if the status code isn't 200
         """
-        lol=json.dumps(self.query_data)
-	print lol
+        print "\nES URL:",self.es_url
         results = requests.post(self.es_url, data=json.dumps(self.query_data), auth=(self.user, self.password))
+#	print "query_data....HERE"
+#	print query_data
         if results.status_code != 200:
             self.results = {}
             raise Exception(results.text)
 
         self.results = results.json()
         
+        print "\nResults:",self.results
+
         return self.results
 
     def parse_basic_query(self, app, query_params, exclude_fields=[]):
+        print "\nparse_basic_query() called..."
+        print query_params
+
         """build the search filter dict 
 
         Notes:
@@ -150,6 +157,7 @@ class EsSearcher():
 
         #keywords
         keyword = query_params.get('query', '').replace('+', '')
+        print keyword
 
         #date added
         start_added = query_params.get('start_time', '')
@@ -163,6 +171,12 @@ class EsSearcher():
         end_valid = query_params.get('valid_end', '')
         end_valid_date = convert_timestamp(end_valid)
 
+	#dataOne
+	dataone_archive=query_params.get('dataone_archive','')
+	releasedsince=query_params.get('releasedsince','')
+	print "dataone_archive parameter passed as: %s" % dataone_archive
+	print "releasedsince set to: %s" % releasedsince
+
         #formats/services/data type
         format = query_params.get('format', '')
         taxonomy = query_params.get('taxonomy', '')
@@ -174,7 +188,7 @@ class EsSearcher():
         epsg = query_params.get('epsg', '')
 
         #sorting
-        sort = query_params.get('sort', 'lastupdate')
+        sort = query_params.get('sort', 'lastupdate') #sets lastupdate to default
         if sort not in ['lastupdate', 'description', 'geo_relevance']:
             raise Exception('Bad sort')
         sort = 'date_added' if sort == 'lastupdate' else ('title_search' if sort == 'description' else sort)
@@ -204,7 +218,7 @@ class EsSearcher():
         #all of the filters
         ands = [
             {"term": {"applications": app.lower()}},
-            {"term": {"embargo": False}},
+#            {"term": {"embargo": False}},
             {"term": {"active": True}}
         ]
 
@@ -219,6 +233,10 @@ class EsSearcher():
 
         if theme or subtheme or groupname:
             ands.append(self.build_category_filter(app.lower(), theme, subtheme, groupname))
+
+	if dataone_archive:
+#	    ands.append({"query": {"term": {"dataOne_archive":True}}})
+	    ands.append({"term": {"dataOne_archive":True}})
 
         if format:
             ands.append({"query": {"term": {"formats": format.lower()}}})
@@ -253,6 +271,20 @@ class EsSearcher():
             if range_query:
                 ands += range_query
 
+	#Build in releaseDate to filter out datasets that have been embargoed and haven't reached their release dates
+	release_date_query=self.build_releasedate_filter()
+	print "release_date_query:", release_date_query
+	if release_date_query:
+		ands.append(release_date_query)
+		print "after adding released_date_query returns...%s" % ands
+
+#	if(releasedsince):
+	releasedsince_query=self.build_releasedsince_filter(releasedsince)
+	print "\n\nreleasedsince_query:",releasedsince_query
+	if releasedsince_query:
+		ands.append(releasedsince_query)
+		print "after adding releasedsince_query returns....%s" % ands
+
         if exclude_fields:
             #lazy man's handling of give me all collections (no collections in mapping) or any dataset not in a collection (in collection, has collections list in mapping)
             ands += [{"missing": {"field": e}} for e in exclude_fields]
@@ -280,6 +312,8 @@ class EsSearcher():
         #and add the sort element back in
         query_request.update(sorts)
 
+	print "\nQuery_request....",query_request
+	
         #should have a nice es search
         self.query_data = query_request
 
@@ -369,6 +403,50 @@ class EsSearcher():
             }
         }
     
+
+    def build_releasedate_filter(self):
+        today=datetime.datetime.now().strftime(self.dfmt)
+        print "Today: %s" % today
+        ands = {"lte":today}
+	"""
+	{
+	    "sort": [
+	        {"date_added": {"order": "u'desc'"}},
+	        {"title_search": {"order": "asc"}}
+	    ],
+	    "fields": ["_id"],
+	    "query": {"filtered": {"filter": {"and": [
+	        {"term": {"applications": "u'energize'"}},
+	        {"term": {"embargo": "false"}},
+	        {"term": {"active": "true"}},
+	        {"term": {"dataone_archive":"true"}},
+	        {"range": {"releaseDate": {"lte": "2017-03-01"}}},
+	        {"range": {"releaseDate": {"gte": "2016-03-01"}}}]
+	        }}},
+	    "from": 0,
+	    "size": 15
+	}
+
+	"""
+	print "build_releasedate_filter() called with ands equal to: {'range': {'releaseDate': %s}}" % ands
+	range_query={"range": {"releaseDate": ands}}
+	print "range_query1:",range_query
+        return range_query
+
+
+    def build_releasedsince_filter(self,releasedsince):
+	if(releasedsince):
+	        print "build_releasedsince_filter() called using: %s" % releasedsince
+	else:
+		print "build_releasedsince_filter() called without date"
+		releasedsince="1970-01-01"
+        ands = {"gte":releasedsince}
+	print "...and returning {'range': {'releaseDate':%s}}" % ands
+        range_query= {"range": {"releaseDate": ands}}
+	print "range_query2:",range_query
+	return range_query
+
+
     def build_simple_date_filter(self, element, start_date, end_date):
         """build a date filter for an element (single date element unparsed only)
 

@@ -55,6 +55,7 @@ def return_fileresponse(output, mimetype, filename):
 
 @view_config(route_name='dataset')
 def dataset(request):
+    print "dataset() called..."
     """
 
     Notes:
@@ -464,6 +465,8 @@ dataset maintenance
 '''
 @view_config(route_name='add_dataset', request_method='POST')
 def add_dataset(request):
+    print "add_dataset() called"
+
     """
 
     we are skipping the file upload - no one wanted to do that (or no one wanted it to post to ibrix)
@@ -549,8 +552,18 @@ def add_dataset(request):
     description = post_data['description']
     basename = post_data['basename']
     taxonomy = post_data['taxonomy']
+    dataone_archive = post_data['dataone_archive']
+    is_embargoed = post_data['is_embargoed']
+    releasedate = post_data['releasedate']  
+
+    print "\nDataone_archive: %s" % dataone_archive
+    print "DataOne Release Date: %s" % releasedate
+    print "Is Embargoed: %s" % is_embargoed
     apps = post_data['apps'] if 'apps' in post_data else []
     validdates = post_data['dates'] if 'dates' in post_data else {}
+#    print "Valid date 0: %s" % post_data['dates']
+#    print "Valid date 1: %s" % validdates["start"]
+    print "Validdates:",validdates
     spatials = post_data['spatial'] if 'spatial' in post_data else []
     formats = post_data['formats']
     services = post_data['services']
@@ -576,21 +589,22 @@ def add_dataset(request):
 
     project = post_data['project'] if 'project' in post_data else ''
 
-    embargo = post_data['embargo'] if 'embargo' in post_data else {}
+#    embargo = post_data['is_embargoed'] if 'is_embargoed'
     #this is not good
-    embargoed = True if 'embargoed' in embargo else False
-    embargo_release = embargo['release_date'] if embargo else ''
+#    embargoed = True if 'embargoed' in embargo else False
+#    embargo_release = embargo['release_date'] if embargo else ''
     
 
     #we may have instances where we have an external dataset (tri-state replices for example)
     #and we want to keep the uuid for that dataset so we can provide a uuid or make one here
     provided_uuid = post_data['uuid'] if 'uuid' in post_data else generate_uuid4()
 
-    #like make the new dataset
+    #Instantiate a new dataset
     new_dataset = Dataset(description)
     new_dataset.basename = basename
     new_dataset.taxonomy = taxonomy
     new_dataset.record_count = records
+
     if taxonomy == 'vector':
         new_dataset.geomtype = geomtype
         new_dataset.feature_count = features
@@ -598,10 +612,17 @@ def add_dataset(request):
         
     new_dataset.inactive = False if active == 'true' else True
 
-    if embargoed == 'true':
-        #need to set is_embargoed and the release date so the dataset is unavailable through gstore
+    #DataOne Capabilities
+    new_dataset.dataone_archive=dataone_archive
+    new_dataset.embargo_release_date=releasedate
+    if is_embargoed == 'True':
+	print "Yes, it's true!"
         new_dataset.is_embargoed = True
-        new_dataset.embargo_release_date = embargo_release
+
+    print "\ndataone_archive",new_dataset.dataone_archive
+    print "embargoReleaseDate",new_dataset.embargo_release_date
+    print "is_embargoed",new_dataset.is_embargoed
+
 
     if not geom and taxonomy not in ['table']:
         #go make one
@@ -726,7 +747,17 @@ def add_dataset(request):
     #TODO: add the publication date
     new_dataset.date_published = datetime.now()
 
-    #create the new dataset with all its pieces
+    if(is_embargoed=='False'):
+	    new_dataset.embargo_release_date=new_dataset.date_published
+    else:
+	    new_dataset.embargo_release_date=releasedate
+
+    print "new_dataset values...."
+    print new_dataset
+
+    #*******************************CREATE THE NEW DATASET IN POSTGRESQL************************************************************
+    #*****************************************************************************************************************************
+
     try:
         DBSession.add(new_dataset)
         DBSession.commit()
@@ -737,7 +768,11 @@ def add_dataset(request):
 
     dataset_uuid = str(new_dataset.uuid)
 
-    #add the dataset to the index
+
+#***********************************NOW CREATE NEW DOCUMENT FOR THE DATASET IN ELASTICSEARCH************************************************************
+
+
+    #add the dataset to the ELASTICSEARCH index
     es_description = {
         "host": request.registry.settings['es_root'],
         "index": request.registry.settings['es_dataset_index'], 
@@ -749,6 +784,7 @@ def add_dataset(request):
     indexer = DatasetIndexer(es_description, new_dataset, request)  
     #TODO: update the list for facets
     indexer.build_document([])
+
     #add to the index
     try:
         indexer.put_document()
