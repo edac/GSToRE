@@ -57,7 +57,7 @@ class Dataset(Base):
     __table__ = Table('datasets', Base.metadata,
         Column('id', Integer, primary_key=True),
         Column('description', String(200)),
-	Column('author', String(150)),
+#	Column('author', String(150)),
         Column('taxonomy', String(50)),
         Column('feature_count', Integer),
         Column('record_count', Integer),
