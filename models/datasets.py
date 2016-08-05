@@ -57,7 +57,7 @@ class Dataset(Base):
     __table__ = Table('datasets', Base.metadata,
         Column('id', Integer, primary_key=True),
         Column('description', String(200)),
-#	Column('author', String(150)),
+	Column('author', String(150)),
         Column('taxonomy', String(50)),
         Column('feature_count', Integer),
         Column('record_count', Integer),
@@ -398,7 +398,7 @@ class Dataset(Base):
         Raises:
         """
     
-        results = {'type': 'dataset','dataone_archive':self.dataone_archive, 'id': self.id, 'uuid': self.uuid, 'description': self.description, 
+        results = {'type': 'dataset','dataone_archive':self.dataone_archive,'author':self.author, 'id': self.id, 'uuid': self.uuid, 'description': self.description, 
                 'lastupdate': self.dateadded.strftime('%Y%m%d'), 'name': self.basename, 'taxonomy': self.taxonomy,
                 'categories': [{'theme': t.theme, 'subtheme': t.subtheme, 'groupname': t.groupname} for t in self.categories if app in t.apps]}
         if self.box:

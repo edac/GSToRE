@@ -177,6 +177,10 @@ class EsSearcher():
 	print "dataone_archive parameter passed as: %s" % dataone_archive
 	print "releasedsince set to: %s" % releasedsince
 
+	#author
+	author=query_params.get('author','')
+	print "author param passed as: %s" % author
+
         #formats/services/data type
         format = query_params.get('format', '')
         taxonomy = query_params.get('taxonomy', '')
@@ -214,6 +218,10 @@ class EsSearcher():
 
         # the main query block
         filtered = {}
+
+        if author:
+		filtered.update({"query":{"query_string":{"query": author,"fields": ["author"]}}})
+
 
         #all of the filters
         ands = [

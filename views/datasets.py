@@ -553,12 +553,14 @@ def add_dataset(request):
     basename = post_data['basename']
     taxonomy = post_data['taxonomy']
     dataone_archive = post_data['dataone_archive']
+    author = post_data['author']
+
     is_embargoed = post_data['is_embargoed']
     releasedate = post_data['releasedate']  
-
     print "\nDataone_archive: %s" % dataone_archive
     print "DataOne Release Date: %s" % releasedate
     print "Is Embargoed: %s" % is_embargoed
+
     apps = post_data['apps'] if 'apps' in post_data else []
     validdates = post_data['dates'] if 'dates' in post_data else {}
 #    print "Valid date 0: %s" % post_data['dates']
@@ -612,6 +614,7 @@ def add_dataset(request):
         
     new_dataset.inactive = False if active == 'true' else True
 
+
     #DataOne Capabilities
     new_dataset.dataone_archive=dataone_archive
     new_dataset.embargo_release_date=releasedate
@@ -623,6 +626,10 @@ def add_dataset(request):
     print "embargoReleaseDate",new_dataset.embargo_release_date
     print "is_embargoed",new_dataset.is_embargoed
 
+
+    #Adding in the author/PI
+    new_dataset.author=author
+    print "author", new_dataset.author
 
     if not geom and taxonomy not in ['table']:
         #go make one
@@ -746,7 +753,6 @@ def add_dataset(request):
 
     #TODO: add the publication date
     new_dataset.date_published = datetime.now()
-
     if(is_embargoed=='False'):
 	    new_dataset.embargo_release_date=new_dataset.date_published
     else:

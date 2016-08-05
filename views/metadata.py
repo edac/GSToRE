@@ -42,10 +42,10 @@ def generate_metadata(request):
     d = get_dataset(dataset_id) 
 
     if not d:
-        return HTTPNotFound()
+        return HTTPNotFound('Dataset not found')
 
     if d.is_embargoed or d.inactive:
-        return HTTPNotFound()
+        return HTTPNotFound('dataset is embargoed or inactive')
 
     #set up the transformation
     xslt_path = request.registry.settings['XSLT_PATH']
@@ -61,12 +61,12 @@ def generate_metadata(request):
         #check the requested standard against the default list - excluded_standards
         supported_standards = d.get_standards(request)
         if (standard not in supported_standards and '19119' not in standard) or ('19119' in standard and standard.split(':')[0] not in supported_standards):
-            return HTTPNotFound()
+            return HTTPNotFound('Standard is not supported')
 
         #and check the format of the requested standard
         ms = DBSession.query(MetadataStandards).filter(and_(MetadataStandards.alias==standard, "'%s'=ANY(supported_formats)" % format.lower()))
         if not ms:
-            return HTTPNotFound()
+            return HTTPNotFound('Format issues...')
 
         #transform and return
         gstoreapp = DBSession.query(GstoreApp).filter(GstoreApp.route_key==app).first()
@@ -80,7 +80,7 @@ def generate_metadata(request):
             service = standard.split(':')[-1]
             supported_services = d.get_services(request)
             if service.lower() not in supported_services:
-                return HTTPNotFound()
+                return HTTPNotFound('Not a supported service')
             metadata_info.update({"service": service})
             standard = standard.split(':')[0]
 
@@ -91,7 +91,7 @@ def generate_metadata(request):
             return HTTPServerError('Invalid output')
         if output == 'No matching stylesheet':
             #no xslt for the standard + format output
-            return HTTPNotFound()
+            return HTTPNotFound('No matching xslt')
 
         content_type = 'text/html' if format == 'html' else 'application/xml'
         
@@ -104,7 +104,7 @@ def generate_metadata(request):
         #check for some xml with that standard
         om = [o for o in d.original_metadata if o.original_xml_standard == standard and o.original_xml]
         if not om:
-            return HTTPNotFound()
+            return HTTPNotFound('check for some xml with that standard failed')
 
         r = Response(om[0].original_xml, content_type='application/xml')
         r.headers['X-Robots-Tag'] = 'nofollow'
@@ -112,7 +112,7 @@ def generate_metadata(request):
         return r
 
     #otherwise, who knows, we got nothing.
-    return HTTPNotFound()
+    return HTTPNotFound('LOL')
 
 
 

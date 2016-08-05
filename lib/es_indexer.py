@@ -533,6 +533,9 @@ class DatasetIndexer(EsIndexer):
 	doc.update({"dataOne_archive":self.gstore_object.dataone_archive})
 	doc.update({"releaseDate":self.gstore_object.embargo_release_date.strftime('%Y-%m-%d')})
 
+	#author element
+	doc.update({"author":self.gstore_object.author})
+
         #nested category structure
         categories = []
         for category in self.gstore_object.categories:
