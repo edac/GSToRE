@@ -242,9 +242,13 @@ class EsSearcher():
         if theme or subtheme or groupname:
             ands.append(self.build_category_filter(app.lower(), theme, subtheme, groupname))
 
-	if dataone_archive:
+	if (dataone_archive and dataone_archive.lower()=='true'):
 #	    ands.append({"query": {"term": {"dataOne_archive":True}}})
 	    ands.append({"term": {"dataOne_archive":True}})
+	elif (dataone_archive and dataone_archive.lower()=='false'):
+	    ands.append({"term": {"dataOne_archive":False}})	    
+#	else:
+#	    ands.append({"term": {"dataOne_archive":False}})
 
         if format:
             ands.append({"query": {"term": {"formats": format.lower()}}})
