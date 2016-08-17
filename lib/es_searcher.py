@@ -563,7 +563,7 @@ class EsSearcher():
         
         Raises:
         """
-        ors = [{"query": {"match": {element: {"query": keywords, "operator": "and"}}}} for element in elements]
+        ors = [{"query": {"match": {element: {"query": keywords, "operator": "or"}}}} for element in elements]
 
         #TODO: add the wildcard search:
         '''
