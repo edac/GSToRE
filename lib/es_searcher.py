@@ -261,7 +261,7 @@ class EsSearcher():
             if geomtype and geomtype.upper() in ['POLYGON', 'POINT', 'LINESTRING', 'MULTIPOLYGON', '3D POLYGON', '3D LINESTRING']:
                 ands.append({"query": {"term": {"geomtype": geomtype.lower()}}})
         if keyword:
-            keyword_query = self.build_keyword_filter(keyword, ['aliases', 'title'])
+            keyword_query = self.build_keyword_filter(keyword, ['aliases', 'title', 'keywords'])
             if keyword_query:
                 ands.append(keyword_query)
         if box:
