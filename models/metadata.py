@@ -25,6 +25,7 @@ from ..lib.utils import *
 from pyramid.threadlocal import get_current_registry
 
 
+
 '''
 temp definition of xslt filenames (path from the config and must be passed in)
 '''
@@ -42,7 +43,10 @@ FROM_GSTORE_XSLTS = {
     "ISO-19119|XML": "gstore_to_19119.xsl",
     "FGDC-STD-001-1998|HTML": "gstore_to_fgdc_html.xsl",
     "FGDC-STD-012-2002|HTML": "gstore_to_fgdc_html.xsl",
-    "ISO-19115:DS|XML": "gstore_to_ds.xsl"
+    "ISO-19115:DS|XML": "gstore_to_ds.xsl",
+    "ISO-19115:MD|XML": "gstore_to_md.xsl",
+    "apollo|XML": "gstore_to_apollo.xsl",
+    "apollo_FGDC|XML": "gstore_to_apollo_FGDC.xsl"
 }
 
 

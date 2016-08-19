@@ -61,7 +61,7 @@ def generate_metadata(request):
         #check the requested standard against the default list - excluded_standards
         supported_standards = d.get_standards(request)
         if (standard not in supported_standards and '19119' not in standard) or ('19119' in standard and standard.split(':')[0] not in supported_standards):
-            return HTTPNotFound('Standard is not supported')
+            return HTTPNotFound("Standard is not supported. Supported standards are: %s" % supported_standards)
 
         #and check the format of the requested standard
         ms = DBSession.query(MetadataStandards).filter(and_(MetadataStandards.alias==standard, "'%s'=ANY(supported_formats)" % format.lower()))
