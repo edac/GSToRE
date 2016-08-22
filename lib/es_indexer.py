@@ -261,7 +261,8 @@ class EsIndexer:
 	print "Description: %s" % self.es_description
 	print "URL: %s" % self.es_url
 	print "User: %s" % self.user
-	print "Pass: %s" % self.password
+#	print "Formats: %s" % self.gstore_object
+	#print "Pass: %s" % self.password
 #	print "GStore object:" % self.gstore_object
 	print "Request: %s" % self.request
 	
@@ -491,6 +492,7 @@ class DatasetIndexer(EsIndexer):
 
 	
         formats = self.gstore_object.get_formats(self.request)
+	print "formats: %s" % formats
         services = self.gstore_object.get_services(self.request)
         standards = self.gstore_object.get_standards(self.request)
         repos = self.gstore_object.get_repositories()
@@ -530,8 +532,14 @@ class DatasetIndexer(EsIndexer):
             doc.update({"geomtype": self.gstore_object.geomtype.lower()})
 
 	#dataOne elements
+	print "Dataone_Archive now: %s" % self.gstore_object.dataone_archive
 	doc.update({"dataOne_archive":self.gstore_object.dataone_archive})
 	doc.update({"releaseDate":self.gstore_object.embargo_release_date.strftime('%Y-%m-%d')})
+
+	#Formats
+        print "Formats: " 
+        print self.gstore_object.formats
+	doc.update({"formats":self.gstore_object.formats})
 
 	#author element
 	doc.update({"author":self.gstore_object.author})

@@ -568,6 +568,7 @@ def add_dataset(request):
     print "Validdates:",validdates
     spatials = post_data['spatial'] if 'spatial' in post_data else []
     formats = post_data['formats']
+    print "Formats: %s" % formats
     services = post_data['services']
     categories = post_data['categories']
     sources = post_data['sources']
@@ -643,6 +644,11 @@ def add_dataset(request):
 
     #TODO: get rid of formats_cache (once v2 tools issue is resolved in search datasets)
     #new_dataset.formats_cache = ','.join(formats)
+    format=','.join(formats)
+    formatList=[]
+    formatList.append(format)
+    print formatList
+    new_dataset.formats=formatList
     new_dataset.excluded_formats = [f for f in excluded_formats if f not in formats]
     new_dataset.excluded_services = [s for s in excluded_services if s not in services]
     new_dataset.excluded_standards = [s for s in excluded_standards if s not in standards]
