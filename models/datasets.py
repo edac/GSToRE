@@ -431,10 +431,11 @@ class Dataset(Base):
                 #if none, derived + fmt
                 #if one, set + fmt
                 #TODO: what if a vector dataset has external links?
-                for f in fmts:
-                    sf = [s for s in srcs if s.extension == f]
-                    st = sf[0].set if sf else 'derived'
-                    dlds.append((st, f))
+ 		for f in fmts:
+                    if(f!='dat'):
+                            sf = [s for s in srcs if s.extension == f]
+                            st = sf[0].set if sf else 'derived'
+                            dlds.append((st, f))
             elif self.taxonomy == 'file':
                 #just the formats
                 for f in fmts:
