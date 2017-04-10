@@ -111,6 +111,9 @@ def main(global_config, **settings):
 
     config.add_route('home', '/')    
 
+# authors route : lists all authors in an app
+    config.add_route('authors','/apps/{app}/authors.{ext}')
+
 #app routes (stats, etc)
     config.add_route('app_stats', 'apps/{app}/statistics/{stat}.{ext}', custom_predicates=(applist,))
     
