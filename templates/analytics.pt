@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script type="text/javascript"
+  src="https://gstore.unm.edu/javascript/dygraph/dygraph.js"></script>
+<link rel="stylesheet" src="https://gstore.unm.edu/javascript/dygraph/dygraph.css" />
+
+<script type="text/javascript" src="https://gstore.unm.edu/javascript/dygraph/data.js"></script>
+</head>
+
+
+
+  <body>
+    <h3>Click the check boxes to toggle series visibility</h3>
+    <div id="div_g" style="width:600px; height:300px;"></div>
+
+    <p><b>Show Series:</b></p>
+    <p>
+    ${structure: htmlitems}
+    </p>
+
+    <p>g.visibility() = <span id="visibility"></span></p>
+
+
+    <script type="text/javascript">
+      g = new Dygraph(
+            document.getElementById("div_g"),
+            "${url}", {
+              rollPeriod: 7,
+              errorBars: true,
+              visibility: [${truefalse}]
+            }
+          );
+      setStatus();
+
+      function setStatus() {
+        document.getElementById("visibility").innerHTML =
+          g.visibility().toString();
+      }
+
+      function change(el) {
+        g.setVisibility(parseInt(el.id), el.checked);
+        setStatus();
+      }
+    </script>
+
+  </body>
+</html>
