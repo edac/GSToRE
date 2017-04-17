@@ -113,7 +113,6 @@ def main(global_config, **settings):
 
 
 # graph route
-    config.add_route('analyticspage', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/analytics')
     config.add_route('analyticsdata', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/analytics.{ext}')
 
 # authors route : lists all authors in an app
