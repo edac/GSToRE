@@ -37,6 +37,7 @@ def analyticsdata(request):
 
     if format=="csv":
 	response.body=getCSV(d,gm,normalize_params(request.params))
+        response.headers['Access-Control-Allow-Origin'] = '*'
     else :
         response.body = '''format unknown'''
         response.content_type = 'text'
