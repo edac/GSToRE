@@ -13,31 +13,6 @@ import urllib2
 #import pandas as pd
 #import numpy as np
 
-#@view_config(route_name='analyticspage', renderer='../templates/analytics.pt')
-#def analyticspage(request):
-#    app = request.matchdict['app']
-#    dataset_id = request.matchdict['id']
-#    aurl = 'http://129.24.63.66/gstore_v3/apps/'+app+'/datasets/'+dataset_id+'/analytics.csv'
-#    params=""
-#    items = ""
-#    truefalse = ""
-#    response = urllib2.urlopen(aurl)
-#    cr = csv.reader(response)
-#    for i in range(1):
-#       params=cr.next()
-#    for param in params:
-#      if param != "Date":
-#          n=params.index(param)-1
-#      
-#          items = items + '<input type=checkbox id="'+ str(n) +'" onClick="change(this)">\n'
-#          items = items + '<label for="'+ str(n) +'">' + param + '</label><br/>\n'
-#          truefalse = truefalse + "false,"
-#    htmltruefalse = truefalse.rstrip(',')
-#    return dict(
-#        url = aurl,
-#        htmlitems = items,
-#        truefalse = htmltruefalse
-#        )
 
 @view_config(route_name='analyticsdata')
 def analyticsdata(request):
@@ -65,6 +40,7 @@ def analyticsdata(request):
     else :
         response.body = '''format unknown'''
         response.content_type = 'text'
+        response.headers['Access-Control-Allow-Origin'] = '*'
     return response
 
 
