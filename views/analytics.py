@@ -10,7 +10,7 @@ import datetime
 import csv
 import urllib2   
 #Soooon!
-#import pandas as pd
+import pandas as pd
 #import numpy as np
 
 
@@ -36,16 +36,21 @@ def analyticsdata(request):
 
 
     if format=="csv":
-	response.body=getCSV(d,gm,normalize_params(request.params))
-        response.headers['Access-Control-Allow-Origin'] = '*'
-    else :
-        response.body = '''format unknown'''
         response.content_type = 'text'
-        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.body=MakeResponse(d,gm,normalize_params(request.params),format)
+
+    elif format=="json":
+        response.content_type = 'application/json'
+        response.body=MakeResponse(d,gm,normalize_params(request.params),format)
+
+    elif format=="html":
+        response.content_type = 'text/html'
+        response.text=MakeResponse(d,gm,normalize_params(request.params),format)
+
     return response
 
 
-def getCSV(d,gm, params):
+def MakeResponse(d,gm,params,format):
     line=""
     label=""
 
@@ -94,8 +99,19 @@ def getCSV(d,gm, params):
                             line=line + str(tuple[1])+","
         line=line[:-1] + delimiter
     response = label + line
-    response = response.replace("-99.9","null")
+    response = response.replace("-99.9","NaN")
     response = response.replace("observed","Date")
-    DaDATA=StringIO(response)
-    return response
+ 
+    if format=="csv":
+        return response
+    elif format=="json":
+        DaDATA=StringIO(response)
+        df = pd.read_csv(DaDATA, sep=",", index_col = ["Date"]) 
+        jsonresponse=df.describe().to_json()
+        return jsonresponse
+    elif format=="html":
+        DaDATA=StringIO(response)
+        df = pd.read_csv(DaDATA, sep=",", index_col = ["Date"])
+        jsonresponse=df.describe().transpose().to_html()
+        return jsonresponse
 
