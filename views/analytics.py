@@ -37,7 +37,7 @@ def analyticsdata(request):
 
     if format=="csv":
         response.content_type = 'text'
-        response.body=MakeResponse(d,gm,normalize_params(request.params),format)
+        response.text=MakeResponse(d,gm,normalize_params(request.params),format)
 
     elif format=="json":
         response.content_type = 'application/json'
@@ -55,7 +55,9 @@ def MakeResponse(d,gm,params,format):
     line=""
     label=""
 
+    fields = d.attributes
 
+    labelformat = params['labelformat'] if 'labelformat' in params else "name"
     limit = int(params['limit']) if 'limit' in params else d.record_count + 10000000
     offset = int(params['offset']) if 'offset' in params else 0
     sort = []
@@ -81,6 +83,12 @@ def MakeResponse(d,gm,params,format):
 
                             label=label + str(tuple[0])+","
         label=label[:-1] + delimiter
+        if labelformat=="original_name":
+            for a in fields:
+                label=label.replace(a.name, a.orig_name)
+        if labelformat=="description":
+            for a in fields:
+                label=label.replace(a.name, a.description)
 
     is_spatial = False
     allvals=""
