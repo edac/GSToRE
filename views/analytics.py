@@ -113,6 +113,6 @@ def MakeResponse(d,gm,params,format):
     elif format=="html":
         DaDATA=StringIO(response)
         df = pd.read_csv(DaDATA, sep=",", index_col = ["Date"])
-        jsonresponse=df.describe().transpose().to_html()
+        jsonresponse=df.describe().transpose().to_html(classes="table table-hover text-centered")
         return jsonresponse
 
