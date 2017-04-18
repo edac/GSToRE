@@ -47,6 +47,7 @@ def analyticsdata(request):
         response.content_type = 'text/html'
         response.text=MakeResponse(d,gm,normalize_params(request.params),format)
 
+    response.headers['Access-Control-Allow-Origin'] = '*'
     return response
 
 
