@@ -94,6 +94,10 @@ def MakeResponse(d,gm,params,format):
         if labelformat=="description":
             for a in fields:
                 label=label.replace(a.name, a.description)
+        if labelformat=="name":
+               for a in fields:
+                    label=label.replace(a.name, a.name)
+
 
     is_spatial = False
     allvals=""
