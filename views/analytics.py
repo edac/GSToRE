@@ -35,9 +35,13 @@ def analyticsdata(request):
 
 
 
-    if format=="csv":
+    if format=="dygraph":
         response.content_type = 'text'
         response.text=MakeResponse(d,gm,normalize_params(request.params),format)
+
+    elif format=="csv":
+        response.content_type = 'text'
+        response.body=MakeResponse(d,gm,normalize_params(request.params),format)
 
     elif format=="json":
         response.content_type = 'application/json'
@@ -60,6 +64,7 @@ def MakeResponse(d,gm,params,format):
     labelformat = params['labelformat'] if 'labelformat' in params else "name"
     limit = int(params['limit']) if 'limit' in params else d.record_count + 10000000
     offset = int(params['offset']) if 'offset' in params else 0
+    transpose=params['transpose'] if 'transpose' in params else "false"
     sort = []
     if 'sort' in params and 'order' in params:
         #NOTE: this is only going to work for observed AS OBS right now
@@ -111,16 +116,31 @@ def MakeResponse(d,gm,params,format):
     response = response.replace("-99.9","NaN")
     response = response.replace("observed","Date")
  
-    if format=="csv":
+    if format=="dygraph":
         return response
+
+    elif format=="csv":
+        DaDATA=StringIO(response)
+        df = pd.read_csv(DaDATA, sep=",", index_col = ["Date"])
+        if transpose=="true":
+            csvresponse=df.describe().transpose().to_csv()
+        else:
+            csvresponse=df.describe().to_csv()
+        return csvresponse
     elif format=="json":
         DaDATA=StringIO(response)
         df = pd.read_csv(DaDATA, sep=",", index_col = ["Date"]) 
-        jsonresponse=df.describe().to_json()
+        if transpose=="true":
+            jsonresponse=df.describe().transpose().to_json()
+        else:
+            jsonresponse=df.describe().to_json()
         return jsonresponse
     elif format=="html":
         DaDATA=StringIO(response)
         df = pd.read_csv(DaDATA, sep=",", index_col = ["Date"])
-        jsonresponse=df.describe().transpose().to_html(classes="table table-hover text-centered")
-        return jsonresponse
+        if transpose=="true":
+            htmlresponse=df.describe().transpose().to_html(classes="table table-hover text-centered")
+        else:
+            htmlresponse=df.describe().to_html(classes="table table-hover text-centered")
+        return htmlresponse
 
