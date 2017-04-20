@@ -181,6 +181,9 @@ class EsSearcher():
 	author=query_params.get('author','')
 	print "author param passed as: %s" % author
 
+        #uuid
+        uuid=query_params.get('uuid','')
+        print "uuid param passed as : %s" % uuid
         #formats/services/data type
         format = query_params.get('format', '')
         taxonomy = query_params.get('taxonomy', '')
@@ -256,7 +259,9 @@ class EsSearcher():
             ands.append({"query": {"term": {"services": service.lower()}}})
         if taxonomy:
             ands.append({"query": {"term": {"taxonomy": taxonomy.lower()}}})
-            
+        if uuid:
+            ands.append({"query": {"term": {"_id": uuid.lower()}}})
+
             #NOTE: geomtype is not currently in the indexed docs
             if geomtype and geomtype.upper() in ['POLYGON', 'POINT', 'LINESTRING', 'MULTIPOLYGON', '3D POLYGON', '3D LINESTRING']:
                 ands.append({"query": {"term": {"geomtype": geomtype.lower()}}})
