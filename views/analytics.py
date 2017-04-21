@@ -143,8 +143,9 @@ def MakeResponse(d,gm,params,format):
         DaDATA=StringIO(response)
         df = pd.read_csv(DaDATA, sep=",", index_col = ["Date"])
         if transpose=="true":
-            htmlresponse=df.describe().transpose().to_html(classes="table table-hover text-centered")
+            htmlresponse=df.describe().transpose().to_html(classes="table-style-two table")
         else:
-            htmlresponse=df.describe().to_html(classes="table table-hover text-centered")
+#            htmlresponse=df.describe().loc[['count','max','kurt']].to_html(classes="table-style-two")
+            htmlresponse=df.describe().to_html(classes="table-style-twotable")
         return htmlresponse
 
