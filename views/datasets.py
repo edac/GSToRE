@@ -25,6 +25,7 @@ from ..lib.spatial_streamer import *
 #TODO: add dataset statistics view - min/max per attribute, histogram info, etc
 
 def return_fileresponse(output, mimetype, filename):
+    print "return_fileresponse"
     """
 
     Notes:
@@ -80,7 +81,10 @@ def dataset(request):
 
     #go get the dataset
     d = get_dataset(dataset_id)
-
+    print "Datset ID is:"
+    print d.id
+    print "Dataset UUID is :"
+    print d.uuid
     if not d:
         return HTTPNotFound()
 
@@ -226,6 +230,7 @@ def dataset(request):
 
 @view_config(route_name='dataset_streaming')
 def stream_dataset(request):
+    print "stream_dataset"
     """
     stream dataset as json, kml, csv, geojson, gml
     for improved access options (pull in json for a table on a webpage, etc)
@@ -288,6 +293,12 @@ def stream_dataset(request):
 
     #add the basic parameters (limit, offset, sort)
     vectors = gm.query({'d.id': d.id}, None, sort, limit, offset)
+    countTotal = gm.count({'d.id': d.id}, None, sort, limit, offset)
+    countSubtotal=0
+    if countTotal<limit:
+        countSubtotal=countTotal
+    else:
+        countSubtotal=limit
 
     #vectors = gm.query({'d.id': d.id})
     
@@ -311,6 +322,7 @@ def stream_dataset(request):
         streamer = GeoJsonStreamer(fields)
     elif format == 'json':
         streamer = JsonStreamer(fields)
+        streamer.update_description(str(countTotal),str(countSubtotal))
     elif format == 'csv':
         streamer = CsvStreamer(fields)
     else:
