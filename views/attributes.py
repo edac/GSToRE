@@ -48,7 +48,7 @@ def attributes(request):
 
     if format == 'json':
         rsp = {'total': len(fields), 'dataset': {'id': d.id, 'uuid': d.uuid}}
-        res = [{'uuid': a.uuid, 'name': a.name, 'original_name': a.orig_name, 'description': a.description, 'datatype': ogr_to_kml_fieldtype(a.ogr_type)} for a in fields] #ogr_to_psql(a.ogr_type)
+        res = [{'uuid': a.uuid, 'name': a.name, 'original_name': a.orig_name, 'description': a.description, 'datatype': ogr_to_kml_fieldtype(a.ogr_type),'nodata':a.nodata } for a in fields] #ogr_to_psql(a.ogr_type)
         rsp.update({'results': res})
 
         rsp = json.dumps(rsp)
