@@ -117,6 +117,7 @@ def main(global_config, **settings):
 
 # authors route : lists all authors in an app
     config.add_route('authors','/apps/{app}/authors.{ext}')
+    config.add_route('datasetsreport','/apps/{app}/datasetsreport.{ext}')
 
 #app routes (stats, etc)
     config.add_route('app_stats', 'apps/{app}/statistics/{stat}.{ext}', custom_predicates=(applist,))
@@ -172,6 +173,9 @@ def main(global_config, **settings):
 
 #to the deprecated schema call
     config.add_route('schema', '/apps/{app}/datasets/{id:\d+}/schema.{ext}', custom_predicates=(applist,))
+
+#to digitalcommons
+    config.add_route('digitalcommons', '/apps/{app}/dc/{doctypes}.{ext}', custom_predicates=(applist,))
 
 #to dataone
     config.add_route('dataone_noversion', '/dataone')
