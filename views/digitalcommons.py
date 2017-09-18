@@ -9,6 +9,7 @@ from sqlalchemy.sql.expression import and_, or_, cast
 from sqlalchemy.sql import between
 import xml.etree.ElementTree as ET
 from datetime import datetime
+from time import strftime
 import requests
 from ..models.metadata import DatasetMetadata
 from ..models import DBSession
@@ -104,7 +105,7 @@ def search_digitalcommons(request):
 	    latitude=""
 	    longitude=""
 	    polygon=""
-	    geolocate="FALSE"
+	    geolocate=""
 	    a2fname=""
             a3fname=""
             a4fname=""
@@ -121,7 +122,10 @@ def search_digitalcommons(request):
             a3inst=""
             a4inst=""
 	    datarow=0
+	    pubdate=""
             for row in result:
+                pubdate=row[0].strftime("%Y-%m-%d %H:%M:%S")
+
 		if row[7] is not None:
 			box=row[7]
 			if box[0]==box[2] and box[1]==box[3]:
@@ -131,8 +135,8 @@ def search_digitalcommons(request):
 			 #create polygon
 				log.info(box)
 
-		if latitude and longitude:
-			geolocate="TRUE"
+#		if latitude and longitude:
+#			geolocate=""
 #		unicode(string_data.encode('utf-8'))
 #                xmlroot = ET.fromstring(row[3])
                 xmlroot = ET.fromstring(row[3].encode('utf-8'))
@@ -143,7 +147,7 @@ def search_digitalcommons(request):
                 kw = xmlroot.findall("./identification[1]/themes[1]/theme/term")
                 for i in kw:
 			if i.text is not None:
-                            keywords=keywords+i.text +","
+                            keywords=keywords+i.text +", "
 
                 em = xmlroot.findall("./contacts[1]/contact[1]/email[1]")
                 for i in em:
@@ -195,13 +199,13 @@ def search_digitalcommons(request):
                 for i in a4em:
                         if i.text!="clearinghouse@edac.unm.edu":
                                 a4email=i.text
-		keywords = keywords.rstrip(',')
+		keywords = keywords.rstrip(', ')
 		name=row[1].split()
 	        gstoreurl="http://gstore.unm.edu/apps/"+app+"/datasets/"+uuid+"/"+row[4]+".original."+row[6]
 
 #Populate the data
 	    	if ext=="csv":
-                	rowstring="\""+str(row[2])+"\","+str(gstoreurl)+",\""+str(keywords)+"\",\""+abstract+"\","+str(name[0])+",,"+str(name[1])+",,"+str(email)+",\""+institution+"\",FALSE,"+a2fname+",,"+a2lname+",,"+a2email+","+a2inst+","+a2iscorp+","+a3fname+",,"+a3lname+",,"+a3email+","+a3inst+","+a3iscorp+","+a4fname+",,"+a4lname+",,"+a4email+","+a4inst+","+a4iscorp+",,IIA-1301346,,,,"+str(row[5])+",,Dataset,"+geolocate+","+str(latitude)+","+str(longitude)+",,,Energize New Mexico,"+str(row[0])+",,National Science Foundation"
+                	rowstring="\""+str(row[2])+"\","+str(gstoreurl)+",\""+str(keywords)+"\",\""+abstract+"\","+str(name[0])+",,"+str(name[1])+",,"+str(email)+",\""+institution+"\",FALSE,"+a2fname+",,"+a2lname+",,"+a2email+","+a2inst+","+a2iscorp+","+a3fname+",,"+a3lname+",,"+a3email+","+a3inst+","+a3iscorp+","+a4fname+",,"+a4lname+",,"+a4email+","+a4inst+","+a4iscorp+",,IIA-1301346,,,,"+str(row[5])+",,dataset,"+geolocate+","+str(latitude)+","+str(longitude)+",,,Energize New Mexico,"+pubdate+",,National Science Foundation"
 			csvstring=csvstring+rowstring+"\n"
 		row_num=row_num+1
 		if ext=="xls":
