@@ -7,6 +7,7 @@ from sqlalchemy import func
 
 import json
 import datetime
+import re
 
 from requests.auth import HTTPBasicAuth
 
@@ -155,6 +156,8 @@ class EsSearcher():
         #category
         theme, subtheme, groupname = self.extract_category(query_params)
 
+	excludetheme, excludesubtheme, excludegroupname = self.extract_category_exclude(query_params)
+
         #keywords
         keyword = query_params.get('query', '').replace('+', '')
         print keyword
@@ -244,6 +247,9 @@ class EsSearcher():
 
         if theme or subtheme or groupname:
             ands.append(self.build_category_filter(app.lower(), theme, subtheme, groupname))
+
+        if excludetheme or excludesubtheme or excludegroupname:
+            ands.append(self.build_exclude_category_filter(app.lower(), excludetheme, excludesubtheme, excludegroupname))
 
 	if (dataone_archive and dataone_archive.lower()=='true'):
 #	    ands.append({"query": {"term": {"dataOne_archive":True}}})
@@ -363,6 +369,32 @@ class EsSearcher():
     '''
     build helpers
     '''
+    def extract_category_exclude(self, query_params):
+        """parse the category triplet for the search 
+
+        Notes:
+            
+        Args:
+            query_params (dict): the query params from the gstore search request
+
+        Returns:
+            theme (str): the theme
+            subtheme (str): the subtheme
+            groupname (str): the groupname
+        
+        Raises:
+        """
+        excludetheme = query_params['excludetheme'].replace('+', ' ') if 'excludetheme' in query_params else ''
+        excludesubtheme = query_params['excludesubtheme'].replace('+', ' ') if 'excludesubtheme' in query_params else ''
+        excludegroupname = query_params['excludegroupname'].replace('+', ' ') if 'excludegroupname' in query_params else ''
+
+        return excludetheme, excludesubtheme, excludegroupname
+
+    '''
+    build helpers
+    '''
+
+
     def build_category_filter(self, app, theme, subtheme, groupname):
         '''
         using the category_facet set (multiple categories per doctype),
@@ -420,6 +452,35 @@ class EsSearcher():
             }
         }
     
+    def build_exclude_category_filter(self, app, excludetheme, excludesubtheme, excludegroupname):
+        ands = [{"term": {"category_facets.apps": app}}]
+ 
+        if excludetheme:
+            excludethemelist=re.split(r',', excludetheme)
+            for excludethemeitem in excludethemelist:
+                ands.append({"not": {"query": {"match": {"category_facets.theme":{"query": excludethemeitem, "operator": "and"}}}}})
+        if excludesubtheme:
+            excludesubthemelist=re.split(r',', excludesubtheme)
+            for excludesubthemeitem in excludesubthemelist:
+                ands.append({"not": {"query": {"match": {"category_facets.subtheme":{"query": excludesubthemeitem, "operator": "and"}}}}})
+        if excludegroupname:
+            excludegroupnamelist=re.split(r',', excludegroupname)
+            for excludegroupnameitem in excludegroupnamelist:
+                ands.append({"not": {"query": {"match": {"category_facets.groupname":{"query": excludegroupnameitem, "operator": "and"}}}}})
+        return {
+            "query": {
+                "nested": {
+                    "path": "category_facets",
+                    "query": {
+                        "filtered": {
+                            "filter": {
+                                "and": ands
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
     def build_releasedate_filter(self):
         today=datetime.datetime.now().strftime(self.dfmt)
@@ -873,4 +934,3 @@ class RepositorySearcher(EsSearcher):
         '''
         pass
 
-        
