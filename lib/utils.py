@@ -317,3 +317,11 @@ def get_overlap_date_clause(start_column, end_column, start_range, end_range):
         clause = None
     return clause
     
+
+
+def validate_uuid4(uuid_string):
+     try:
+         val = uuid.UUID(uuid_string, version=4)
+     except ValueError:
+         return False
+     return val.hex == uuid_string.replace('-', '')
