@@ -75,7 +75,12 @@ def MakeResponse(d,gm,params,format):
     firstrecord = gm.query({'d.id': d.id },limit=1)
     for record1 in firstrecord:
         geom_repr=""
-        record_id = record1['f']['id']
+#        record_id = record1['f']['id']
+        try:
+            record_id = record1['r']['id']
+        except:
+            record_id = record1['f']['id']
+
         observed = record1['obs'].strftime('%Y-%m-%dT%H:%M:%S+00') if 'obs' in record1 else ''
         atts = record1['atts']
         datavalues = [(a['name'], convert_by_ogrtype(a['val'], ogr.OFTString, "csv") if isinstance(a['val'], str) or isinstance(a['val'], unicode) else a['val']) for a in atts]
@@ -90,6 +95,7 @@ def MakeResponse(d,gm,params,format):
         label=label[:-1] + delimiter
         if labelformat=="original_name":
             for a in fields:
+		print a
                 label=label.replace(a.name, a.orig_name)
         if labelformat=="description":
             for a in fields:
@@ -103,7 +109,12 @@ def MakeResponse(d,gm,params,format):
     allvals=""
     for vector in vectors:
         geom_repr=""
-        record_id = vector['f']['id']
+#        record_id = vector['f']['id']
+        try:
+            record_id = vector['r']['id']
+        except:
+            record_id = vector['f']['id']
+
         observed = vector['obs'].strftime('%Y-%m-%dT%H:%M:%S+00') if 'obs' in vector else ''
         atts = vector['atts']
         datavalues = [(a['name'], convert_by_ogrtype(a['val'], ogr.OFTString, "csv") if isinstance(a['val'], str) or isinstance(a['val'], unicode) else a['val']) for a in atts]

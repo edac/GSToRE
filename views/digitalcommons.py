@@ -124,7 +124,7 @@ def search_digitalcommons(request):
 	    datarow=0
 	    pubdate=""
             for row in result:
-                pubdate=row[0].strftime("%Y-%m-%d %H:%M:%S")
+                pubdate=row[0].strftime("%m/%d/%Y %H:%M:%S")
 
 		if row[7] is not None:
 			box=row[7]
@@ -209,7 +209,7 @@ def search_digitalcommons(request):
 			csvstring=csvstring+rowstring+"\n"
 		row_num=row_num+1
 		if ext=="xls":
-                        columns = [str(row[2]), str(gstoreurl), str(keywords), abstract, str(name[0]), '', str(name[1]), '', str(email), institution, 'FALSE', a2fname, '', a2lname, '', a2email, a2inst, a2iscorp, a3fname, '', a3lname, '', a3email, a3inst, a3iscorp, a4fname, '', a4lname, '', a4email, a4inst, a4iscorp, '', 'IIA-1301346', '', '', '', str(row[5]), '', 'Dataset', geolocate, str(latitude), str(longitude), '', '', 'Energize New Mexico', str(row[0]), '', 'National Science Foundation']
+                        columns = [str(row[2]), str(gstoreurl), str(keywords), abstract, str(name[0]), '', str(name[1]), '', str(email), institution, 'FALSE', a2fname, '', a2lname, '', a2email, a2inst, a2iscorp, a3fname, '', a3lname, '', a3email, a3inst, a3iscorp, a4fname, '', a4lname, '', a4email, a4inst, a4iscorp, '', 'IIA-1301346', '', '', '', str(row[5]), '', 'Dataset', geolocate, str(latitude), str(longitude), '', '', 'Energize New Mexico', str(pubdate), '', 'National Science Foundation']
     			for col_num in range(len(columns)):
             			sheet1.write(row_num, col_num, columns[col_num])
 
