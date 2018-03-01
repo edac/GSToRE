@@ -42,8 +42,6 @@ def search_digitalcommons(request):
     
     book = xlwt.Workbook(encoding="utf-8")
     sheet1 = book.add_sheet("8898655")
-#    sheet1.write(0, 0, "title")
-#    sheet1.write(0, 1, "fulltext_url")
     row_num = 0
     columns = ['title', 'fulltext_url', 'keywords', 'abstract', 'author1_fname', 'author1_mname', 'author1_lname', 'author1_suffix', 'author1_email', 'author1_institution', 'author1_is_corporate', 'author2_fname', 'author2_mname', 'author2_lname', 'author2_suffix', 'author2_email', 'author2_institution', 'author2_is_corporate', 'author3_fname', 'author3_mname', 'author3_lname', 'author3_suffix', 'author3_email', 'author3_institution', 'author3_is_corporate', 'author4_fname', 'author4_mname', 'author4_lname', 'author4_suffix', 'author4_email', 'author4_institution', 'author4_is_corporate', 'associated_publications', 'award_number', 'disciplines', 'centroid', 'comments', 'component', 'custom_citation', 'document_type', 'geolocate', 'latitude', 'longitude', 'permanent_url', 'polygon', 'project', 'publication_date', 'season', 'sponsor']
     for col_num in range(len(columns)):

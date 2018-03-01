@@ -9,19 +9,11 @@
         <service name="MNCore" version="v1" available="true"/>
     </services>
     <synchronization>
-<<<<<<< HEAD
-        <schedule hour="*" mday="*" min="0/3" mon="*" sec="10" wday="?" year="*"/>
-    </synchronization>
-    <ping success="true"/>
-    <subject>${subject}</subject>
-    <contactSubject>CN=Dev Team A10142,O=Google,C=US,DC=cilogon,DC=org</contactSubject>
-=======
         <schedule hour="1" mday="*" min="1" mon="*" sec="1" wday="*" year="*"/>
     </synchronization>
     <ping success="true"/>
     <subject>${subject}</subject>
     <contactSubject>${contactsubject}</contactSubject>
->>>>>>> gstore/master
 </d1:node>
 
 

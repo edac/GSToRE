@@ -14,12 +14,8 @@ from pyramid.events import subscriber
 from pyramid.events import NewRequest
 
 
-<<<<<<< HEAD
 #TODO: put in some reasonable error messages. 
 #custom error methods   
-=======
-#custom error methods
->>>>>>> gstore/master
 @notfound_view_config(request_method='GET')
 def notfound_get(request):
 	return HTTPNotFound('Invalid GET request.')
@@ -39,12 +35,8 @@ def any_of(segment_name, *allowed):
         if info['match'][segment_name] in allowed:
             return True
     return predicate
-<<<<<<< HEAD
-applist = any_of('app', 'rgis', 'epscor', 'hydroserver', 'epht', 'elseweb', 'tristate', 'energize')
-#removed dataone, see route changes below
-=======
 applist = any_of('app', 'gstore')
->>>>>>> gstore/master
+#removed dataone, see route changes below
 
 #check for the dataset type (original vs. derived) for downloads
 def any_type(segment_name, *allowed):
@@ -101,15 +93,10 @@ all the routing
 def main(global_config, **settings):
     """ This function returns a Pyramid WSGI application.
     """
-<<<<<<< HEAD
     
-    config = Configurator(settings=settings)    
-=======
-
     config = Configurator(settings=settings)
     config.include('pyramid_chameleon')
     config.include('pyramid_mako')
->>>>>>> gstore/master
     config.scan('.models')
     engine = engine_from_config(settings, 'sqlalchemy.', pool_reset_on_return='commit', poolclass=NullPool)
 
@@ -121,16 +108,8 @@ def main(global_config, **settings):
     config.add_static_view(name='xslts', path='gstore_v3:../resources/xslts')
     config.add_static_view(name='docs', path='gstore_v3:../resources/docs')
 
-<<<<<<< HEAD
     #TODO: comment this out for production (or don't copy the stuff that's in the sandbox dir)
     config.add_static_view(name='samples', path='gstore_v3:../resources/samples')
-
-    config.add_route('home', '/')    
-
-#app routes (stats, etc)
-    config.add_route('app_stats', 'apps/{app}/statistics/{stat}.{ext}', custom_predicates=(applist,))
-    
-=======
 
     config.add_route('home', '/')    
 
@@ -144,8 +123,7 @@ def main(global_config, **settings):
 
 #app routes (stats, etc)
     config.add_route('app_stats', 'apps/{app}/statistics/{stat}.{ext}', custom_predicates=(applist,))
-
->>>>>>> gstore/master
+    
 #to the attributes
     config.add_route('attributes', '/apps/{app}/attributes/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
     config.add_route('dataset_attributes', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/attributes.{ext}', custom_predicates=(applist,))
@@ -161,11 +139,7 @@ def main(global_config, **settings):
 #to the metadata
 
     #config.add_route('metadata_sitemap', '/apps/{app}/sitemap.html', custom_predicates=(applist,))
-<<<<<<< HEAD
     
-=======
-
->>>>>>> gstore/master
     config.add_route('metadata', '/apps/{app}/{datatype}/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata/{standard}.{ext}', custom_predicates=(applist,))
 
 #to the provenance
@@ -179,7 +153,6 @@ def main(global_config, **settings):
 #to the search
     config.add_route('search_categories', '/apps/{app}/search/categories.json', custom_predicates=(applist,))
     config.add_route('search_features', '/apps/{app}/search/features.json', custom_predicates=(applist,))
-<<<<<<< HEAD
     
     config.add_route('searches', '/apps/{app}/search/{doctypes}.{ext}', custom_predicates=(applist,))
 
@@ -187,15 +160,6 @@ def main(global_config, **settings):
     
     config.add_route('search_facets', '/apps/{app}/search/facets/{facet}.{ext}', custom_predicates=(applist,)) #TODO: is this what is needs to be? need some route, though.
     
-=======
-
-    config.add_route('searches', '/apps/{app}/search/{doctypes}.{ext}', custom_predicates=(applist,))
-
-    config.add_route('search_within_collection', '/apps/{app}/search/collection/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/datasets.{ext}', custom_predicates=(applist,))
-
-    config.add_route('search_facets', '/apps/{app}/search/facets/{facet}.{ext}', custom_predicates=(applist,)) 
-
->>>>>>> gstore/master
 
 #to ogc services (datasets | tile indexes)
     #for the base layers
@@ -203,27 +167,18 @@ def main(global_config, **settings):
 
     config.add_route('services', '/apps/{app}/{type}/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/services/{service_type}/{service}', custom_predicates=(applist,servicelist,))
 
-<<<<<<< HEAD
     
 
 #TODO: deprecate this (move functionality to the interfaces where it belongs)
-=======
-
-
-
->>>>>>> gstore/master
 #to the mapper
     config.add_route('mapper', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/mapper', custom_predicates=(applist,))
 
 #to the deprecated schema call
     config.add_route('schema', '/apps/{app}/datasets/{id:\d+}/schema.{ext}', custom_predicates=(applist,))
 
-<<<<<<< HEAD
-=======
 #to digitalcommons
     config.add_route('digitalcommons', '/apps/{app}/dc/{doctypes}.{ext}', custom_predicates=(applist,))
 
->>>>>>> gstore/master
 #to dataone
     config.add_route('dataone_noversion', '/dataone')
     config.add_route('dataone_noversion_slash', '/dataone/')
@@ -245,10 +200,7 @@ def main(global_config, **settings):
     config.add_route('dataone_checksum_slash', '/dataone/v1/checksum/{pid:.*}/')
     config.add_route('dataone_replica', '/dataone/v1/replica/{pid:.*}')
     config.add_route('dataone_replica_slash', '/dataone/v1/replica/{pid:.*}/')
-<<<<<<< HEAD
     
-=======
->>>>>>> gstore/master
     config.add_route('dataone_error', '/dataone/v1/error') 
     config.add_route('dataone_error_slash', '/dataone/v1/error/') 
 
@@ -259,10 +211,7 @@ def main(global_config, **settings):
 #to the dataset
     #use the integer dataset_id or the uuid
     config.add_route('dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}', custom_predicates=(applist, typelist,))
-<<<<<<< HEAD
     #config.add_route('zip_dataset', '/apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}.zip', custom_predicates=(applist, typelist,))
-=======
->>>>>>> gstore/master
     config.add_route('add_dataset', '/apps/{app}/datasets', custom_predicates=(applist,)) #POST
     config.add_route('update_dataset', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,)) #PUT
     config.add_route('update_dataset_index', '/apps/{app}/datasets/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/index', custom_predicates=(applist,))
@@ -280,13 +229,9 @@ def main(global_config, **settings):
     config.add_route('search_repo', '/apps/{app}/repository/{repo}/{doctypes}/{standard}.{ext}', custom_predicates=(applist,))
 
 #to hydroserver
-<<<<<<< HEAD
     #services (MODIFY FOR WSDL VS REST)
     config.add_route('hydroserver', '/apps/{app}/{odm}/REST/waterml_{version}.svc/{method}', custom_predicates=(applist,))
     #capabilities (if we need it)
-=======
-    config.add_route('hydroserver', '/apps/{app}/{odm}/REST/waterml_{version}.svc/{method}', custom_predicates=(applist,))
->>>>>>> gstore/master
 
 #to tile index
     config.add_route('tileindexes', '/apps/{app}/tileindexes/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
@@ -295,10 +240,7 @@ def main(global_config, **settings):
 
 #to collections
     config.add_route('collections', '/apps/{app}/collections/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/services.{ext}', custom_predicates=(applist,))
-<<<<<<< HEAD
     #config.add_route('collection_metadata', '/apps/{app}/collections/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata/{standard}.{ext}', custom_predicates=(applist,))
-=======
->>>>>>> gstore/master
     config.add_route('collection_footprint', '/apps/{app}/collections/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/footprint.{ext}', custom_predicates=(applist,))
     config.add_route('add_collection', '/apps/{app}/collections', custom_predicates=(applist,))
     config.add_route('update_collection', '/apps/{app}/collections/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}', custom_predicates=(applist,))
@@ -308,13 +250,8 @@ def main(global_config, **settings):
     config.add_route('vocabs', '/apps/{app}/vocabs/{type}.{ext}', custom_predicates=(applist,))
     config.add_route('vocab', '/apps/{app}/vocabs/{type}/{id:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}.{ext}', custom_predicates=(applist,))
     config.add_route('add_vocab', '/apps/{app}/vocabs/{type}', custom_predicates=(applist,))
-<<<<<<< HEAD
     
     config.scan('gstore_v3')
     #config.scan()
-=======
-
-    config.scan('gstore_v3')
->>>>>>> gstore/master
     return config.make_wsgi_app()
 

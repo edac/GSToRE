@@ -15,13 +15,6 @@ dataset mapping:
 {
     "dataset": {
         "properties": {
-<<<<<<< HEAD
-            "active": {
-                "type": "boolean"
-            },
-            "embargo": {
-                "type": "boolean"
-=======
             "dataOne_archive": {"type": "boolean"},
             "embargoDate": {
                 "type": "date",
@@ -31,10 +24,6 @@ dataset mapping:
 		    },
             "active": {
                 "type": "boolean"
-            },
-#            "embargo": {
-#                "type": "boolean"
->>>>>>> gstore/master
             },
             "available": {
                 "type": "boolean"
@@ -223,7 +212,7 @@ class EsIndexer:
 
     Note:
         See EsSearcher for search access.
-        
+
     Attributes:
         es_description (dict): host, index, type, user, password
         gstore_object (obj): a Dataset, Collection or TileIndex object
@@ -231,7 +220,7 @@ class EsIndexer:
         document (dict): an index document dict (for inserts)
         partial (dict): a partial index document dict (for updates)
         uuid (str): the gstore_object uuid
-        
+
     """
 
     def __init__(self, es_description, gstore_object, req):
@@ -242,15 +231,11 @@ class EsIndexer:
             the specified default which is basically the record index.
 
             "type" in the es_description can be a comma-delimited list of objects types (datasets,collections)
-            
+
         Args:
             es_description (dict): host, index, type, user, password
             gstore_object (obj): a Dataset, Collection or TileIndex object
             req (Request): request from the view
-                    
-        Returns:
-        
-        Raises:
         """
         self.es_description = es_description
 
@@ -265,31 +250,13 @@ class EsIndexer:
         self.partial = {}
         self.uuid = gstore_object.uuid
 
-<<<<<<< HEAD
-=======
-	print "\nES_indexer() instantiation"
-	print "Description: %s" % self.es_description
-	print "URL: %s" % self.es_url
-	print "User: %s" % self.user
-#	print "Formats: %s" % self.gstore_object
-	#print "Pass: %s" % self.password
-#	print "GStore object:" % self.gstore_object
-	print "Request: %s" % self.request
-	
 
->>>>>>> gstore/master
     def __repr__(self):
         return '<EsIndexer (%s, %s)>' % (self.es_url, self.uuid)
 
     def put_document(self):
         """execute the PUT request to ElasticSearch for INSERTs
 
-        Notes:
-            
-        Args:
-                    
-        Returns:
-        
         Raises:
             Exception: if the status code from ES is anything except 201, the insert failed
         """
@@ -297,8 +264,6 @@ class EsIndexer:
         if not self.document or not self.uuid:
             return
 
-        #it's like rocket science over here
-        #but need to append the dataset uuid (as the es _id) to the route
         es_url = self.es_url + '/' + self.uuid
         result = requests.put(es_url, data=json.dumps(self.document), auth=(self.user, self.password))
 
@@ -307,7 +272,6 @@ class EsIndexer:
 
     def update_document(self, elements_to_update):
         """execute the POST request to ElasticSearch for UPDATEs 
-    
         Example structure:
             {
 	            "script": "ctx._source.dataset.active = 'param1'; next thing", 
@@ -319,11 +283,6 @@ class EsIndexer:
         Notes:
             This is just for the script-based element updates. For anything more involved than
             setting a boolean, use the partial doc update.
-            
-        Args:
-                    
-        Returns:
-        
         Raises:
             Exception: if the status code from ES is anything except 200, the update failed
         """
@@ -340,7 +299,7 @@ class EsIndexer:
 
         es_url = self.es_url + '/' + self.uuid + '/_update'
         #concat multiple script bits with ';'
-        
+
         result = requests.post(es_url, data=json.dumps({"script": ';'.join(updates), "params": params}), auth=(self.user, self.password))
 
         if result.status_code != 200:
@@ -359,11 +318,6 @@ class EsIndexer:
         Notes:
             This is just a wrapper (doc>DOCTYPE) for the document dict (matching the mapping
             of the doctype).
-            
-        Args:
-                    
-        Returns:
-        
         Raises:
             Exception: if the status code from ES is anything except 200, the update failed
         """
@@ -373,13 +327,11 @@ class EsIndexer:
         data = {"doc": {self.es_description['type']: self.partial}}
 
         es_url = self.es_url + '/' + self.uuid + '/_update'
-        
+
         result = requests.post(es_url, data=json.dumps(data), auth=(self.user, self.password))
 
         if result.status_code != 200:
             raise Exception(result.content)
-            
-    #TODO: add a REMOVE ELEMENT option just in case
 
     def build_location(self, box):
         """build a bbox element (for the location geometry)
@@ -387,21 +339,20 @@ class EsIndexer:
         Notes:
             the original mapping didn't include the area element
             so it wound up not being nested. sorry.
-            
+
         Args:
             box (string): bbox as a string (of floats) "minx, miny, maxx, maxy"
-                    
+
         Returns:
             area (float): area of the bbox
             loc (dict): the bbox as Polygon geometry element
-        
+
         Raises:
         """
         loc = {}
 
         bbox = string_to_bbox(box)
 
-        #TODO: deal with the srid
         geom = bbox_to_geom(bbox, 4326)
 
         area = geom.GetArea()
@@ -413,33 +364,20 @@ class EsIndexer:
             #otherwise it's a polygon (not thrilled with how es/lucene handles envelopes - it doesn't seem to do it very well)
             #note also that it's sort of a geojson structure
             loc = {"bbox": {"type": "Polygon", "coordinates": [[[bbox[0], bbox[1]], [bbox[2], bbox[1]], [bbox[2], bbox[3]], [bbox[0], bbox[3]], [bbox[0], bbox[1]]]]}}
-        
         return area, loc
 
     def build_date_element(self, key, datetime_obj):
         """build a date element
-
-        Notes:
-            
         Args:
             key (string): name of the date element to create
             datetime_obj (datetime): the datetime to use
-                    
         Returns:
             (dict): the generated, complete date element
-        
-        Raises:
         """
         return {key: {"date": datetime_obj.strftime('%Y-%m-%d'), "year": datetime_obj.year, "month": datetime_obj.month, "day": datetime_obj.day}}
 
 class DatasetIndexer(EsIndexer):
     """ElasticSearch index api access for Datasets
-
-    Note:
-        
-        
-    Attributes:
-        
     """
 
     def build_document(self, facets_to_include):
@@ -460,8 +398,8 @@ class DatasetIndexer(EsIndexer):
             get the taxonomy ( + geomtype)
             get the aliases
 
-            get the statuses 
-                embargo: t/f 
+            get the statuses
+                embargo: t/f
                 active: t/f
                 available: t/f
 
@@ -479,18 +417,9 @@ class DatasetIndexer(EsIndexer):
                 projects
                 attributes
                 parameters
-            
         Args:
             facets_to_include (list): list of data to include for facets
-                    
-        Returns:
-        
-        Raises:
         """
-<<<<<<< HEAD
-=======
-	print "\nbuild_document() called from ES_indexer..."
->>>>>>> gstore/master
         doc = {}
 
         doc.update({"title": self.gstore_object.description, "title_search": self.gstore_object.description,
@@ -503,18 +432,12 @@ class DatasetIndexer(EsIndexer):
             doc.update(self.build_date_element("valid_start", self.gstore_object.begin_datetime))
         if self.gstore_object.end_datetime:
             doc.update(self.build_date_element("valid_end", self.gstore_object.end_datetime))
-
-<<<<<<< HEAD
         formats = self.gstore_object.get_formats(self.request)
-=======
-	
-        formats = self.gstore_object.get_formats(self.request)
-	print "formats: %s" % formats
->>>>>>> gstore/master
         services = self.gstore_object.get_services(self.request)
         standards = self.gstore_object.get_standards(self.request)
         repos = self.gstore_object.get_repositories()
-        #TODO: metadata standards?
+
+        #TODO: metadata standards
 
         doc.update({
                 "applications": self.gstore_object.apps_cache, 
@@ -525,7 +448,7 @@ class DatasetIndexer(EsIndexer):
 
         #repack the repos
         doc.update({"supported_repositories": [{"app": k, "repos": v} for k,v in repos.iteritems()]})
-        
+
         isotopic = ''
         abstract = ''
         terms = []
@@ -533,40 +456,25 @@ class DatasetIndexer(EsIndexer):
             isotopic = self.gstore_object.gstore_metadata[0].get_isotopic()
             abstract = self.gstore_object.gstore_metadata[0].get_abstract()
             terms = self.gstore_object.gstore_metadata[0].get_keywords()
-            
-            #only add the metadata timestamp if it's gstore? too many of the repos rely on iso so this is the current safest bet
+
             metadata_date = self.gstore_object.gstore_metadata[0].date_modified
             if metadata_date:
                 doc.update(self.build_date_element("gstore_metadata", metadata_date))
-            
         doc.update({"isotopic": isotopic, "abstract": abstract, "keywords": terms})
 
         doc.update({"aliases": self.gstore_object.aliases if self.gstore_object.aliases else []})
 
-<<<<<<< HEAD
-        doc.update({"embargo": self.gstore_object.is_embargoed, "active": not self.gstore_object.inactive, "available": self.gstore_object.is_available})
-=======
         doc.update({"is_embargoed": self.gstore_object.is_embargoed, "active": not self.gstore_object.inactive, "available": self.gstore_object.is_available})
->>>>>>> gstore/master
 
         doc.update({"taxonomy": self.gstore_object.taxonomy})
         if self.gstore_object.geomtype and self.gstore_object.taxonomy == 'vector':
             doc.update({"geomtype": self.gstore_object.geomtype.lower()})
 
-<<<<<<< HEAD
-        #nested category structure
-        categories = []
-        for category in self.gstore_object.categories:
-            categories.append({"theme": str(category.theme), "subtheme": str(category.subtheme), "groupname": str(category.groupname), "apps": category.apps})
-=======
 	#dataOne elements
-	print "Dataone_Archive now: %s" % self.gstore_object.dataone_archive
 	doc.update({"dataOne_archive":self.gstore_object.dataone_archive})
 	doc.update({"releaseDate":self.gstore_object.embargo_release_date.strftime('%Y-%m-%d')})
 
 	#Formats
-        print "Formats: " 
-        print self.gstore_object.formats
 	doc.update({"formats":self.gstore_object.formats})
 
 	#author element
@@ -576,16 +484,11 @@ class DatasetIndexer(EsIndexer):
         categories = []
         for category in self.gstore_object.categories:
             categories.append({"theme": str(category.theme), "subtheme": str(category.subtheme), "groupname": str(category.groupname), "apps": self.gstore_object.apps_cache})
->>>>>>> gstore/master
         doc.update({"category_facets": categories})
 
         #and the original structure just in case
         cat = self.gstore_object.categories[0]
-<<<<<<< HEAD
-        doc.update({"category": {"theme": str(cat.theme), "subtheme": str(cat.subtheme), "groupname": str(cat.groupname), "apps": category.apps}})
-=======
         doc.update({"category": {"theme": str(cat.theme), "subtheme": str(cat.subtheme), "groupname": str(cat.groupname), "apps": self.gstore_object.apps_cache}})
->>>>>>> gstore/master
 
         if self.gstore_object.taxonomy not in ['table']:
             area, loc = self.build_location(self.gstore_object.box)
@@ -598,12 +501,6 @@ class DatasetIndexer(EsIndexer):
 
         self.document = {self.es_description['type']: doc}
 
-<<<<<<< HEAD
-=======
-	print "\nDocument contents:"
-	print doc
-
->>>>>>> gstore/master
     def build_partial(self, keys_to_update):
         """build a partial dataset document
 
@@ -619,13 +516,8 @@ class DatasetIndexer(EsIndexer):
         Notes:
             The element structures should match those built in the build_document method
             (which matches the mapping)
-            
         Args:
             keys_to_update (list): list of elements to include in the partial doc
-                    
-        Returns:
-        
-        Raises:
         """
         data_to_update = {}
 
@@ -634,17 +526,17 @@ class DatasetIndexer(EsIndexer):
                 #the description as tokens for the keyword search and as complete string for sorting
                 data_to_update.update({"title": self.gstore_object.description})
                 data_to_update.update({"title_search": self.gstore_object.description})
-                
+
             elif key == 'date_added':
                 data_to_update.update({"date_added": self.gstore_object.dateadded.strftime('%Y-%m-%d')})
-                
+
             elif key == 'date_published':
                 data_to_update.update(self.build_date_element("date_published", self.gstore_object.date_published))
-               
+
             elif key == 'valid_start':
                 if self.gstore_object.begin_datetime:
                     data_to_update.update(self.build_date_element("valid_start", self.gstore_object.begin_datetime))
-                    
+
             elif key == 'valid_end':
                 if self.gstore_object.end_datetime:
                      data_to_update.update(self.build_date_element("valid_end", self.gstore_object.end_datetime))
@@ -657,71 +549,62 @@ class DatasetIndexer(EsIndexer):
             elif key == 'formats':
                 formats = self.gstore_object.get_formats(self.request)
                 data_to_update.update({"formats": formats})
-                
+
             elif key == 'services':
                 services = self.gstore_object.get_services(self.request)
                 data_to_update.update({"services": services})
-                
+
             elif key == 'standards':
                 standards = self.gstore_object.get_standards(self.request)
                 data_to_update.update({"standards": standards})
-                
+
             elif key == 'supported_repositories':
                 repos = self.gstore_object.get_repositories()
                 data_to_update.update({"supported_repositories": [{"app": k, "repos": v} for k,v in repos.iteritems()]})
-                
+
             elif key == 'applications':
                 data_to_update.update({"applications": self.gstore_object.apps_cache})
-                
+
             elif key == 'isotopic':
                 isotopic = self.gstore_object.gstore_metadata[0].get_isotopic() if self.gstore_object.gstore_metadata else ''
                 data_to_update.update({"isotopic": isotopic})
-                
+
             elif key == 'abstract':
                 abstract = self.gstore_object.gstore_metadata[0].get_abstract() if self.gstore_object.gstore_metadata else ''
                 data_to_update.update({"abstract": abstract})
-                
+
             elif key == 'keywords':
                 keywords = self.gstore_object.gstore_metadata[0].get_keywords() if self.gstore_object.gstore_metadata else ''
                 data_to_update.update({"keywords": keywords})
-                
+
             elif key == 'aliases':
                 data_to_update.update({"aliases": self.gstore_object.aliases if self.gstore_object.aliases else []})
-                
+
             elif key == 'embargo':
                 data_to_update.update({"embargo": self.gstore_object.is_embargoed})
-                
+
             elif key == 'active':
                 data_to_update.update({"active": not self.gstore_object.inactive})
-                
+
             elif key == 'available':
                 data_to_update.update({"available": self.gstore_object.is_available})
-                
+
             elif key == 'taxonomy':
                 data_to_update.update({"taxonomy": self.gstore_object.taxonomy})
                 if self.gstore_object.geomtype and self.gstore_object.taxonomy == 'vector':
                     data_to_update.update({"geomtype": self.gstore_object.geomtype.lower()})
-                    
+
             elif key == 'categories':
                 #nested category structure
                 categories = []
                 for category in self.gstore_object.categories:
-<<<<<<< HEAD
-                    categories.append({"theme": str(category.theme), "subtheme": str(category.subtheme), "groupname": str(category.groupname), "apps": category.apps})
-                data_to_update.update({"category_facets": categories})
-
-                #and the original structure just in case IT IS VERY WRONG
-                cat = self.gstore_object.categories[0]
-                data_to_update.update({"category": {"theme": str(cat.theme), "subtheme": str(cat.subtheme), "groupname": str(cat.groupname), "apps": category.apps}})
-=======
                     categories.append({"theme": str(category.theme), "subtheme": str(category.subtheme), "groupname": str(category.groupname), "apps": self.gstore_object.apps_cache})
                 data_to_update.update({"category_facets": categories})
 
                 #and the original structure just in case
                 cat = self.gstore_object.categories[0]
                 data_to_update.update({"category": {"theme": str(cat.theme), "subtheme": str(cat.subtheme), "groupname": str(cat.groupname), "apps": self.gstore_object.apps_cache}})
->>>>>>> gstore/master
-                
+
             elif key == 'category_hierarchy':
                 #for the 1..3 structure not in place
                 pass
@@ -730,10 +613,10 @@ class DatasetIndexer(EsIndexer):
                     area, loc = self.build_location(self.gstore_object.box)
                     data_to_update.update({"location": loc})
                     data_to_update.update({"area": area})
-                
+
             elif key == 'collections':
                 data_to_update.update({"collections": [str(c.uuid) for c in self.gstore_object.collections]})   
-                         
+
             else:
                 pass
 
@@ -741,14 +624,9 @@ class DatasetIndexer(EsIndexer):
 
 class CollectionIndexer(EsIndexer):
     """ElasticSearch index api access for Collections
-
-    Note:
-
-    Attributes:
-        
     """
     #TODO: add the partial updater
-    
+
     def build_document(self):
         """build a new collection doctype document
 
@@ -771,12 +649,6 @@ class CollectionIndexer(EsIndexer):
                 get the abstract
                 get the keywords?
                 get isotopic
-            
-        Args:
-                    
-        Returns:
-        
-        Raises:
         """
         doc = {}
 
@@ -829,10 +701,4 @@ class CollectionIndexer(EsIndexer):
             area, loc = self.build_location(self.gstore_object.bbox)
             doc.update({"location": loc})
             doc.update({"area": area})
-    
         self.document = {self.es_description['type']: doc}
-
-
-
-
-        

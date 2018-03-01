@@ -57,10 +57,7 @@ class Dataset(Base):
     __table__ = Table('datasets', Base.metadata,
         Column('id', Integer, primary_key=True),
         Column('description', String(200)),
-<<<<<<< HEAD
-=======
 	Column('author', String(150)),
->>>>>>> gstore/master
         Column('taxonomy', String(50)),
         Column('feature_count', Integer),
         Column('record_count', Integer),
@@ -83,10 +80,7 @@ class Dataset(Base):
         Column('is_embargoed', Boolean, default=False),
         Column('embargo_release_date', TIMESTAMP),
         Column('is_cacheable', Boolean, default=True),
-<<<<<<< HEAD
-=======
 	Column('dataone_archive', Boolean, default=False),
->>>>>>> gstore/master
         Column('aliases', ARRAY(String)),
         Column('license_id', Integer, ForeignKey('gstoredata.licenses.id')),
         Column('date_published', TIMESTAMP),
@@ -151,11 +145,7 @@ class Dataset(Base):
         Raises:
         """
         self.description = description
-<<<<<<< HEAD
-
-=======
 	print "Now we are instantiating a new dataset"
->>>>>>> gstore/master
         #TODO: generate the uuid for this on create (but overwrite for the tristate sharing datasets, so remember that)
         #that way it at least has a uuid no matter what
         
@@ -408,11 +398,7 @@ class Dataset(Base):
         Raises:
         """
     
-<<<<<<< HEAD
-        results = {'type': 'dataset', 'id': self.id, 'uuid': self.uuid, 'description': self.description, 
-=======
         results = {'type': 'dataset','dataone_archive':self.dataone_archive,'author':self.author, 'id': self.id, 'uuid': self.uuid, 'description': self.description, 
->>>>>>> gstore/master
                 'lastupdate': self.dateadded.strftime('%Y%m%d'), 'name': self.basename, 'taxonomy': self.taxonomy,
                 'categories': [{'theme': t.theme, 'subtheme': t.subtheme, 'groupname': t.groupname} for t in self.categories if app in t.apps]}
         if self.box:
@@ -445,18 +431,11 @@ class Dataset(Base):
                 #if none, derived + fmt
                 #if one, set + fmt
                 #TODO: what if a vector dataset has external links?
-<<<<<<< HEAD
-                for f in fmts:
-                    sf = [s for s in srcs if s.extension == f]
-                    st = sf[0].set if sf else 'derived'
-                    dlds.append((st, f))
-=======
  		for f in fmts:
                     if(f!='dat'):
                             sf = [s for s in srcs if s.extension == f]
                             st = sf[0].set if sf else 'derived'
                             dlds.append((st, f))
->>>>>>> gstore/master
             elif self.taxonomy == 'file':
                 #just the formats
                 for f in fmts:

@@ -1,18 +1,14 @@
 from pyramid.view import view_config
 from pyramid.response import Response, FileResponse
-
 from pyramid.httpexceptions import HTTPNotFound, HTTPServerError, HTTPBadRequest, HTTPNotImplemented, HTTPServiceUnavailable
-
 from sqlalchemy import desc, asc, func
 from sqlalchemy.sql.expression import and_
 from sqlalchemy.sql import between
-
 from datetime import datetime
 import urllib2
 import json
 import os, shutil, cgi
 from lxml import etree
-
 from ..models import DBSession, DataoneSession
 from ..models.datasets import (
     Dataset,
@@ -21,7 +17,6 @@ from ..models.metadata import DatasetMetadata
 from ..models.dataone import *
 from ..models.dataone_logs import DataoneLog, DataoneError 
 from ..models.apps import GstoreApp
-
 from ..lib.utils import *
 from ..lib.database import *
 from ..lib.mongo import gMongo, gMongoUri
@@ -35,24 +30,13 @@ see http://mule1.dataone.org/ArchitectureDocs-current/apis/MN_APIs.html
 '''
 some presets
 '''
-NODE = 'urn:node:EDACGSTORE'
-<<<<<<< HEAD
-SUBJECT = 'CN=gstore.unm.edu,DC=dataone,DC=org'
-=======
-#SUBJECT = 'CN=gstore.unm.edu,DC=dataone,DC=org'
-SUBJECT = 'CN=urn:node:EDACGSTORE,DC=dataone,DC=org'
->>>>>>> gstore/master
-RIGHTSHOLDER = 'CN=gstore.unm.edu,DC=dataone,DC=org'
-#CONTACTSUBJECT = 'CN=gstore.unm.edu,O=Google,C=US,DC=cilogon,DC=org'
-
-#the string for the dev coordinating node (or maybe staging)
-#CONTACTSUBJECT = 'CN=Dev Team A10142,O=Google,C=US,DC=cilogon,DC=org'
-#the one for produciton
-#CONTACTSUBJECT='CN=Soren Scott A11096,O=Google,C=US,DC=cilogon,DC=org'
-CONTACTSUBJECT='CN=Hays Barrett A13341,O=Google,C=US,DC=cilogon,DC=org'
-NAME = 'EDAC Gstore Repository'
-ALIAS = 'EDACGSTORE'
-DESCRIPTION = "Earth Data Analysis Center's (EDAC) Geographical Storage, Transformation and Retrieval Engine (GSTORE) platform archives data produced by various NM organizations, including NM EPSCoR and RGIS. GSTORE primarily houses GIS and other digital documents relevant to state agencies, local government, and scientific researchers. See RGIS and NM EPSCoR for more information on the scope of data. It currently uses the FGDC metadata standard to describe all of its holdings."
+NODE = 'urn:node:YOURCN'
+SUBJECT = 'CN=urn:node:YOURCN,DC=dataone,DC=org'
+RIGHTSHOLDER = 'CN=your.domain.com,DC=dataone,DC=org'
+CONTACTSUBJECT='CN=Your Contact IDNUMBER,O=Google,C=US,DC=cilogon,DC=org'
+NAME = 'The Name of your REPO'
+ALIAS = 'YOURCN'
+DESCRIPTION = "DESCRIPTION OF YOUR CN"
 CN_RESOLVER='https://cn.dataone.org/cn/v1/resolve'
 
 #TODO: add the system metadata date modified trigger to obsoleting step and then add something for actually updating that model
@@ -205,11 +189,6 @@ def return_error(error_type, detail_code, error_code, error_message='', pid=''):
         xml = '<?xml version="1.0" encoding="UTF-8"?><error detailCode="%s" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: DOESNTEXIST</description></error>' % (detail_code)
         return Response(xml, content_type='text/xml; charset=UTF-8', status='404')
 
-#removed this because something about the PID (probably the encoding) caused the D1 tester to fail in ways that make no sense
-#    elif error_code == 404 and error_type == 'metadata':
-#        xml = '<?xml version="1.0" encoding="UTF-8"?><error detailCode="%s" errorCode="404" name="NotFound"><description>No system metadata could be found for given PID: %s</description></error>' % (detail_code, ('%s' % pid).encode('utf-8'))
-
-#        return Response(xml, content_type='text/xml; charset=UTF-8', status='404')
     elif error_code == 400 or error_code == 401:
         error_message = error_message if error_message else 'Invalid Request'
         xml = '<?xml version="1.0" encoding="UTF-8"?><error detailCode="%s" errorCode="%s"><description>%s</description></error>' % (detail_code, error_code, error_message)
@@ -302,7 +281,8 @@ def dataone(request):
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/dataone/' % (load_balancer)
 
-    #this is annoying. and incorrect anywhere but production
+    
+    
     base_url = base_url.replace('http:', 'https:')
 
     #set up the dict
@@ -348,7 +328,6 @@ def log(request):
     is_good_offset, offset = is_good_int(offset, 0)
     is_good_limit, limit = is_good_int(limit, 20)
 
-    #just because it's a good int doesn't mean we like it
     #reset to 20 if greater
     limit = 20 if limit > 20 else limit
 
@@ -431,7 +410,6 @@ def search(request):
     is_good_offset, offset = is_good_int(offset, 0)
     is_good_limit, limit = is_good_int(limit, 20)
 
-    #just because it's a good int doesn't mean we like it
     #reset to 20 if greater
     limit = 20 if limit > 20 else limit
 
@@ -698,14 +676,8 @@ def metadata(request):
     load_balancer = request.registry.settings['BALANCER_URL']
     base_url = '%s/dataone/v1/' % (load_balancer)
 
-    #this is annoying. and incorrect anywhere but production
     base_url = base_url.replace('http:', 'https:')
 
-    #TODO: what the hell will the modified date be? who knows?
-
-    #use the obsoletedby's date as the system modified date?
-
-    #TODO: replace the hardcoded junk with ???
     rsp = {'pid': pid, 'dateadded': datetime_to_dataone(obj.date_added), 
             'obj_format': str(formatid), 'file_size': file_size, 
             'uid': ALIAS, 
@@ -810,10 +782,8 @@ def error(request):
     message = [kvp for kvp in kvps if kvp[0] == 'message']
     
     if not message:
-        #this is not the right error, but if it fails ???
         return return_error('object', 2164, 401)
 
-    #just for kicks
     message = message[0][1].split(';')[0]
 
     try:
@@ -838,7 +808,6 @@ def error(request):
     except:
         return return_error('object', 2161, 500)
 
-    #just dump it into another table? sure why the hell not
     de = DataoneError(message)
     try:
         DataoneSession.add(de)
@@ -984,7 +953,7 @@ def add_object(request):
 
     for data object/science metadata
     {
-        'dataset': #id
+        'dataset': 
         'options': {
             'dataset format':
             'metadata standard':
@@ -1119,7 +1088,6 @@ def add_object(request):
         xslt_path = request.registry.settings['XSLT_PATH'] + '/xslts'
         dataone_path = request.registry.settings['DATAONE_PATH']
 
-        #this is annoying. and incorrect anywhere but production
         balancer_url = balancer_url.replace('http:', 'https:')
     
         if object_type == 'dataobject':
@@ -1141,8 +1109,6 @@ def add_object(request):
                 app_prefs = req_app.preferred_metadata_standards    
             std = next(s for s in app_prefs if s in supported_standards)
 
-            #the size of the file is unknown since we are now building the file
-            #that would contain the metadata listing the size of the file.
             metadata_info = {
                 "app": "dataone",
                 "distribution_links": [
@@ -1191,9 +1157,9 @@ def update_object(request):
     """
 
     {
-        'identifier': #for the actual object which i don't know how we'll know actually
+        'identifier': 
         'update': {
-            'method': # register as dirty
+            'method': 
         }
     }
 

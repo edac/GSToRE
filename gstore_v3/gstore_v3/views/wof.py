@@ -12,11 +12,7 @@ http://nmhis.unm.edu/RGET/REST/waterml_1_1.svc/siteinfo?location=RioGrandeET:ALF
 http://nmhis.unm.edu/RGET/REST/waterml_1_1.svc/variables?variable=RioGrandeET:Wind_Speed_Ave
 http://nmhis.unm.edu/RGET/REST/waterml_1_1.svc/datavalues?location=RioGrandeET:ALF&variable=RioGrandeET:svpma&startDate=2008-11-08T07:00:00Z&endDate=2008-11-11T07:00:00Z
 '''
-<<<<<<< HEAD
-@view_config(route_name='hydroserver', match_param=('method=siteinfo', 'version=1_1, app=hydroserver'))
-=======
 @view_config(route_name='hydroserver', match_param=('method=siteinfo', 'version=1_1', 'app=hydroserver'))
->>>>>>> gstore/master
 def sites(request):
     #site
     params = normalize_params(request.params)

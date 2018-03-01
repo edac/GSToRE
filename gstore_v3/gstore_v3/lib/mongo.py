@@ -9,22 +9,9 @@ pretty basic - connect, query, and insert
 
 note: not in init - possible remote mongo instances on
       a dataset-by-dataset need (i.e. dataset x is in a different db than dataset y)
-      so no one connection
-
-      and diff db/collection for dataone logging
+      so no one connection and diff db/collection for dataone logging
 '''
 class gMongo:
-#    def __init__(self, connstr, collection=''):
-#        #set up the connection
-#        #required: mongodb://edacdb1:27017/gstore_test (host:port/database)
-#        conn_url = urlparse(connstr)
-#        self.conn = pymongo.Connection(host=conn_url.hostname, port=conn_url.port)
-
-#        #TODO: add any authentication information in
-#        self.db = self.conn[conn_url.path[1:]]
-
-#        if collection:
-#            self.collection = self.db[collection]
 
     #use the mongo connection widget instead
     def __init__(self, mongo_uri):
@@ -41,8 +28,6 @@ class gMongo:
     def close(self):
         self.conn.close()
 
-<<<<<<< HEAD
-=======
 
     #Get the count of the datasets returned.
     def count(self, querydict, fielddict={}, sortdict = {}, limit=None, offset=None):
@@ -60,7 +45,6 @@ class gMongo:
         return c
 
 
->>>>>>> gstore/master
     #TODO: something about the possibly unknown collection info
     def query(self, querydict, fielddict={}, sortdict = {}, limit=None, offset=None):
         #what to do if there's no defined collection?
@@ -103,16 +87,12 @@ class gMongo:
         done = self.collection.remove(querydict)        
         return done
 
-    #TODO: add some insert doc validation?
-    #      but now we have mutliple mongo deals running so maybe not here
 
-#meh. just do all the parsing and have one passable widget from view to model 
 class gMongoUri:
     def __init__(self, connstr, collstr):
         connection_uri = urlparse(connstr)
         self.collection_name = collstr
 
-        #TODO: add the authentication part someday
         self.hostname = connection_uri.hostname
         self.port = connection_uri.port
         self.db = connection_uri.path[1:]

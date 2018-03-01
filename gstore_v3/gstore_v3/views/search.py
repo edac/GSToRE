@@ -1,25 +1,19 @@
 from pyramid.view import view_config
 from pyramid.response import Response
-
 from pyramid.httpexceptions import HTTPNotFound, HTTPServerError, HTTPBadRequest
-
 import sqlalchemy
 from sqlalchemy import desc, asc, func
 from sqlalchemy.sql.expression import and_, or_, cast
 from sqlalchemy.sql import between
-
 import json
 from datetime import datetime
-
 import requests
-
 from ..models import DBSession
 from ..models.datasets import (
     Dataset,
     Category
     )
 from ..models.features import Feature
-
 from ..models.vocabs import geolookups
 from ..lib.spatial import *
 from ..lib.mongo import *
@@ -52,7 +46,6 @@ def return_no_results(ext='json'):
 '''
 doctype response
 '''
-#TODO: replace the streamers here with the other streamer? meh, the other json is a different structure so maybe not.
 def generate_search_response(searcher, request, app, limit, base_url, ext, version=3):
     """generate the streamer for the search results for doctypes
 
@@ -69,7 +62,7 @@ def generate_search_response(searcher, request, app, limit, base_url, ext, versi
     if total < 1:
         return return_no_results(ext)
 
-    #TODO: figure out what to do if, horrifically, the es uuid count does not match the dataset count
+    #TODO: figure out what to do if, es uuid count does not match the dataset count
     search_objects = searcher.get_result_ids()
     
     subtotal = len(search_objects)
@@ -167,7 +160,7 @@ def search_categories(request):
             "filtered": {
                 "filter": {
                     "and": [
-                        {"term": {"embargo": False}},
+                        {"term": {"is_embargoed": False}},
                         {"term": {"active": True}}
                     ]
                 }
@@ -491,10 +484,6 @@ def search(request):
     #TODO: add the rest of the filtering
     keyword = '%'+keyword+'%'
     geos = DBSession.query(geolookups).filter(geolookups.c.what==geolookup).filter(or_(geolookups.c.description.ilike(keyword), "array_to_string(aliases, ',') like '%s'" % keyword)).order_by(order_clause).limit(limit).offset(offset)
-<<<<<<< HEAD
-
-=======
->>>>>>> gstore/master
     #dump the results
     #TODO: check for anything weird about the bbox (or deal with reprojection, etc)
     response = Response(json.dumps({'results': [{'text': g.description, 'box': [float(b) for b in g.box]} for g in geos]}))

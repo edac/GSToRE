@@ -142,8 +142,6 @@ def convert_by_ogrtype(value, ogr_type, fmt='', datefmt=''):
             pass
     if ogr_type == ogr.OFTDateTime:
         #no expected format, no datetime
-#        if not datefmt:
-#            return value
         if datefmt:
             try:
                 #try to parse
@@ -151,8 +149,6 @@ def convert_by_ogrtype(value, ogr_type, fmt='', datefmt=''):
             except:
                 #return value
                 pass
-    #it's just a string
-    #value = '%s' % value
     value = encode_as_ascii(value) if fmt in ['kml', 'gml', 'csv'] else value.encode('utf-8')
     
     #and do one last check for kml, gml & ampersands
@@ -199,20 +195,6 @@ def geom_to_wkt(geom, srid=''):
 def check_wkb_size(wkb):
     return len(wkb.encode('utf-8')) *  0.0000009536743
 
-'''
-0103000000010000000500000098CD95A187FB5AC0D7A37287D47B414098CD95A187FB5AC04499A34D494443407BE60D79A93F5AC04499A34D494443407BE60D79A93F5AC0D7A37287D47B414098CD95A187FB5AC0D7A37287D47B4140
-{-107.930153271,34.9674233732,-104.994718803,38.5334870385}
-
-tests:
-bbox = [-107.930153271,34.9674233732,-104.994718803,38.5334870385]
->>> spatial.bbox_to_wkb(bbox, 4326)
-'00000000030000000100000005c05afb87a195cd9840417bd48772a3d7c05afb87a195cd98404344494da39944c05a3fa9790de67b404344494da39944c05a3fa9790de67b40417bd48772a3d7c05afb87a195cd9840417bd48772a3d7'
->>> spatial.wkb_to_bbox('0103000000010000000500000098CD95A187FB5AC0D7A37287D47B414098CD95A187FB5AC04499A34D494443407BE60D79A93F5AC04499A34D494443407BE60D79A93F5AC0D7A37287D47B414098CD95A187FB5AC0D7A37287D47B4140', 4326)
-[-107.930153271, 34.9674233732, -104.994718803, 38.5334870385]
->>> spatial.wkb_to_bbox('00000000030000000100000005c05afb87a195cd9840417bd48772a3d7c05afb87a195cd98404344494da39944c05a3fa9790de67b404344494da39944c05a3fa9790de67b40417bd48772a3d7c05afb87a195cd9840417bd48772a3d7', 4326)
-[-107.930153271, 34.9674233732, -104.994718803, 38.5334870385]
-
-'''
 
 #wkt to geom 
 def wkt_to_geom(wkt, epsg):

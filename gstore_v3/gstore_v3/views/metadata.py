@@ -9,13 +9,9 @@ from sqlalchemy.sql.expression import and_
 import os, json
 from lxml import etree
 
-<<<<<<< HEAD
-from ..models import DBSession
-=======
 #from the models init script
 from ..models import DBSession
 #from the generic model loader (like meta from gstore v2)
->>>>>>> gstore/master
 from ..models.datasets import (
     Dataset,
     )
@@ -25,22 +21,6 @@ from ..models.apps import GstoreApp
 
 from ..lib.database import *
 
-<<<<<<< HEAD
-
-@view_config(route_name='metadata', match_param='datatype=datasets')
-def generate_metadata(request):
-    """either transform from gstore or just return an unmodified xml blob depending on what the dataset has
-
-    Notes:
-        
-    Args:
-        
-    Returns:
-    
-    Raises:
-    """
-
-=======
 '''
 standard return metadata as X for a dataset
 
@@ -54,8 +34,7 @@ def generate_metadata(request):
     either transform from gstore or just return an unmodified xml blob depending on what the dataset has
     '''
     
->>>>>>> gstore/master
-    app = request.matchdict['app'] #doesn't actually mean anything right now
+    app = request.matchdict['app']
     dataset_id = request.matchdict['id']
     standard = request.matchdict.get('standard') 
     format = request.matchdict['ext']
@@ -63,17 +42,6 @@ def generate_metadata(request):
     d = get_dataset(dataset_id) 
 
     if not d:
-<<<<<<< HEAD
-        return HTTPNotFound()
-
-    if d.is_embargoed or d.inactive:
-        return HTTPNotFound()
-
-    #set up the transformation
-    xslt_path = request.registry.settings['XSLT_PATH']
-    base_url = request.registry.settings['BALANCER_URL']
-
-=======
         return HTTPNotFound('Dataset not found')
 
     if d.is_embargoed or d.inactive:
@@ -81,12 +49,10 @@ def generate_metadata(request):
 
     #set up the transformation
     xslt_path = request.registry.settings['XSLT_PATH']
-    #base_url = '%s/apps/%s/datasets/' % (request.registry.settings['BALANCER_URL'], app)
 
     base_url = request.registry.settings['BALANCER_URL']
 
 
->>>>>>> gstore/master
     #check for the kind of metadata: gstore (standard + format check) | original (standard & format == xml) | bail
     if d.gstore_metadata:
         #check the standard and format
@@ -94,20 +60,12 @@ def generate_metadata(request):
         #check the requested standard against the default list - excluded_standards
         supported_standards = d.get_standards(request)
         if (standard not in supported_standards and '19119' not in standard) or ('19119' in standard and standard.split(':')[0] not in supported_standards):
-<<<<<<< HEAD
-            return HTTPNotFound()
-=======
             return HTTPNotFound("Standard is not supported. Supported standards are: %s" % supported_standards)
->>>>>>> gstore/master
 
         #and check the format of the requested standard
         ms = DBSession.query(MetadataStandards).filter(and_(MetadataStandards.alias==standard, "'%s'=ANY(supported_formats)" % format.lower()))
         if not ms:
-<<<<<<< HEAD
-            return HTTPNotFound()
-=======
             return HTTPNotFound('Format issues...')
->>>>>>> gstore/master
 
         #transform and return
         gstoreapp = DBSession.query(GstoreApp).filter(GstoreApp.route_key==app).first()
@@ -121,11 +79,7 @@ def generate_metadata(request):
             service = standard.split(':')[-1]
             supported_services = d.get_services(request)
             if service.lower() not in supported_services:
-<<<<<<< HEAD
-                return HTTPNotFound()
-=======
                 return HTTPNotFound('Not a supported service')
->>>>>>> gstore/master
             metadata_info.update({"service": service})
             standard = standard.split(':')[0]
 
@@ -136,11 +90,7 @@ def generate_metadata(request):
             return HTTPServerError('Invalid output')
         if output == 'No matching stylesheet':
             #no xslt for the standard + format output
-<<<<<<< HEAD
-            return HTTPNotFound()
-=======
             return HTTPNotFound('No matching xslt')
->>>>>>> gstore/master
 
         content_type = 'text/html' if format == 'html' else 'application/xml'
         
@@ -153,11 +103,7 @@ def generate_metadata(request):
         #check for some xml with that standard
         om = [o for o in d.original_metadata if o.original_xml_standard == standard and o.original_xml]
         if not om:
-<<<<<<< HEAD
-            return HTTPNotFound()
-=======
             return HTTPNotFound('check for some xml with that standard failed')
->>>>>>> gstore/master
 
         r = Response(om[0].original_xml, content_type='application/xml')
         r.headers['X-Robots-Tag'] = 'nofollow'
@@ -165,57 +111,16 @@ def generate_metadata(request):
         return r
 
     #otherwise, who knows, we got nothing.
-<<<<<<< HEAD
-    return HTTPNotFound()
-=======
     return HTTPNotFound('LOL')
->>>>>>> gstore/master
 
 
 
-##TODO: never run this. either make it static or check on the apache config option and chuck it
-#@view_config(route_name='metadata_sitemap', renderer='sitemap.mako')
-#def generate_metadata_sitemap(request):
-#    '''
-#    generate a sitemap of all the fgdc (for now) html metadata pages
-#    '''
-#    app = request.matchdict['app']
-
-#    base_url = '%s/apps/%s/datasets/' % (request.registry.settings['BALANCER_URL'], app)
-
-#    datasets = DBSession.query(Dataset).filter(and_(*[Dataset.inactive==False, "apps_cache @> ARRAY['%s']" % (app), Dataset.is_embargoed==False]))
-
-#    results = []
-#    for d in datasets:
-#        supported_standards = d.get_standards(request)
-
-#        fgdc_std = [f for f in supported_standards if 'fgdc' in f.lower()]
-
-#        if not fgdc_std:
-#            continue
-
-#        results.append({"link": base_url + str(d.uuid) + '/metadata/' + fgdc_std[0] + '.html', "description": str(d.description)})
-
-#    return {"app": app, "datasets": results}
 
 @view_config(route_name='metadata', match_param='datatype=collections')
 def generate_collection_metadata(request):
-<<<<<<< HEAD
-    """build the collection level metadata (iso ds, not great fgdc)
-
-    Notes:
-        
-    Args:
-        
-    Returns:
-    
-    Raises:
-    """
-=======
     '''
     build the collection level metadata (iso ds, not great fgdc)
     '''
->>>>>>> gstore/master
 
     app = request.matchdict['app'] #doesn't actually mean anything right now
     collection_id = request.matchdict['id']
@@ -266,10 +171,6 @@ def generate_collection_metadata(request):
 
         r = Response(output, content_type=content_type)
         r.headers['X-Robots-Tag'] = 'nofollow'
-<<<<<<< HEAD
-        r.headers['Access-Control-Allow-Origin'] = '*'
-=======
->>>>>>> gstore/master
         return r
 
 
@@ -278,26 +179,8 @@ def generate_collection_metadata(request):
 '''
 other
 '''
-#TODO: this is probably not necessary (see the metadata method instead) 
-# unless we just want something that ignores the dataset (why would we want that?)
-#@view_config(route_name='get_metadata')
-#def show(request):
-#    return Response('metadata = %s' % (request.matchdict['id']))
 
 #return a deprecation warning for v1 api requests
 @view_config(route_name='schema')
 def schema(request):
-<<<<<<< HEAD
-    """
-
-    Notes:
-        
-    Args:
-        
-    Returns:
-    
-    Raises:
-    """
-=======
->>>>>>> gstore/master
     return Response('Deprecated. Do not use.')

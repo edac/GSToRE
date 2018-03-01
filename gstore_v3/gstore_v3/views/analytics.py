@@ -9,9 +9,7 @@ from ..lib.utils import *
 import datetime
 import csv
 import urllib2   
-#Soooon!
 import pandas as pd
-#import numpy as np
 
 
 @view_config(route_name='analyticsdata')
@@ -75,7 +73,6 @@ def MakeResponse(d,gm,params,format):
     firstrecord = gm.query({'d.id': d.id },limit=1)
     for record1 in firstrecord:
         geom_repr=""
-#        record_id = record1['f']['id']
         try:
             record_id = record1['r']['id']
         except:
@@ -95,7 +92,6 @@ def MakeResponse(d,gm,params,format):
         label=label[:-1] + delimiter
         if labelformat=="original_name":
             for a in fields:
-		print a
                 label=label.replace(a.name, a.orig_name)
         if labelformat=="description":
             for a in fields:
@@ -109,7 +105,6 @@ def MakeResponse(d,gm,params,format):
     allvals=""
     for vector in vectors:
         geom_repr=""
-#        record_id = vector['f']['id']
         try:
             record_id = vector['r']['id']
         except:
@@ -156,7 +151,6 @@ def MakeResponse(d,gm,params,format):
         if transpose=="true":
             htmlresponse=df.describe().transpose().to_html(classes="table-style-two table")
         else:
-#            htmlresponse=df.describe().loc[['count','max','kurt']].to_html(classes="table-style-two")
             htmlresponse=df.describe().to_html(classes="table-style-twotable")
         return htmlresponse
 

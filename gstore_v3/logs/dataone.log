@@ -1,0 +1,562 @@
+2012-08-02 14:35:39,074 INFO  [sqlalchemy.engine.base.Engine][MainThread] select version()
+2012-08-02 14:35:39,074 INFO  [sqlalchemy.engine.base.Engine][MainThread] {}
+2012-08-02 14:35:39,077 INFO  [sqlalchemy.engine.base.Engine][MainThread] select current_schema()
+2012-08-02 14:35:39,077 INFO  [sqlalchemy.engine.base.Engine][MainThread] {}
+2012-08-02 14:35:39,083 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,083 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_styles', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,087 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,087 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'collections', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,089 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,090 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_sampletypes', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,091 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,091 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_classes', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,093 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,093 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_timeunits', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,095 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,095 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_datatypes', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,096 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,097 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_speciation', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,098 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,098 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'datasets', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,100 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,100 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'get_tileindexes', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,102 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,102 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_variablenames', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,104 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,104 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_samplemediums', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,105 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,106 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'geolookups', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,107 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,107 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_units', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,109 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,109 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'lut_parameters', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,111 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,111 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'tileindexes', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,113 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,113 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_generalcategories', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,114 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,115 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'categories', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,116 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,116 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_censorcodes', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,118 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,118 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_valuetypes', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,120 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,120 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'parameters', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,122 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,122 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'shapes', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,123 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,124 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'categories_datasets', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,125 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,125 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'original_metadata', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,127 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,127 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'tileindexes_datasets', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,129 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,129 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'features_attributes', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,131 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,131 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'collections_datasets', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,132 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,133 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'sources', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,134 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,134 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'parameters_parameterluts', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,136 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,136 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'source_files', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,138 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,138 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,139 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,140 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings_classes', 'schema': u'gstoredata'}
+2012-08-02 14:35:39,141 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 14:35:39,141 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings_styles', 'schema': u'gstoredata'}
+2012-08-02 14:36:49,749 INFO  [sqlalchemy.engine.base.Engine][MainThread] BEGIN (implicit)
+2012-08-02 14:36:49,750 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT gstoredata.shapes.dataset_id AS gstoredata_shapes_dataset_id, gstoredata.shapes.fid AS gstoredata_shapes_fid 
+FROM gstoredata.shapes 
+WHERE gstoredata.shapes.dataset_id = %(dataset_id_1)s
+2012-08-02 14:36:49,750 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'dataset_id_1': 52207}
+2012-08-02 14:37:05,310 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT gstoredata.shapes.dataset_id AS gstoredata_shapes_dataset_id, gstoredata.shapes.fid AS gstoredata_shapes_fid 
+FROM gstoredata.shapes 
+WHERE gstoredata.shapes.dataset_id = %(dataset_id_1)s
+2012-08-02 14:37:05,310 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'dataset_id_1': 52207}
+2012-08-02 15:15:57,705 INFO  [sqlalchemy.engine.base.Engine][MainThread] select version()
+2012-08-02 15:15:57,729 INFO  [sqlalchemy.engine.base.Engine][MainThread] {}
+2012-08-02 15:15:57,735 INFO  [sqlalchemy.engine.base.Engine][MainThread] select current_schema()
+2012-08-02 15:15:57,735 INFO  [sqlalchemy.engine.base.Engine][MainThread] {}
+2012-08-02 15:15:57,741 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,741 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_speciation', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,745 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,746 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'collections', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,749 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,749 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'get_tileindexes', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,751 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,751 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'categories', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,753 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,753 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_styles', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,754 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,754 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_timeunits', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,756 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,756 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'lut_parameters', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,758 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,758 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_generalcategories', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,760 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,760 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'tileindexes', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,761 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,762 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_samplemediums', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,763 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,763 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'geolookups', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,765 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,765 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_variablenames', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,767 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,767 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_datatypes', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,768 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,769 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_classes', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,770 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,770 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_units', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,772 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,772 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'datasets', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,774 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,774 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_sampletypes', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,776 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,776 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_censorcodes', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,777 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,778 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_valuetypes', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,779 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,779 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'parameters', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,781 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,781 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'collections_datasets', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,783 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,783 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'categories_datasets', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,784 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,785 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'original_metadata', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,786 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,786 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'tileindexes_datasets', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,788 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,788 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'features_attributes', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,790 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,790 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'shapes', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,791 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,792 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'sources', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,793 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,793 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'parameters_parameterluts', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,795 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,795 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'source_files', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,797 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,797 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,798 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,799 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings_classes', 'schema': u'gstoredata'}
+2012-08-02 15:15:57,800 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-02 15:15:57,800 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings_styles', 'schema': u'gstoredata'}
+2012-08-02 15:18:11,907 INFO  [sqlalchemy.engine.base.Engine][MainThread] BEGIN (implicit)
+2012-08-02 15:18:11,949 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT count(*) AS count_1 
+FROM (SELECT gstoredata.shapes.fid AS gstoredata_shapes_fid, gstoredata.shapes.gid AS gstoredata_shapes_gid, gstoredata.shapes.dataset_id AS gstoredata_shapes_dataset_id, gstoredata.shapes.uuid AS gstoredata_shapes_uuid 
+FROM gstoredata.shapes 
+WHERE gstoredata.shapes.dataset_id = %(dataset_id_1)s) AS anon_1
+2012-08-02 15:18:11,949 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'dataset_id_1': 52211}
+2012-08-02 15:18:43,317 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT count(*) AS count_1 
+FROM (SELECT gstoredata.shapes.fid AS gstoredata_shapes_fid 
+FROM gstoredata.shapes 
+WHERE gstoredata.shapes.dataset_id = %(dataset_id_1)s) AS anon_1
+2012-08-02 15:18:43,317 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'dataset_id_1': 52211}
+2012-08-02 15:19:23,746 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT gstoredata.shapes.fid AS gstoredata_shapes_fid 
+FROM gstoredata.shapes 
+WHERE gstoredata.shapes.dataset_id = %(dataset_id_1)s 
+ LIMIT %(param_1)s
+2012-08-02 15:19:23,746 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'dataset_id_1': 52211, 'param_1': 1}
+2012-08-02 15:19:31,498 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT gstoredata.shapes.fid AS gstoredata_shapes_fid 
+FROM gstoredata.shapes 
+WHERE gstoredata.shapes.dataset_id = %(dataset_id_1)s 
+ LIMIT %(param_1)s
+2012-08-02 15:19:31,498 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'dataset_id_1': 52211, 'param_1': 1}
+2012-08-02 15:19:45,625 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT gstoredata.shapes.fid AS gstoredata_shapes_fid 
+FROM gstoredata.shapes 
+WHERE gstoredata.shapes.dataset_id = %(dataset_id_1)s 
+ LIMIT %(param_1)s
+2012-08-02 15:19:45,626 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'dataset_id_1': 52211, 'param_1': 1}
+2012-08-06 10:34:03,826 INFO  [sqlalchemy.engine.base.Engine][MainThread] select version()
+2012-08-06 10:34:03,839 INFO  [sqlalchemy.engine.base.Engine][MainThread] {}
+2012-08-06 10:34:03,842 INFO  [sqlalchemy.engine.base.Engine][MainThread] select current_schema()
+2012-08-06 10:34:03,842 INFO  [sqlalchemy.engine.base.Engine][MainThread] {}
+2012-08-06 10:34:03,848 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,848 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_censorcodes', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,852 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,853 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_classes', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,854 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,854 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_units', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,856 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,856 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'collections', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,858 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,858 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'tileindexes', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,860 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,860 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_sampletypes', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,861 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,862 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_valuetypes', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,863 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,863 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_variablenames', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,865 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,865 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'datasets', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,867 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,867 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_styles', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,869 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,869 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_samplemediums', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,871 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,871 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'get_tileindexes', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,872 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,872 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'categories', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,874 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,874 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_generalcategories', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,876 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,876 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_timeunits', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,878 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,878 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_speciation', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,879 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,880 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'lut_parameters', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,881 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,881 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'geolookups', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,883 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,883 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_datatypes', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,885 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,885 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'collections_datasets', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,886 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,887 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'parameters', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,888 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,888 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'tileindexes_datasets', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,890 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,890 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'categories_datasets', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,892 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,892 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'sources', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,893 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,894 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'features_attributes', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,895 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,895 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'original_metadata', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,897 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,897 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'shapes', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,899 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,899 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'source_files', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,901 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,901 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'parameters_parameterluts', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,902 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,903 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,904 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,904 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings_styles', 'schema': u'gstoredata'}
+2012-08-06 10:34:03,906 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 10:34:03,906 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings_classes', 'schema': u'gstoredata'}
+2012-08-06 10:39:10,826 INFO  [sqlalchemy.engine.base.Engine][MainThread] BEGIN (implicit)
+2012-08-06 10:39:10,829 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT gstoredata.datasets.id AS gstoredata_datasets_id, gstoredata.datasets.description AS gstoredata_datasets_description, gstoredata.datasets.taxonomy AS gstoredata_datasets_taxonomy, gstoredata.datasets.feature_count AS gstoredata_datasets_feature_count, gstoredata.datasets.record_count AS gstoredata_datasets_record_count, gstoredata.datasets.dateadded AS gstoredata_datasets_dateadded, gstoredata.datasets.basename AS gstoredata_datasets_basename, gstoredata.datasets.geom AS gstoredata_datasets_geom, gstoredata.datasets.geomtype AS gstoredata_datasets_geomtype, gstoredata.datasets.formats_cache AS gstoredata_datasets_formats_cache, gstoredata.datasets.orig_epsg AS gstoredata_datasets_orig_epsg, gstoredata.datasets.inactive AS gstoredata_datasets_inactive, gstoredata.datasets.box AS gstoredata_datasets_box, gstoredata.datasets.apps_cache AS gstoredata_datasets_apps_cache, gstoredata.datasets.begin_datetime AS gstoredata_datasets_begin_datetime, gstoredata.datasets.end_datetime AS gstoredata_datasets_end_datetime, gstoredata.datasets.is_available AS gstoredata_datasets_is_available, gstoredata.datasets.has_metadata_cache AS gstoredata_datasets_has_metadata_cache, gstoredata.datasets.excluded_formats AS gstoredata_datasets_excluded_formats, gstoredata.datasets.excluded_services AS gstoredata_datasets_excluded_services, gstoredata.datasets.uuid AS gstoredata_datasets_uuid, st_area(gstoredata.datasets.geom) AS st_area_1 
+FROM gstoredata.datasets 
+WHERE gstoredata.datasets.uuid = %(uuid_1)s 
+ LIMIT %(param_1)s
+2012-08-06 10:39:10,829 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'uuid_1': 'b8989369-3183-49af-a817-1c9b37116ebc', 'param_1': 1}
+2012-08-06 11:38:56,195 INFO  [sqlalchemy.engine.base.Engine][MainThread] select version()
+2012-08-06 11:38:56,195 INFO  [sqlalchemy.engine.base.Engine][MainThread] {}
+2012-08-06 11:38:56,198 INFO  [sqlalchemy.engine.base.Engine][MainThread] select current_schema()
+2012-08-06 11:38:56,198 INFO  [sqlalchemy.engine.base.Engine][MainThread] {}
+2012-08-06 11:38:56,204 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,205 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_censorcodes', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,208 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,209 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_classes', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,210 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,210 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'collections', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,212 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,212 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'geolookups', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,214 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,214 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_speciation', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,216 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,216 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_valuetypes', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,217 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,218 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_sampletypes', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,219 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,219 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'categories', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,221 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,221 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'datasets', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,223 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,223 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_units', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,225 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,225 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'lut_parameters', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,226 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,227 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_samplemediums', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,228 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,228 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'get_tileindexes', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,230 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,230 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_generalcategories', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,232 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,232 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_timeunits', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,234 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,234 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_styles', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,236 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,236 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_variablenames', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,237 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,238 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'tileindexes', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,239 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,239 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_datatypes', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,241 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,241 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'collections_datasets', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,243 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,243 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'parameters', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,244 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,245 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'tileindexes_datasets', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,246 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,246 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'categories_datasets', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,248 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,248 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'original_metadata', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,250 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,250 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'sources', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,252 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,252 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'shapes', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,253 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,254 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'features_attributes', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,255 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,255 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'source_files', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,257 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,257 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'parameters_parameterluts', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,259 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,259 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,260 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,261 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings_styles', 'schema': u'gstoredata'}
+2012-08-06 11:38:56,262 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 11:38:56,263 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings_classes', 'schema': u'gstoredata'}
+2012-08-06 11:39:22,367 INFO  [sqlalchemy.engine.base.Engine][MainThread] BEGIN (implicit)
+2012-08-06 11:39:22,370 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT gstoredata.datasets.id AS gstoredata_datasets_id, gstoredata.datasets.description AS gstoredata_datasets_description, gstoredata.datasets.taxonomy AS gstoredata_datasets_taxonomy, gstoredata.datasets.feature_count AS gstoredata_datasets_feature_count, gstoredata.datasets.record_count AS gstoredata_datasets_record_count, gstoredata.datasets.dateadded AS gstoredata_datasets_dateadded, gstoredata.datasets.basename AS gstoredata_datasets_basename, gstoredata.datasets.geom AS gstoredata_datasets_geom, gstoredata.datasets.geomtype AS gstoredata_datasets_geomtype, gstoredata.datasets.formats_cache AS gstoredata_datasets_formats_cache, gstoredata.datasets.orig_epsg AS gstoredata_datasets_orig_epsg, gstoredata.datasets.inactive AS gstoredata_datasets_inactive, gstoredata.datasets.box AS gstoredata_datasets_box, gstoredata.datasets.apps_cache AS gstoredata_datasets_apps_cache, gstoredata.datasets.begin_datetime AS gstoredata_datasets_begin_datetime, gstoredata.datasets.end_datetime AS gstoredata_datasets_end_datetime, gstoredata.datasets.is_available AS gstoredata_datasets_is_available, gstoredata.datasets.has_metadata_cache AS gstoredata_datasets_has_metadata_cache, gstoredata.datasets.excluded_formats AS gstoredata_datasets_excluded_formats, gstoredata.datasets.excluded_services AS gstoredata_datasets_excluded_services, gstoredata.datasets.uuid AS gstoredata_datasets_uuid, st_area(gstoredata.datasets.geom) AS st_area_1 
+FROM gstoredata.datasets 
+WHERE gstoredata.datasets.uuid = %(uuid_1)s 
+ LIMIT %(param_1)s
+2012-08-06 11:39:22,370 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'uuid_1': 'b8989369-3183-49af-a817-1c9b37116ebc', 'param_1': 1}
+2012-08-06 11:43:06,476 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT gstoredata.datasets.id AS gstoredata_datasets_id, gstoredata.datasets.description AS gstoredata_datasets_description, gstoredata.datasets.taxonomy AS gstoredata_datasets_taxonomy, gstoredata.datasets.feature_count AS gstoredata_datasets_feature_count, gstoredata.datasets.record_count AS gstoredata_datasets_record_count, gstoredata.datasets.dateadded AS gstoredata_datasets_dateadded, gstoredata.datasets.basename AS gstoredata_datasets_basename, gstoredata.datasets.geom AS gstoredata_datasets_geom, gstoredata.datasets.geomtype AS gstoredata_datasets_geomtype, gstoredata.datasets.formats_cache AS gstoredata_datasets_formats_cache, gstoredata.datasets.orig_epsg AS gstoredata_datasets_orig_epsg, gstoredata.datasets.inactive AS gstoredata_datasets_inactive, gstoredata.datasets.box AS gstoredata_datasets_box, gstoredata.datasets.apps_cache AS gstoredata_datasets_apps_cache, gstoredata.datasets.begin_datetime AS gstoredata_datasets_begin_datetime, gstoredata.datasets.end_datetime AS gstoredata_datasets_end_datetime, gstoredata.datasets.is_available AS gstoredata_datasets_is_available, gstoredata.datasets.has_metadata_cache AS gstoredata_datasets_has_metadata_cache, gstoredata.datasets.excluded_formats AS gstoredata_datasets_excluded_formats, gstoredata.datasets.excluded_services AS gstoredata_datasets_excluded_services, gstoredata.datasets.uuid AS gstoredata_datasets_uuid, st_area(gstoredata.datasets.geom) AS st_area_1 
+FROM gstoredata.datasets 
+WHERE gstoredata.datasets.description = %(description_1)s
+2012-08-06 11:43:06,476 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'description_1': '%taos%'}
+2012-08-06 11:43:22,427 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT count(*) AS count_1 
+FROM (SELECT gstoredata.datasets.id AS gstoredata_datasets_id, gstoredata.datasets.description AS gstoredata_datasets_description, gstoredata.datasets.taxonomy AS gstoredata_datasets_taxonomy, gstoredata.datasets.feature_count AS gstoredata_datasets_feature_count, gstoredata.datasets.record_count AS gstoredata_datasets_record_count, gstoredata.datasets.dateadded AS gstoredata_datasets_dateadded, gstoredata.datasets.basename AS gstoredata_datasets_basename, gstoredata.datasets.geom AS gstoredata_datasets_geom, gstoredata.datasets.geomtype AS gstoredata_datasets_geomtype, gstoredata.datasets.formats_cache AS gstoredata_datasets_formats_cache, gstoredata.datasets.orig_epsg AS gstoredata_datasets_orig_epsg, gstoredata.datasets.inactive AS gstoredata_datasets_inactive, gstoredata.datasets.box AS gstoredata_datasets_box, gstoredata.datasets.apps_cache AS gstoredata_datasets_apps_cache, gstoredata.datasets.begin_datetime AS gstoredata_datasets_begin_datetime, gstoredata.datasets.end_datetime AS gstoredata_datasets_end_datetime, gstoredata.datasets.is_available AS gstoredata_datasets_is_available, gstoredata.datasets.has_metadata_cache AS gstoredata_datasets_has_metadata_cache, gstoredata.datasets.excluded_formats AS gstoredata_datasets_excluded_formats, gstoredata.datasets.excluded_services AS gstoredata_datasets_excluded_services, gstoredata.datasets.uuid AS gstoredata_datasets_uuid, st_area(gstoredata.datasets.geom) AS st_area_1 
+FROM gstoredata.datasets 
+WHERE gstoredata.datasets.description = %(description_1)s) AS anon_1
+2012-08-06 11:43:22,428 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'description_1': '%taos%'}
+2012-08-06 11:44:15,610 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT count(*) AS count_1 
+FROM (SELECT gstoredata.datasets.id AS gstoredata_datasets_id, gstoredata.datasets.description AS gstoredata_datasets_description, gstoredata.datasets.taxonomy AS gstoredata_datasets_taxonomy, gstoredata.datasets.feature_count AS gstoredata_datasets_feature_count, gstoredata.datasets.record_count AS gstoredata_datasets_record_count, gstoredata.datasets.dateadded AS gstoredata_datasets_dateadded, gstoredata.datasets.basename AS gstoredata_datasets_basename, gstoredata.datasets.geom AS gstoredata_datasets_geom, gstoredata.datasets.geomtype AS gstoredata_datasets_geomtype, gstoredata.datasets.formats_cache AS gstoredata_datasets_formats_cache, gstoredata.datasets.orig_epsg AS gstoredata_datasets_orig_epsg, gstoredata.datasets.inactive AS gstoredata_datasets_inactive, gstoredata.datasets.box AS gstoredata_datasets_box, gstoredata.datasets.apps_cache AS gstoredata_datasets_apps_cache, gstoredata.datasets.begin_datetime AS gstoredata_datasets_begin_datetime, gstoredata.datasets.end_datetime AS gstoredata_datasets_end_datetime, gstoredata.datasets.is_available AS gstoredata_datasets_is_available, gstoredata.datasets.has_metadata_cache AS gstoredata_datasets_has_metadata_cache, gstoredata.datasets.excluded_formats AS gstoredata_datasets_excluded_formats, gstoredata.datasets.excluded_services AS gstoredata_datasets_excluded_services, gstoredata.datasets.uuid AS gstoredata_datasets_uuid, st_area(gstoredata.datasets.geom) AS st_area_1 
+FROM gstoredata.datasets 
+WHERE gstoredata.datasets.description ILIKE %(description_1)s) AS anon_1
+2012-08-06 11:44:15,610 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'description_1': '%taos%'}
+2012-08-06 11:44:25,221 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT gstoredata.datasets.id AS gstoredata_datasets_id, gstoredata.datasets.description AS gstoredata_datasets_description, gstoredata.datasets.taxonomy AS gstoredata_datasets_taxonomy, gstoredata.datasets.feature_count AS gstoredata_datasets_feature_count, gstoredata.datasets.record_count AS gstoredata_datasets_record_count, gstoredata.datasets.dateadded AS gstoredata_datasets_dateadded, gstoredata.datasets.basename AS gstoredata_datasets_basename, gstoredata.datasets.geom AS gstoredata_datasets_geom, gstoredata.datasets.geomtype AS gstoredata_datasets_geomtype, gstoredata.datasets.formats_cache AS gstoredata_datasets_formats_cache, gstoredata.datasets.orig_epsg AS gstoredata_datasets_orig_epsg, gstoredata.datasets.inactive AS gstoredata_datasets_inactive, gstoredata.datasets.box AS gstoredata_datasets_box, gstoredata.datasets.apps_cache AS gstoredata_datasets_apps_cache, gstoredata.datasets.begin_datetime AS gstoredata_datasets_begin_datetime, gstoredata.datasets.end_datetime AS gstoredata_datasets_end_datetime, gstoredata.datasets.is_available AS gstoredata_datasets_is_available, gstoredata.datasets.has_metadata_cache AS gstoredata_datasets_has_metadata_cache, gstoredata.datasets.excluded_formats AS gstoredata_datasets_excluded_formats, gstoredata.datasets.excluded_services AS gstoredata_datasets_excluded_services, gstoredata.datasets.uuid AS gstoredata_datasets_uuid, st_area(gstoredata.datasets.geom) AS st_area_1 
+FROM gstoredata.datasets 
+WHERE gstoredata.datasets.description ILIKE %(description_1)s
+2012-08-06 11:44:25,222 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'description_1': '%taos%'}
+2012-08-06 13:24:18,305 INFO  [sqlalchemy.engine.base.Engine][MainThread] select version()
+2012-08-06 13:24:18,306 INFO  [sqlalchemy.engine.base.Engine][MainThread] {}
+2012-08-06 13:24:18,308 INFO  [sqlalchemy.engine.base.Engine][MainThread] select current_schema()
+2012-08-06 13:24:18,308 INFO  [sqlalchemy.engine.base.Engine][MainThread] {}
+2012-08-06 13:24:18,314 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,315 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_censorcodes', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,318 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,319 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_sampletypes', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,320 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,320 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'collections', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,322 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,322 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'geolookups', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,324 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,324 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_variablenames', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,326 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,326 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_timeunits', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,327 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,328 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'get_tileindexes', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,329 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,329 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'tileindexes', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,331 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,331 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_datatypes', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,333 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,333 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'categories', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,334 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,335 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_samplemediums', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,336 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,337 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_units', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,338 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,338 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_generalcategories', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,340 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,340 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_valuetypes', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,342 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,342 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_speciation', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,344 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,344 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'datasets', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,346 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,346 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_classes', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,348 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,348 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_styles', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,349 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,349 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'lut_parameters', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,351 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,351 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'collections_datasets', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,353 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,353 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'tileindexes_datasets', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,355 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,355 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'parameters', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,356 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,357 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'categories_datasets', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,358 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,358 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'features_attributes', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,360 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,360 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'sources', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,362 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,362 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'original_metadata', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,364 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,364 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'shapes', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,365 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,366 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'source_files', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,367 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,368 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'parameters_parameterluts', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,369 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,369 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,371 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,371 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings_styles', 'schema': u'gstoredata'}
+2012-08-06 13:24:18,373 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:24:18,373 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings_classes', 'schema': u'gstoredata'}
+2012-08-06 13:30:25,424 INFO  [sqlalchemy.engine.base.Engine][MainThread] BEGIN (implicit)
+2012-08-06 13:30:25,426 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT count(*) AS count_1 
+FROM (SELECT gstoredata.datasets.id AS gstoredata_datasets_id, gstoredata.datasets.description AS gstoredata_datasets_description, gstoredata.datasets.taxonomy AS gstoredata_datasets_taxonomy, gstoredata.datasets.feature_count AS gstoredata_datasets_feature_count, gstoredata.datasets.record_count AS gstoredata_datasets_record_count, gstoredata.datasets.dateadded AS gstoredata_datasets_dateadded, gstoredata.datasets.basename AS gstoredata_datasets_basename, gstoredata.datasets.geom AS gstoredata_datasets_geom, gstoredata.datasets.geomtype AS gstoredata_datasets_geomtype, gstoredata.datasets.formats_cache AS gstoredata_datasets_formats_cache, gstoredata.datasets.orig_epsg AS gstoredata_datasets_orig_epsg, gstoredata.datasets.inactive AS gstoredata_datasets_inactive, gstoredata.datasets.box AS gstoredata_datasets_box, gstoredata.datasets.apps_cache AS gstoredata_datasets_apps_cache, gstoredata.datasets.begin_datetime AS gstoredata_datasets_begin_datetime, gstoredata.datasets.end_datetime AS gstoredata_datasets_end_datetime, gstoredata.datasets.is_available AS gstoredata_datasets_is_available, gstoredata.datasets.has_metadata_cache AS gstoredata_datasets_has_metadata_cache, gstoredata.datasets.excluded_formats AS gstoredata_datasets_excluded_formats, gstoredata.datasets.excluded_services AS gstoredata_datasets_excluded_services, gstoredata.datasets.uuid AS gstoredata_datasets_uuid, st_area(gstoredata.datasets.geom) AS st_area_1 
+FROM gstoredata.datasets 
+WHERE gstoredata.datasets.description ILIKE %(description_1)s ORDER BY st_area(gstoredata.datasets.geom) ASC) AS anon_1
+2012-08-06 13:30:25,427 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'description_1': '%taos%'}
+2012-08-06 13:30:57,003 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT gstoredata.datasets.id AS gstoredata_datasets_id, gstoredata.datasets.description AS gstoredata_datasets_description, gstoredata.datasets.taxonomy AS gstoredata_datasets_taxonomy, gstoredata.datasets.feature_count AS gstoredata_datasets_feature_count, gstoredata.datasets.record_count AS gstoredata_datasets_record_count, gstoredata.datasets.dateadded AS gstoredata_datasets_dateadded, gstoredata.datasets.basename AS gstoredata_datasets_basename, gstoredata.datasets.geom AS gstoredata_datasets_geom, gstoredata.datasets.geomtype AS gstoredata_datasets_geomtype, gstoredata.datasets.formats_cache AS gstoredata_datasets_formats_cache, gstoredata.datasets.orig_epsg AS gstoredata_datasets_orig_epsg, gstoredata.datasets.inactive AS gstoredata_datasets_inactive, gstoredata.datasets.box AS gstoredata_datasets_box, gstoredata.datasets.apps_cache AS gstoredata_datasets_apps_cache, gstoredata.datasets.begin_datetime AS gstoredata_datasets_begin_datetime, gstoredata.datasets.end_datetime AS gstoredata_datasets_end_datetime, gstoredata.datasets.is_available AS gstoredata_datasets_is_available, gstoredata.datasets.has_metadata_cache AS gstoredata_datasets_has_metadata_cache, gstoredata.datasets.excluded_formats AS gstoredata_datasets_excluded_formats, gstoredata.datasets.excluded_services AS gstoredata_datasets_excluded_services, gstoredata.datasets.uuid AS gstoredata_datasets_uuid, st_area(gstoredata.datasets.geom) AS st_area_1 
+FROM gstoredata.datasets 
+WHERE gstoredata.datasets.description ILIKE %(description_1)s ORDER BY st_area(gstoredata.datasets.geom) ASC
+2012-08-06 13:30:57,004 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'description_1': '%taos%'}
+2012-08-06 13:48:18,946 INFO  [sqlalchemy.engine.base.Engine][MainThread] select version()
+2012-08-06 13:48:18,947 INFO  [sqlalchemy.engine.base.Engine][MainThread] {}
+2012-08-06 13:48:18,949 INFO  [sqlalchemy.engine.base.Engine][MainThread] select current_schema()
+2012-08-06 13:48:18,950 INFO  [sqlalchemy.engine.base.Engine][MainThread] {}
+2012-08-06 13:48:18,956 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,956 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_censorcodes', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,960 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,960 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_classes', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,962 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,962 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'collections', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,963 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,964 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'geolookups', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,965 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,965 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_valuetypes', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,967 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,967 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_datatypes', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,969 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,969 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_sampletypes', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,970 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,971 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'datasets', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,972 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,972 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_units', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,974 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,974 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_styles', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,976 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,976 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_samplemediums', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,978 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,978 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'get_tileindexes', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,979 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,980 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_variablenames', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,981 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,981 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'lut_parameters', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,983 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,983 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_timeunits', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,985 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,985 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_speciation', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,987 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,987 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'tileindexes', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,988 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,989 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'categories', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,990 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,990 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_generalcategories', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,992 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,992 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'collections_datasets', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,994 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,994 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'features_attributes', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,996 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,996 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'tileindexes_datasets', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,997 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,998 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'parameters', 'schema': u'gstoredata'}
+2012-08-06 13:48:18,999 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:18,999 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'categories_datasets', 'schema': u'gstoredata'}
+2012-08-06 13:48:19,001 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:19,001 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'sources', 'schema': u'gstoredata'}
+2012-08-06 13:48:19,003 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:19,003 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'original_metadata', 'schema': u'gstoredata'}
+2012-08-06 13:48:19,005 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:19,005 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'shapes', 'schema': u'gstoredata'}
+2012-08-06 13:48:19,006 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:19,007 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'source_files', 'schema': u'gstoredata'}
+2012-08-06 13:48:19,008 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:19,008 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'parameters_parameterluts', 'schema': u'gstoredata'}
+2012-08-06 13:48:19,010 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:19,010 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings', 'schema': u'gstoredata'}
+2012-08-06 13:48:19,012 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:19,012 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings_styles', 'schema': u'gstoredata'}
+2012-08-06 13:48:19,013 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:48:19,014 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings_classes', 'schema': u'gstoredata'}
+2012-08-06 13:51:15,918 INFO  [sqlalchemy.engine.base.Engine][MainThread] BEGIN (implicit)
+2012-08-06 13:51:15,920 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT count(*) AS count_1 
+FROM (SELECT gstoredata.datasets.id AS gstoredata_datasets_id, gstoredata.datasets.description AS gstoredata_datasets_description, gstoredata.datasets.taxonomy AS gstoredata_datasets_taxonomy, gstoredata.datasets.feature_count AS gstoredata_datasets_feature_count, gstoredata.datasets.record_count AS gstoredata_datasets_record_count, gstoredata.datasets.dateadded AS gstoredata_datasets_dateadded, gstoredata.datasets.basename AS gstoredata_datasets_basename, gstoredata.datasets.geom AS gstoredata_datasets_geom, gstoredata.datasets.geomtype AS gstoredata_datasets_geomtype, gstoredata.datasets.formats_cache AS gstoredata_datasets_formats_cache, gstoredata.datasets.orig_epsg AS gstoredata_datasets_orig_epsg, gstoredata.datasets.inactive AS gstoredata_datasets_inactive, gstoredata.datasets.box AS gstoredata_datasets_box, gstoredata.datasets.apps_cache AS gstoredata_datasets_apps_cache, gstoredata.datasets.begin_datetime AS gstoredata_datasets_begin_datetime, gstoredata.datasets.end_datetime AS gstoredata_datasets_end_datetime, gstoredata.datasets.is_available AS gstoredata_datasets_is_available, gstoredata.datasets.has_metadata_cache AS gstoredata_datasets_has_metadata_cache, gstoredata.datasets.excluded_formats AS gstoredata_datasets_excluded_formats, gstoredata.datasets.excluded_services AS gstoredata_datasets_excluded_services, gstoredata.datasets.uuid AS gstoredata_datasets_uuid, st_area(gstoredata.datasets.geom) / st_area(gstoredata.datasets.geom) AS anon_2 
+FROM gstoredata.datasets 
+WHERE gstoredata.datasets.description ILIKE %(description_1)s) AS anon_1
+2012-08-06 13:51:15,920 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'description_1': '%taos%'}
+2012-08-06 13:51:22,960 INFO  [sqlalchemy.engine.base.Engine][MainThread] SELECT gstoredata.datasets.id AS gstoredata_datasets_id, gstoredata.datasets.description AS gstoredata_datasets_description, gstoredata.datasets.taxonomy AS gstoredata_datasets_taxonomy, gstoredata.datasets.feature_count AS gstoredata_datasets_feature_count, gstoredata.datasets.record_count AS gstoredata_datasets_record_count, gstoredata.datasets.dateadded AS gstoredata_datasets_dateadded, gstoredata.datasets.basename AS gstoredata_datasets_basename, gstoredata.datasets.geom AS gstoredata_datasets_geom, gstoredata.datasets.geomtype AS gstoredata_datasets_geomtype, gstoredata.datasets.formats_cache AS gstoredata_datasets_formats_cache, gstoredata.datasets.orig_epsg AS gstoredata_datasets_orig_epsg, gstoredata.datasets.inactive AS gstoredata_datasets_inactive, gstoredata.datasets.box AS gstoredata_datasets_box, gstoredata.datasets.apps_cache AS gstoredata_datasets_apps_cache, gstoredata.datasets.begin_datetime AS gstoredata_datasets_begin_datetime, gstoredata.datasets.end_datetime AS gstoredata_datasets_end_datetime, gstoredata.datasets.is_available AS gstoredata_datasets_is_available, gstoredata.datasets.has_metadata_cache AS gstoredata_datasets_has_metadata_cache, gstoredata.datasets.excluded_formats AS gstoredata_datasets_excluded_formats, gstoredata.datasets.excluded_services AS gstoredata_datasets_excluded_services, gstoredata.datasets.uuid AS gstoredata_datasets_uuid, st_area(gstoredata.datasets.geom) / st_area(gstoredata.datasets.geom) AS anon_1 
+FROM gstoredata.datasets 
+WHERE gstoredata.datasets.description ILIKE %(description_1)s 
+ LIMIT %(param_1)s
+2012-08-06 13:51:22,961 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'description_1': '%taos%', 'param_1': 1}
+2012-08-06 13:53:44,726 INFO  [sqlalchemy.engine.base.Engine][MainThread] select version()
+2012-08-06 13:53:44,727 INFO  [sqlalchemy.engine.base.Engine][MainThread] {}
+2012-08-06 13:53:44,729 INFO  [sqlalchemy.engine.base.Engine][MainThread] select current_schema()
+2012-08-06 13:53:44,729 INFO  [sqlalchemy.engine.base.Engine][MainThread] {}
+2012-08-06 13:53:44,735 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,735 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_units', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,739 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,739 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_censorcodes', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,741 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,741 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'geolookups', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,743 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,743 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'collections', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,745 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,745 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_sampletypes', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,746 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,747 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_valuetypes', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,748 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,748 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_variablenames', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,750 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,750 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'datasets', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,752 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,752 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'categories', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,753 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,754 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_classes', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,755 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,755 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_speciation', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,757 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,757 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_samplemediums', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,759 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,759 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_generalcategories', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,760 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,761 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_timeunits', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,762 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,763 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_styles', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,764 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,764 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'get_tileindexes', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,766 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,766 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'tileindexes', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,768 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,768 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'cv_datatypes', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,769 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,770 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'lut_parameters', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,771 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,771 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'collections_datasets', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,773 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,773 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'features_attributes', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,775 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,775 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'tileindexes_datasets', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,777 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,777 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'parameters', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,778 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,779 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'categories_datasets', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,780 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,780 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'sources', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,782 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,782 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'original_metadata', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,784 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,784 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'shapes', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,786 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,786 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'source_files', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,787 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,788 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'parameters_parameterluts', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,789 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,789 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,791 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,791 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings_styles', 'schema': u'gstoredata'}
+2012-08-06 13:53:44,793 INFO  [sqlalchemy.engine.base.Engine][MainThread] select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname=%(schema)s and relname=%(name)s
+2012-08-06 13:53:44,793 INFO  [sqlalchemy.engine.base.Engine][MainThread] {'name': u'mapfile_settings_classes', 'schema': u'gstoredata'}

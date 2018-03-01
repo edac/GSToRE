@@ -1,14 +1,9 @@
 from pyramid.view import view_config
 from pyramid.response import Response
-
 from pyramid.httpexceptions import HTTPNotFound, HTTPServerError, HTTPBadRequest
-
 import json
 from datetime import datetime
-
-#from the models init script
 from ..models import DBSession
-#from the generic model loader (like meta from gstore v2)
 from ..models.repositories import (
     Repository
     )
@@ -172,8 +167,6 @@ def search_repo(request):
         return HTTPNotFound('no standard')
 
     doctypes = ','.join([dt[:-1] for dt in doctypes.split(',')])
-
-    #do a search for DOCTYPES where app == app AND repo == repo AND standard = standard, RETURN metadata links
     searcher = RepositorySearcher(
         {
             "host": request.registry.settings['es_root'], 
@@ -230,7 +223,6 @@ def search_repo(request):
             elif object_tuple[1] == 'dataset':
                 o = get_dataset(object_tuple[0])
 
-                #add a thing for uuid, metadata link for the standard if it's supported
                 #TODO: fix the 19119 for wxs
                 if standard in o.get_standards(request):
                     output = {

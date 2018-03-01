@@ -22,13 +22,7 @@ from ..lib.es_indexer import DatasetIndexer
 from ..lib.spatial_streamer import *
 
 
-#TODO: add dataset statistics view - min/max per attribute, histogram info, etc
-
 def return_fileresponse(output, mimetype, filename):
-<<<<<<< HEAD
-=======
-    print "return_fileresponse"
->>>>>>> gstore/master
     """
 
     Notes:
@@ -54,15 +48,10 @@ def return_fileresponse(output, mimetype, filename):
     don't really want to get into. Basically, don't change the key and don't chuck the cookie
     as long as rgis/epscor use that plugin.
     '''
-    fr.set_cookie(key='fileDownload', value='true', max_age=31536000, path='/')
     return fr
 
 @view_config(route_name='dataset')
 def dataset(request):
-<<<<<<< HEAD
-=======
-    print "dataset() called..."
->>>>>>> gstore/master
     """
 
     Notes:
@@ -87,14 +76,6 @@ def dataset(request):
 
     #go get the dataset
     d = get_dataset(dataset_id)
-<<<<<<< HEAD
-
-=======
-    print "Datset ID is:"
-    print d.id
-    print "Dataset UUID is :"
-    print d.uuid
->>>>>>> gstore/master
     if not d:
         return HTTPNotFound()
 
@@ -240,10 +221,6 @@ def dataset(request):
 
 @view_config(route_name='dataset_streaming')
 def stream_dataset(request):
-<<<<<<< HEAD
-=======
-    print "stream_dataset"
->>>>>>> gstore/master
     """
     stream dataset as json, kml, csv, geojson, gml
     for improved access options (pull in json for a table on a webpage, etc)
@@ -306,10 +283,6 @@ def stream_dataset(request):
 
     #add the basic parameters (limit, offset, sort)
     vectors = gm.query({'d.id': d.id}, None, sort, limit, offset)
-<<<<<<< HEAD
-
-#    vectors = gm.query({'d.id': d.id})
-=======
     countTotal = gm.count({'d.id': d.id}, None, sort, limit, offset)
     countSubtotal=0
     if countTotal<limit:
@@ -318,15 +291,12 @@ def stream_dataset(request):
         countSubtotal=limit
 
     #vectors = gm.query({'d.id': d.id})
->>>>>>> gstore/master
     
     records = [d.convert_doc_to_record(vector, epsg, format, is_spatial) for vector in vectors]
 
     fields = [{"name": f.name, "type": f.ogr_type, "len": f.ogr_width} for f in d.attributes]
 
     if [a for a in records[0]['datavalues'] if a[0] == 'observed']:
-        #this is not a good plan but we don't have the flag for "dataset contains observation timestamp" today
-        #and it's as a string for now
         fields.append({"name": "observed", "type": 4, "len": 20})
 
     if format == 'kml' and d.taxonomy in ['vector']:
@@ -340,10 +310,7 @@ def stream_dataset(request):
         streamer = GeoJsonStreamer(fields)
     elif format == 'json':
         streamer = JsonStreamer(fields)
-<<<<<<< HEAD
-=======
         streamer.update_description(str(countTotal),str(countSubtotal))
->>>>>>> gstore/master
     elif format == 'csv':
         streamer = CsvStreamer(fields)
     else:
@@ -390,9 +357,6 @@ def services(request):
     if d.is_embargoed or d.inactive:
         return HTTPNotFound()
 
-    #ogc services as {host}/apps/{app}/datasets/{id}/services/{service_type}/{service}
-    #downloads as {host}/apps/{app}/datasets/{id}.{set}.{ext}
-    #metadata as {host}/apps/{app}/datasets/{id}/metadata/{standard}.{ext}
     '''
     {
         id:
@@ -498,11 +462,7 @@ dataset maintenance
 '''
 @view_config(route_name='add_dataset', request_method='POST')
 def add_dataset(request):
-<<<<<<< HEAD
-=======
-    print "add_dataset() called"
 
->>>>>>> gstore/master
     """
 
     we are skipping the file upload - no one wanted to do that (or no one wanted it to post to ibrix)
@@ -588,30 +548,16 @@ def add_dataset(request):
     description = post_data['description']
     basename = post_data['basename']
     taxonomy = post_data['taxonomy']
-<<<<<<< HEAD
-    apps = post_data['apps'] if 'apps' in post_data else []
-    validdates = post_data['dates'] if 'dates' in post_data else {}
-    spatials = post_data['spatial'] if 'spatial' in post_data else []
-    formats = post_data['formats']
-=======
     dataone_archive = post_data['dataone_archive']
     author = post_data['author']
 
     is_embargoed = post_data['is_embargoed']
     releasedate = post_data['releasedate']  
-    print "\nDataone_archive: %s" % dataone_archive
-    print "DataOne Release Date: %s" % releasedate
-    print "Is Embargoed: %s" % is_embargoed
 
     apps = post_data['apps'] if 'apps' in post_data else []
     validdates = post_data['dates'] if 'dates' in post_data else {}
-#    print "Valid date 0: %s" % post_data['dates']
-#    print "Valid date 1: %s" % validdates["start"]
-    print "Validdates:",validdates
     spatials = post_data['spatial'] if 'spatial' in post_data else []
     formats = post_data['formats']
-    print "Formats: %s" % formats
->>>>>>> gstore/master
     services = post_data['services']
     categories = post_data['categories']
     sources = post_data['sources']
@@ -635,36 +581,17 @@ def add_dataset(request):
 
     project = post_data['project'] if 'project' in post_data else ''
 
-<<<<<<< HEAD
-    embargo = post_data['embargo'] if 'embargo' in post_data else {}
-    #this is not good
-    embargoed = True if 'embargoed' in embargo else False
-    embargo_release = embargo['release_date'] if embargo else ''
-=======
-#    embargo = post_data['is_embargoed'] if 'is_embargoed'
-    #this is not good
-#    embargoed = True if 'embargoed' in embargo else False
-#    embargo_release = embargo['release_date'] if embargo else ''
->>>>>>> gstore/master
-    
 
     #we may have instances where we have an external dataset (tri-state replices for example)
     #and we want to keep the uuid for that dataset so we can provide a uuid or make one here
     provided_uuid = post_data['uuid'] if 'uuid' in post_data else generate_uuid4()
 
-<<<<<<< HEAD
-    #like make the new dataset
-=======
     #Instantiate a new dataset
->>>>>>> gstore/master
     new_dataset = Dataset(description)
     new_dataset.basename = basename
     new_dataset.taxonomy = taxonomy
     new_dataset.record_count = records
-<<<<<<< HEAD
-=======
 
->>>>>>> gstore/master
     if taxonomy == 'vector':
         new_dataset.geomtype = geomtype
         new_dataset.feature_count = features
@@ -672,29 +599,17 @@ def add_dataset(request):
         
     new_dataset.inactive = False if active == 'true' else True
 
-<<<<<<< HEAD
-    if embargoed == 'true':
-        #need to set is_embargoed and the release date so the dataset is unavailable through gstore
-        new_dataset.is_embargoed = True
-        new_dataset.embargo_release_date = embargo_release
-=======
 
     #DataOne Capabilities
     new_dataset.dataone_archive=dataone_archive
     new_dataset.embargo_release_date=releasedate
     if is_embargoed == 'True':
-	print "Yes, it's true!"
         new_dataset.is_embargoed = True
 
-    print "\ndataone_archive",new_dataset.dataone_archive
-    print "embargoReleaseDate",new_dataset.embargo_release_date
-    print "is_embargoed",new_dataset.is_embargoed
 
 
     #Adding in the author/PI
     new_dataset.author=author
-    print "author", new_dataset.author
->>>>>>> gstore/master
 
     if not geom and taxonomy not in ['table']:
         #go make one
@@ -707,15 +622,10 @@ def add_dataset(request):
     new_dataset.apps_cache = [app] + apps
 
     #TODO: get rid of formats_cache (once v2 tools issue is resolved in search datasets)
-    #new_dataset.formats_cache = ','.join(formats)
-<<<<<<< HEAD
-=======
     format=','.join(formats)
     formatList=[]
     formatList.append(format)
-    print formatList
     new_dataset.formats=formatList
->>>>>>> gstore/master
     new_dataset.excluded_formats = [f for f in excluded_formats if f not in formats]
     new_dataset.excluded_services = [s for s in excluded_services if s not in services]
     new_dataset.excluded_standards = [s for s in excluded_standards if s not in standards]
@@ -730,7 +640,6 @@ def add_dataset(request):
 
         c = DBSession.query(Category).filter(and_(Category.theme==theme, Category.subtheme==subtheme, Category.groupname==groupname)).first()
         if not c:
-            #we'll need to add a new category BEFORE running this (?)
             return HTTPBadRequest('Missing category triplet')
 
         new_dataset.categories.append(c)
@@ -826,22 +735,15 @@ def add_dataset(request):
 
     #TODO: add the publication date
     new_dataset.date_published = datetime.now()
-<<<<<<< HEAD
-
-    #create the new dataset with all its pieces
-=======
     if(is_embargoed=='False'):
 	    new_dataset.embargo_release_date=new_dataset.date_published
     else:
 	    new_dataset.embargo_release_date=releasedate
 
-    print "new_dataset values...."
-    print new_dataset
 
     #*******************************CREATE THE NEW DATASET IN POSTGRESQL************************************************************
     #*****************************************************************************************************************************
 
->>>>>>> gstore/master
     try:
         DBSession.add(new_dataset)
         DBSession.commit()
@@ -852,15 +754,11 @@ def add_dataset(request):
 
     dataset_uuid = str(new_dataset.uuid)
 
-<<<<<<< HEAD
-    #add the dataset to the index
-=======
 
 #***********************************NOW CREATE NEW DOCUMENT FOR THE DATASET IN ELASTICSEARCH************************************************************
 
 
     #add the dataset to the ELASTICSEARCH index
->>>>>>> gstore/master
     es_description = {
         "host": request.registry.settings['es_root'],
         "index": request.registry.settings['es_dataset_index'], 
@@ -872,10 +770,7 @@ def add_dataset(request):
     indexer = DatasetIndexer(es_description, new_dataset, request)  
     #TODO: update the list for facets
     indexer.build_document([])
-<<<<<<< HEAD
-=======
 
->>>>>>> gstore/master
     #add to the index
     try:
         indexer.put_document()

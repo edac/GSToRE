@@ -23,7 +23,6 @@ _IMAGE_MIMETYPES = {
     }
 def get_image_mimetype(s):
     #check the value and the key for fun
-    #m = [v for k, v in _IMAGE_MIMETYPES.iteritems() if v.lower() == s.lower() or k.upper() == s.upper()]
     m = [(k, v) for k, v in _IMAGE_MIMETYPES.iteritems() if v.lower() == s.lower() or k.upper() == s.upper()]
     m = m[0] if m else None
     return m
@@ -38,9 +37,6 @@ def create_zip(fullname, files):
         fname = f.split('/')[-1]
         zipf.write(f, fname)
     zipf.close()
-
-    #which is silly except as a success indicator
-    #which is silly
     return fullname
 
 '''
@@ -182,14 +178,6 @@ def get_all_standards(req):
         return []
     return [s for s in stds.split(',') if s != 'GSTORE']
 
-#'''
-#get default metadata standards (i think this is not the one we want)
-#'''
-#def get_all_standards(req):
-#    stds =  req.registry.settings['DEFAULT_STANDARDS']
-#    if not stds:
-#        return []
-#    return stds.split(',')
 
 
 '''
@@ -209,7 +197,6 @@ def build_ogc_url(app, data_type, uuid, service, version):
     ?SERVICE={service}&REQUEST=GetCapabilities&VERSION={version}
 
     '''
-    #return req.route_path('services', app=app, type=data_type, id=uuid, service=service, service_type='ogc') +'?SERVICE=%s&REQUEST=GetCapabilities&VERSION=%s' % (service, version)
     return '/apps/%s/%s/%s/services/%s/%s?SERVICE=%s&REQUEST=GetCapabilities&VERSION=%s' % (app, data_type, uuid, 'ogc', service, service, version) 
 
 
@@ -217,14 +204,12 @@ def build_metadata_url(app, data_type, uuid, standard, extension):
     '''
     /apps/{app}/{datatype}/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/metadata/{standard}.{ext}
     '''
-    #return req.route_path('metadata', app=app, datatype=data_type, id=uuid, standard=standard, ext=extension)
     return '/apps/%s/%s/%s/metadata/%s.%s' % (app, data_type, uuid, standard, extension)
 
 def build_dataset_url(app, uuid, basename, aset, extension):
     '''
     /apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/{basename}.{type}.{ext}
     '''
-    #return req.route_path('dataset', app=app, id=uuid, basename=basename, type=aset, ext=extension)
     return '/apps/%s/datasets/%s/%s.%s.%s' % (app, uuid, basename, aset, extension)
 
 def build_service_url(app, data_type, uuid):
@@ -238,7 +223,6 @@ def build_mapper_url(app, uuid):
     /apps/{app}/datasets/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/mapper
     '''
 
-    #return req.route_path('mapper', app=app, id=uuid)
     return '/apps/%s/datasets/%s/mapper' % (app, uuid)
 
 def build_prov_trace_url(app, uuid, ontology, format):
@@ -251,7 +235,7 @@ def build_prov_trace_url(app, uuid, ontology, format):
 '''
 convert the multidict request parameters to lowercase keys
 '''
-#convert all of the request parameter keys to lower case just to not have to deal with camelcase, uppercase, lowercase, all the cases!
+
 def normalize_params(params):
     new_params = {}
     for k in params.keys():
@@ -317,8 +301,6 @@ def get_overlap_date_clause(start_column, end_column, start_range, end_range):
         clause = None
     return clause
     
-<<<<<<< HEAD
-=======
 
 
 def validate_uuid4(uuid_string):
@@ -327,4 +309,4 @@ def validate_uuid4(uuid_string):
      except ValueError:
          return False
      return val.hex == uuid_string.replace('-', '')
->>>>>>> gstore/master
+

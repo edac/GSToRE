@@ -1,21 +1,17 @@
 from pyramid.view import view_config
 from pyramid.response import Response
 from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError, HTTPBadRequest
-
 from sqlalchemy import desc, asc, func
 from sqlalchemy.sql.expression import and_, cast
 from sqlalchemy.sql import between
 import sqlalchemy
-
 import os, json, re
 from xml.sax.saxutils import escape
-
 from ..models import DBSession
 from ..models.features import (
     Feature,
     )
 from ..models.datasets import Dataset, Category
-
 from ..lib.mongo import gMongo, gMongoUri
 from ..lib.utils import normalize_params
 from ..lib.spatial import *
@@ -75,14 +71,12 @@ def feature(request):
     if not vectors:
         return HTTPServerError()
 
-    #return Response(json.dumps({'d.id': feature.dataset_id, 'f.id': feature.fid, 'count': vectors.count()}))
 
     #TODO: change this to not just be the first one
     vector = vectors[0]
 
     #this is basically the same as the convert_vector method in the streamer
     #but the streamer fails if that method is outside of the request method
-    #so it lives there and this is here and let's not speak of it again.
     fid = int(vector['f']['id'])
     did = int(vector['d']['id'])
     obs = vector['obs'].strftime('%Y%m%dT%H:%M:%S') if 'obs' in vector else ''
@@ -261,9 +255,6 @@ def features(request):
                                                                                               
     if geomtype and geomtype.upper() in ['POLYGON', 'POINT', 'LINESTRING', 'MULTIPOLYGON', '3D POLYGON', '3D LINESTRING']:
         dataset_clauses.append(Dataset.geomtype==geomtype.upper())
-#    else:
-#        #let's not mix-and-match geometry types
-#        return HTTPNotFound('bad geomtype')
 
     #add the dateadded
     if start_added or end_added:
@@ -304,7 +295,7 @@ def features(request):
         if epsg != srid:
             reproject_geom(bbox_geom, epsg, srid)
 
-        #i don't remember why we're converting the geom back to wkt, probably the srid mismatch thing
+        #convert the geom back to wkt
         dataset_clauses.append(func.st_intersects(func.st_setsrid(Dataset.geom, srid), func.st_geometryfromtext(geom_to_wkt(bbox_geom, srid))))
 
     #and add the dataset id list
@@ -350,9 +341,6 @@ def features(request):
     elif not start_valid and end_valid:
         mongo_clauses.append({'obs': {'$lte': end_valid}})
 
-    #need to set up the AND
-#    if len(mongo_clauses) > 1:
-#        mongo_clauses = {'$and': mongo_clauses}
 
     #set up the sort
     sort_dict = {}
@@ -361,7 +349,6 @@ def features(request):
     else:
         sort_dict = {'d.id': sort_order, 'obs': sort_order}
 
-    #so just going to lie about this
     #until we run map/reduce to group by dataset id
     sort_dict = {'obs': sort_order}   
     sort_dict = {}
@@ -395,7 +382,7 @@ def features(request):
         head = '' 
         tail = ''
         delimiter = '\n'
-        #some metadata to help people parse what is effectively a honking big text file of csv chunks
+        #some metadata to help people parse what is effectively a large text file of csv
         '''
         dataset
         {description}
@@ -460,7 +447,6 @@ def features(request):
                     'sfields': '\n'.join(["""<SimpleField type="%s" name="%s"><displayName>%s</displayName></SimpleField>""" % (k['type'], k['name'], k['name']) for k in kml_flds])
                 }
 
-#                field_set = ''
                 schema_url = schema_base % (the_dataset.uuid)
             elif format == 'csv':
                 #and add the dataset id, the fid and the observed datetime fields
@@ -503,7 +489,6 @@ def features(request):
                 yield vector_result.encode(encode_as)
 
             dataset_cnt += 1
-            #yield '\n\nDATASET_COUNT: %s (%s, %s)\n\n' % (dataset_cnt, total, json.dumps(feature_clauses))
         yield tail
 
     #build a feature chunk based on the given format (json (no geom), geojson, kml or gml)
@@ -676,7 +661,6 @@ def add_feature(request):
         return {"features": output}
     else:
         return {"fid": feature.fid, "uuid": feature.uuid, "gid": feature.gid, "dataset": feature.dataset_id}
-    #return {'fid': feature.fid, 'uuid': feature.uuid, 'gid': gid}
 
 @view_config(route_name='add_feature_attributes', request_method='POST', renderer='json')
 def add_attributes(request):
@@ -690,7 +674,7 @@ def add_attributes(request):
     fyi: this can be a bulk insert so the fid/uuid info is in the post data and not the route
 
     {
-        fids: []  #if this is separate, then we can assume (ha) that the fid:record is not 1:1 so we can use this to fetch the geoms once instead of pinging shapes every time
+        fids: []  #if this is separate, then we can assume that the fid:record is not 1:1 so we can use this to fetch the geoms once instead of pinging shapes every time
         records: [
             {
                 fid:
@@ -821,10 +805,6 @@ def add_attributes(request):
             obj.update({'obs': obsd, 'year': obsd.year, 'mon': obsd.month, 'day': obsd.day, 'hour': obsd.hour, 'mnt': obsd.minute})
         inserts.append(obj)
 
-    #insert everything to mongo if there's stuff to insert
-#    if len(inserts) != the_dataset.record_count:
-#        return HTTPBadRequest('')
-
     failed_to_post = []    
     failed_errors = []
     if inserts:
@@ -872,7 +852,8 @@ def add_attributes(request):
         #deal with the insert list - pymongo updates the list with _id (objectid)
         #so that and the obs datetime cause json.dumps to fail. we don't care about the _id
         #but we want the datetime
-        archives = []
+ 
+       archives = []
         for i in inserts:
             del i['_id']
             

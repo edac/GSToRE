@@ -6,11 +6,8 @@ from gstore_v3.models import Base, DBSession
 from sqlalchemy import func
 
 import json
-<<<<<<< HEAD
-=======
 import datetime
 import re
->>>>>>> gstore/master
 
 from requests.auth import HTTPBasicAuth
 
@@ -19,7 +16,6 @@ class EsSearcher():
 
     Note:
         See EsIndexer for indexing access.
-        
     Attributes:
         query_data (dict): search filters for the ES POST request
         results (dict): request response
@@ -29,7 +25,6 @@ class EsSearcher():
         default_offset (int): defaults to 0
         default_fields (list): list of field names to include in the response (defaults to _id, our uuids, only)
     """
-    
     query_data = {} 
     results = {} 
 
@@ -38,19 +33,15 @@ class EsSearcher():
     default_limit = 15
     default_offset = 0
     default_fields = ["_id"] 
-    
+
     def __init__(self, es_description):
         """set up the elasticsearch POST url
 
         Notes:
             "type" in the es_description can be a comma-delimited list of objects types (datasets,collections)
-            
+
         Args:
             es_description (dict): host, index, type, user, password
-                    
-        Returns:
-        
-        Raises:
         """
         self.es_description = es_description 
 
@@ -66,28 +57,16 @@ class EsSearcher():
 
         Notes:
             For testing purposes
-            
-        Args:
-                    
         Returns:
             (dict): the search filters
-        
-        Raises:
         """
         return self.query_data
 
     def get_result_total(self):
         """return the number of objects returned by the filter
-
-        Notes:
-            
-        Args:
-                    
         Returns:
             (int): the total number of objects found for the filter(s)
-        
-        Raises:
-        """ 
+        """
         return self.results['hits']['total'] if 'hits' in self.results else 0
 
     def get_result_ids(self):
@@ -95,73 +74,37 @@ class EsSearcher():
 
         Notes:
             Used to generate the output from the object models (services description)
-            
-        Args:
-                    
         Returns:
             (list): list of tuples (_id, _type)
-        
-        Raises:
         """
         if not self.results:
-            return []        
-        
+            return []
+
         return [(i['_id'], i['_type']) for i in self.results['hits']['hits']]
 
     def search(self):
         """execute the es request
-
-        Notes:
-            
-        Args:
-                    
         Returns:
             (json): the json response from elasticsearch
-        
         Raises:
             Exception: returns the es error if the status code isn't 200
         """
-<<<<<<< HEAD
-
         results = requests.post(self.es_url, data=json.dumps(self.query_data), auth=(self.user, self.password))
-=======
-        print "\nES URL:",self.es_url
-        results = requests.post(self.es_url, data=json.dumps(self.query_data), auth=(self.user, self.password))
-#	print "query_data....HERE"
-#	print query_data
->>>>>>> gstore/master
         if results.status_code != 200:
             self.results = {}
             raise Exception(results.text)
 
         self.results = results.json()
-        
-<<<<<<< HEAD
-        return self.results
-
-    def parse_basic_query(self, app, query_params, exclude_fields=[]):
-=======
-        print "\nResults:",self.results
 
         return self.results
 
     def parse_basic_query(self, app, query_params, exclude_fields=[]):
-        print "\nparse_basic_query() called..."
-        print query_params
 
->>>>>>> gstore/master
         """build the search filter dict 
-
-        Notes:
-            
         Args:
             app (str): the app key alias
             query_params (dict): the query params from the gstore search request
             exclude_fields (list, optional): list of fields to use for MISSING query (see collections)
-                    
-        Returns:
-        
-        Raises:
         """
         #pagination
         limit = int(query_params['limit']) if 'limit' in query_params else self.default_limit
@@ -170,16 +113,10 @@ class EsSearcher():
         #category
         theme, subtheme, groupname = self.extract_category(query_params)
 
-<<<<<<< HEAD
-        #keywords
-        keyword = query_params.get('query', '').replace('+', '')
-=======
 	excludetheme, excludesubtheme, excludegroupname = self.extract_category_exclude(query_params)
 
         #keywords
         keyword = query_params.get('query', '').replace('+', '')
-        print keyword
->>>>>>> gstore/master
 
         #date added
         start_added = query_params.get('start_time', '')
@@ -193,22 +130,15 @@ class EsSearcher():
         end_valid = query_params.get('valid_end', '')
         end_valid_date = convert_timestamp(end_valid)
 
-<<<<<<< HEAD
-=======
 	#dataOne
 	dataone_archive=query_params.get('dataone_archive','')
 	releasedsince=query_params.get('releasedsince','')
-	print "dataone_archive parameter passed as: %s" % dataone_archive
-	print "releasedsince set to: %s" % releasedsince
 
 	#author
 	author=query_params.get('author','')
-	print "author param passed as: %s" % author
 
         #uuid
         uuid=query_params.get('uuid','')
-        print "uuid param passed as : %s" % uuid
->>>>>>> gstore/master
         #formats/services/data type
         format = query_params.get('format', '')
         taxonomy = query_params.get('taxonomy', '')
@@ -220,11 +150,7 @@ class EsSearcher():
         epsg = query_params.get('epsg', '')
 
         #sorting
-<<<<<<< HEAD
-        sort = query_params.get('sort', 'lastupdate')
-=======
         sort = query_params.get('sort', 'lastupdate') #sets lastupdate to default
->>>>>>> gstore/master
         if sort not in ['lastupdate', 'description', 'geo_relevance']:
             raise Exception('Bad sort')
         sort = 'date_added' if sort == 'lastupdate' else ('title_search' if sort == 'description' else sort)
@@ -234,7 +160,6 @@ class EsSearcher():
             raise Exception('bad order')
 
         #set up the es sorting
-        #TODO: how to handle multiple doctypes for the sorting
         #use title_search (not_analyzed) field for sorting. otherwise, it will parse the string
         # and sort on something that is not what we intend (ie. sort on 2013 at the end of the string rather
         # than the starting from the first word of the string)
@@ -242,7 +167,7 @@ class EsSearcher():
         if sort != 'title_search':
             #add a secondary sort for the title
             sort_arr.append({"title_search": {"order": "asc"}})
-            
+
         sorts = {"sort": sort_arr}
 
         #build the json data
@@ -251,12 +176,6 @@ class EsSearcher():
         # the main query block
         filtered = {}
 
-<<<<<<< HEAD
-        #all of the filters
-        ands = [
-            {"term": {"applications": app.lower()}},
-            {"term": {"embargo": False}},
-=======
         if author:
 		filtered.update({"query":{"query_string":{"query": author,"fields": ["author"]}}})
 
@@ -264,59 +183,37 @@ class EsSearcher():
         #all of the filters
         ands = [
             {"term": {"applications": app.lower()}},
-#            {"term": {"embargo": False}},
->>>>>>> gstore/master
             {"term": {"active": True}}
         ]
 
-        spatial_search = False        
+        spatial_search = False
 
-#        if theme:
-#            ands.append({"query": {"match": {"category.theme": {"query": theme, "operator": "and"}}}})
-#        if subtheme:
-#            ands.append({"query": {"match": {"category.subtheme": {"query": subtheme, "operator": "and"}}}})
-#        if groupname:
-#            ands.append({"query": {"match": {"category.groupname": {"query": groupname, "operator": "and"}}}})
 
         if theme or subtheme or groupname:
             ands.append(self.build_category_filter(app.lower(), theme, subtheme, groupname))
 
-<<<<<<< HEAD
-=======
         if excludetheme or excludesubtheme or excludegroupname:
             ands.append(self.build_exclude_category_filter(app.lower(), excludetheme, excludesubtheme, excludegroupname))
 
 	if (dataone_archive and dataone_archive.lower()=='true'):
-#	    ands.append({"query": {"term": {"dataOne_archive":True}}})
 	    ands.append({"term": {"dataOne_archive":True}})
 	elif (dataone_archive and dataone_archive.lower()=='false'):
-	    ands.append({"term": {"dataOne_archive":False}})	    
-#	else:
-#	    ands.append({"term": {"dataOne_archive":False}})
+	    ands.append({"term": {"dataOne_archive":False}})
 
->>>>>>> gstore/master
         if format:
             ands.append({"query": {"term": {"formats": format.lower()}}})
         if service:
             ands.append({"query": {"term": {"services": service.lower()}}})
         if taxonomy:
             ands.append({"query": {"term": {"taxonomy": taxonomy.lower()}}})
-<<<<<<< HEAD
-            
-=======
         if uuid:
             ands.append({"query": {"term": {"_id": uuid.lower()}}})
 
->>>>>>> gstore/master
             #NOTE: geomtype is not currently in the indexed docs
             if geomtype and geomtype.upper() in ['POLYGON', 'POINT', 'LINESTRING', 'MULTIPOLYGON', '3D POLYGON', '3D LINESTRING']:
                 ands.append({"query": {"term": {"geomtype": geomtype.lower()}}})
         if keyword:
-<<<<<<< HEAD
-            keyword_query = self.build_keyword_filter(keyword, ['aliases', 'title'])
-=======
             keyword_query = self.build_keyword_filter(keyword, ['aliases', 'title', 'keywords', 'author'])
->>>>>>> gstore/master
             if keyword_query:
                 ands.append(keyword_query)
         if box:
@@ -338,25 +235,16 @@ class EsSearcher():
             if range_query:
                 ands += range_query
 
-<<<<<<< HEAD
-=======
 	#Build in releaseDate to filter out datasets that have been embargoed and haven't reached their release dates
 	release_date_query=self.build_releasedate_filter()
-	print "release_date_query:", release_date_query
 	if release_date_query:
 		ands.append(release_date_query)
-		print "after adding released_date_query returns...%s" % ands
 
-#	if(releasedsince):
 	releasedsince_query=self.build_releasedsince_filter(releasedsince)
-	print "\n\nreleasedsince_query:",releasedsince_query
 	if releasedsince_query:
 		ands.append(releasedsince_query)
-		print "after adding releasedsince_query returns....%s" % ands
 
->>>>>>> gstore/master
         if exclude_fields:
-            #lazy man's handling of give me all collections (no collections in mapping) or any dataset not in a collection (in collection, has collections list in mapping)
             ands += [{"missing": {"field": e}} for e in exclude_fields]
 
         if ands:
@@ -382,11 +270,7 @@ class EsSearcher():
         #and add the sort element back in
         query_request.update(sorts)
 
-<<<<<<< HEAD
-=======
-	print "\nQuery_request....",query_request
-	
->>>>>>> gstore/master
+
         #should have a nice es search
         self.query_data = query_request
 
@@ -397,18 +281,12 @@ class EsSearcher():
     #TODO: change this to handle the new hierarchy
     def extract_category(self, query_params):
         """parse the category triplet for the search 
-
-        Notes:
-            
         Args:
             query_params (dict): the query params from the gstore search request
-                    
         Returns:
             theme (str): the theme
             subtheme (str): the subtheme
             groupname (str): the groupname
-        
-        Raises:
         """
         theme = query_params['theme'].replace('+', ' ') if 'theme' in query_params else ''
         subtheme = query_params['subtheme'].replace('+', ' ') if 'subtheme' in query_params else ''
@@ -419,13 +297,8 @@ class EsSearcher():
     '''
     build helpers
     '''
-<<<<<<< HEAD
-=======
     def extract_category_exclude(self, query_params):
         """parse the category triplet for the search 
-
-        Notes:
-            
         Args:
             query_params (dict): the query params from the gstore search request
 
@@ -433,8 +306,6 @@ class EsSearcher():
             theme (str): the theme
             subtheme (str): the subtheme
             groupname (str): the groupname
-        
-        Raises:
         """
         excludetheme = query_params['excludetheme'].replace('+', ' ') if 'excludetheme' in query_params else ''
         excludesubtheme = query_params['excludesubtheme'].replace('+', ' ') if 'excludesubtheme' in query_params else ''
@@ -447,7 +318,6 @@ class EsSearcher():
     '''
 
 
->>>>>>> gstore/master
     def build_category_filter(self, app, theme, subtheme, groupname):
         '''
         using the category_facet set (multiple categories per doctype),
@@ -489,7 +359,6 @@ class EsSearcher():
             ands.append({"query": {"match": {"category_facets.subtheme":{"query": subtheme, "operator": "and"}}}})
         if groupname:
             ands.append({"query": {"match": {"category_facets.groupname":{"query": groupname, "operator": "and"}}}})
-        
         return {
             "query": {
                 "nested": {
@@ -504,12 +373,8 @@ class EsSearcher():
                 }
             }
         }
-    
-<<<<<<< HEAD
-=======
     def build_exclude_category_filter(self, app, excludetheme, excludesubtheme, excludegroupname):
         ands = [{"term": {"category_facets.apps": app}}]
- 
         if excludetheme:
             excludethemelist=re.split(r',', excludetheme)
             for excludethemeitem in excludethemelist:
@@ -539,7 +404,6 @@ class EsSearcher():
 
     def build_releasedate_filter(self):
         today=datetime.datetime.now().strftime(self.dfmt)
-        print "Today: %s" % today
         ands = {"lte":today}
 	"""
 	{
@@ -561,41 +425,31 @@ class EsSearcher():
 	}
 
 	"""
-	print "build_releasedate_filter() called with ands equal to: {'range': {'releaseDate': %s}}" % ands
 	range_query={"range": {"releaseDate": ands}}
-	print "range_query1:",range_query
         return range_query
 
 
     def build_releasedsince_filter(self,releasedsince):
 	if(releasedsince):
-	        print "build_releasedsince_filter() called using: %s" % releasedsince
+		pass
 	else:
-		print "build_releasedsince_filter() called without date"
 		releasedsince="1970-01-01"
         ands = {"gte":releasedsince}
-	print "...and returning {'range': {'releaseDate':%s}}" % ands
         range_query= {"range": {"releaseDate": ands}}
-	print "range_query2:",range_query
 	return range_query
 
 
->>>>>>> gstore/master
     def build_simple_date_filter(self, element, start_date, end_date):
         """build a date filter for an element (single date element unparsed only)
 
         Notes:
             greater than equal, less than equal, between
-            
         Args:
             element (str): name of the element for the date range filter
             start_date (str): date string a yyyy-MM-dd
             end_date (str): date string a yyyy-MM-dd
-                    
         Returns:
             (dict): a range filter element
-        
-        Raises:
         """
         if not start_date and not end_date:
             return {}
@@ -607,7 +461,6 @@ class EsSearcher():
             range_query = {"lte": end_date.strftime(self.dfmt)}
         if start_date and end_date:
             range_query = {"gte": start_date.strftime(self.dfmt), "lte": end_date.strftime(self.dfmt)}
-            
         return {"range": {element: range_query}}
 
     def build_date_filter(self, start_element, start_date, end_element, end_date):
@@ -626,7 +479,6 @@ class EsSearcher():
                 {"range": {"%s.date" % start_element: {"gte": start_date.strftime(self.dfmt)}}},
                 {"range": {"%s.date" % end_element: {"lte": end_date.strftime(self.dfmt)}}}
             ]
-        
         return range_query
 
     def build_geoshape_filter(self, box, epsg):
@@ -634,16 +486,12 @@ class EsSearcher():
 
         Notes:
             the geo relevance scoring is handling in the main search parser
-            
         Args:
             box (str): bbox as minx,miny,maxx,maxy string
             epsg (str): epsg code
-                    
         Returns:
             geo_shape (dict): a geoshape filter element
             search_area (float): area of the geometry (for the rescorer)
-        
-        Raises:
         """
 
         epsg = int(epsg) if epsg else self.srid
@@ -673,23 +521,13 @@ class EsSearcher():
 
     def build_keyword_filter(self, keywords, elements):
         """build a keyword filter for ORs across one or more elements 
-
-        Notes:
-            
         Args:
             keywords (str): the keyword string (phrase, etc)
             elements (list): list of elements to include in the search
-                    
         Returns:
             (dict): an OR filter element
-        
-        Raises:
         """
-<<<<<<< HEAD
-        ors = [{"query": {"match": {element: {"query": keywords, "operator": "and"}}}} for element in elements]
-=======
         ors = [{"query": {"match": {element: {"query": keywords, "operator": "or"}}}} for element in elements]
->>>>>>> gstore/master
 
         #TODO: add the wildcard search:
         '''
@@ -701,13 +539,11 @@ class EsSearcher():
                 {"term": {"embargo": false}},
                 {"term": {"active": true}},
                 {"query": {"wildcard": {"title_search":"Surfa*"}}}
-                
             ]}}},
             "from": 0,
             "size": 15
         }
         '''
-        
         return {
             "query": {
                 "filtered": {
@@ -727,20 +563,14 @@ class CollectionWithinSearcher(EsSearcher):
         Don't include the exclude_fields (or leave out collections)
 
         Execute update_collection_filter between parsing the query and executing the search
-        
     Attributes:
     """
     def update_collection_filter(self, collection_uuid):
         """add a filter to include the collection uuid to search within 
 
         Notes:
-            
         Args:
             collection_uuid (str): the collection uuid to search within
-                    
-        Returns:
-        
-        Raises:
         """
 
         if not self.query_data:
@@ -763,39 +593,23 @@ class CollectionWithinSearcher(EsSearcher):
             self.query_data['query']['custom_score']['query']['filtered']['filter']['and'].append(uuid_filter)
         else:
             self.query_data['query']['filtered']['filter']['and'].append(uuid_filter)
-        
-        
 
-'''
->>> from gstore_v3.lib import es_searcher
->>> ed = {"host": "http://:/", "index": "", "type": "dataset,collection", "user": "", "password": ""}
->>> es = es_searcher.EsSearcher(ed)
->>> es.es_url
->>> qp = {"query": "modis"}
->>> es.parse_basic_query('rgis', qp, ['collections'])
->>> es.search()
->>> es.get_result_total()
-'''
 
 #for the repository search (object in repository?)
 class RepositorySearcher(EsSearcher):
     """Additional ES search capability for repository listings 
 
-    Note:
-        
-    Attributes:
     """
-    query_data = {} 
-    results = {} 
+    query_data = {}
+    results = {}
 
-    dfmt = '%Y-%m-%d' 
+    dfmt = '%Y-%m-%d'
     srid = 4326
     default_limit = 20
     default_offset = 0
-    default_fields = ["_id"] 
-    
+    default_fields = ["_id"]
     def __init__(self, es_description):
-        self.es_description = es_description 
+        self.es_description = es_description
 
         self.es_url = es_description['host'] + es_description['index'] + '/' + es_description['type'] + '/_search'
         self.user = es_description['user']
@@ -809,28 +623,16 @@ class RepositorySearcher(EsSearcher):
 
         Notes:
             For testing purposes
-            
-        Args:
-                    
         Returns:
             (dict): the search filters
-        
-        Raises:
         """
         return self.query_data
 
     def get_result_total(self):
         """return the number of objects returned by the filter
-
-        Notes:
-            
-        Args:
-                    
         Returns:
             (int): the total number of objects found for the filter(s)
-        
-        Raises:
-        """ 
+        """
         return self.results['hits']['total'] if 'hits' in self.results else 0
 
     def get_result_ids(self):
@@ -838,29 +640,18 @@ class RepositorySearcher(EsSearcher):
 
         Notes:
             Used to generate the output from the object models (services description)
-            
-        Args:
-                    
         Returns:
             (list): list of tuples (_id, _type)
-        
-        Raises:
         """
         if not self.results:
-            return []        
-        
+            return []
         return [(i['_id'], i['_type']) for i in self.results['hits']['hits']]
 
     def search(self):
         """execute the es request
 
-        Notes:
-            
-        Args:
-                    
         Returns:
             (json): the json response from elasticsearch
-        
         Raises:
             Exception: returns the es error if the status code isn't 200
         """
@@ -871,7 +662,6 @@ class RepositorySearcher(EsSearcher):
             raise Exception(results.text)
 
         self.results = results.json()
-        
         #return the json
         return self.results
 
@@ -880,16 +670,11 @@ class RepositorySearcher(EsSearcher):
 
         Notes:
             the query_params is not the straight request params obj. it's repacked to be clear about the date search
-            
         Args:
             app (str): the app key alias
             repo (str): the repository alias
             standard (str): the documentation standard
             query_params (dict): the query params from the gstore search request
-                    
-        Returns:
-        
-        Raises:
         """
 
         query_request = {"size": self.default_limit, "from": self.default_offset, "fields": self.default_fields}
@@ -978,7 +763,7 @@ class RepositorySearcher(EsSearcher):
                             }
                         }
                     }
-                    
+
                 if mq:
                     ands.append(mq) 
 
@@ -994,7 +779,3 @@ class RepositorySearcher(EsSearcher):
         '''
         pass
 
-<<<<<<< HEAD
-        
-=======
->>>>>>> gstore/master

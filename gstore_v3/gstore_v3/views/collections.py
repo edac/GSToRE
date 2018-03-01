@@ -1,9 +1,7 @@
 from pyramid.view import view_config
 from pyramid.response import Response
 from pyramid.httpexceptions import HTTPNotFound, HTTPFound, HTTPServerError, HTTPBadRequest, HTTPServiceUnavailable
-
 from sqlalchemy.exc import DBAPIError
-
 from ..models import DBSession
 from ..models.datasets import (
     Dataset,
@@ -11,12 +9,12 @@ from ..models.datasets import (
 from ..models.categories import Category
 from ..models.collections import Collection
 from ..models.metadata import CollectionMetadata
-
 from ..lib.utils import *
 from ..lib.spatial import *
 from ..lib.database import *
 from ..lib.spatial_streamer import *
 from ..lib.es_indexer import CollectionIndexer, DatasetIndexer
+
 
 '''
 collections
@@ -187,7 +185,6 @@ def add_collection(request):
 
         c = DBSession.query(Category).filter(and_(Category.theme==theme, Category.subtheme==subtheme, Category.groupname==groupname)).first()
         if not c:
-            #we'll need to add a new category BEFORE running this (?)
             return HTTPBadRequest('Missing category triplet')
 
         new_collection.categories.append(c)
@@ -202,7 +199,6 @@ def add_collection(request):
     new_collection.gstore_metadata.append(new_metadata)
 
     for dataset in datasets:
-        #this is silly, who cares
         d = DBSession.query(Dataset).filter(Dataset.id==dataset).first()
         if d:
             new_collection.datasets.append(d)
@@ -241,7 +237,6 @@ def add_collection(request):
         return HTTPServerError('failed to put index document for %s' % new_collection.uuid)
 
     #update all of the datasets to include the new collection uuid
-    #also silly and really needs a better widget
     errors = []
     es_description.update({"type": "dataset"})
     for dataset in datasets:
