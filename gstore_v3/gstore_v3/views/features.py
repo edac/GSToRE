@@ -853,7 +853,7 @@ def add_attributes(request):
         #so that and the obs datetime cause json.dumps to fail. we don't care about the _id
         #but we want the datetime
  
-       archives = []
+        archives = []
         for i in inserts:
             del i['_id']
             
