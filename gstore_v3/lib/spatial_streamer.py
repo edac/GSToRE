@@ -43,6 +43,11 @@ class SpatialStreamer():
 
     field_definitions = ''
 
+<<<<<<< HEAD
+=======
+    count = ''
+
+>>>>>>> gstore/master
     def __init__(self, fields):
         """initialize the streamer
 
@@ -267,7 +272,21 @@ class JsonStreamer(SpatialStreamer):
 
         return json.dumps({"id": idval, "properties": vals})
         
+<<<<<<< HEAD
         
+=======
+    def update_description(self, count, countsub):
+        """update the head to include the count
+
+        Notes:
+
+        Args:
+            description (str): appropriately escaped description
+        Returns:
+        Raises:
+        """
+        self.head = '{"total":'+count+',"subtotal":'+countsub+',"features": ['
+>>>>>>> gstore/master
 
 class GmlStreamer(SpatialStreamer):
     """GML streamer
@@ -482,6 +501,10 @@ class CsvStreamer(SpatialStreamer):
         idval = self.return_record_id(record, index)
         datavalues = [('id', idval)] + record['datavalues']
         vals = []
+<<<<<<< HEAD
+=======
+        print self.fields
+>>>>>>> gstore/master
         for f in self.fields:   
             dv = [d for d in datavalues if str(d[0]) == f['name']]
             v = '%s' % dv[0][1] if dv else ''

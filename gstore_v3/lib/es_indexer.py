@@ -15,11 +15,26 @@ dataset mapping:
 {
     "dataset": {
         "properties": {
+<<<<<<< HEAD
             "active": {
                 "type": "boolean"
             },
             "embargo": {
                 "type": "boolean"
+=======
+            "dataOne_archive": {"type": "boolean"},
+            "embargoDate": {
+                "type": "date",
+                "format": "YYYY-MM-dd"
+		            }
+	        }
+		    },
+            "active": {
+                "type": "boolean"
+            },
+#            "embargo": {
+#                "type": "boolean"
+>>>>>>> gstore/master
             },
             "available": {
                 "type": "boolean"
@@ -250,6 +265,19 @@ class EsIndexer:
         self.partial = {}
         self.uuid = gstore_object.uuid
 
+<<<<<<< HEAD
+=======
+	print "\nES_indexer() instantiation"
+	print "Description: %s" % self.es_description
+	print "URL: %s" % self.es_url
+	print "User: %s" % self.user
+#	print "Formats: %s" % self.gstore_object
+	#print "Pass: %s" % self.password
+#	print "GStore object:" % self.gstore_object
+	print "Request: %s" % self.request
+	
+
+>>>>>>> gstore/master
     def __repr__(self):
         return '<EsIndexer (%s, %s)>' % (self.es_url, self.uuid)
 
@@ -459,6 +487,10 @@ class DatasetIndexer(EsIndexer):
         
         Raises:
         """
+<<<<<<< HEAD
+=======
+	print "\nbuild_document() called from ES_indexer..."
+>>>>>>> gstore/master
         doc = {}
 
         doc.update({"title": self.gstore_object.description, "title_search": self.gstore_object.description,
@@ -472,7 +504,13 @@ class DatasetIndexer(EsIndexer):
         if self.gstore_object.end_datetime:
             doc.update(self.build_date_element("valid_end", self.gstore_object.end_datetime))
 
+<<<<<<< HEAD
         formats = self.gstore_object.get_formats(self.request)
+=======
+	
+        formats = self.gstore_object.get_formats(self.request)
+	print "formats: %s" % formats
+>>>>>>> gstore/master
         services = self.gstore_object.get_services(self.request)
         standards = self.gstore_object.get_standards(self.request)
         repos = self.gstore_object.get_repositories()
@@ -505,21 +543,49 @@ class DatasetIndexer(EsIndexer):
 
         doc.update({"aliases": self.gstore_object.aliases if self.gstore_object.aliases else []})
 
+<<<<<<< HEAD
         doc.update({"embargo": self.gstore_object.is_embargoed, "active": not self.gstore_object.inactive, "available": self.gstore_object.is_available})
+=======
+        doc.update({"is_embargoed": self.gstore_object.is_embargoed, "active": not self.gstore_object.inactive, "available": self.gstore_object.is_available})
+>>>>>>> gstore/master
 
         doc.update({"taxonomy": self.gstore_object.taxonomy})
         if self.gstore_object.geomtype and self.gstore_object.taxonomy == 'vector':
             doc.update({"geomtype": self.gstore_object.geomtype.lower()})
 
+<<<<<<< HEAD
         #nested category structure
         categories = []
         for category in self.gstore_object.categories:
             categories.append({"theme": str(category.theme), "subtheme": str(category.subtheme), "groupname": str(category.groupname), "apps": category.apps})
+=======
+	#dataOne elements
+	print "Dataone_Archive now: %s" % self.gstore_object.dataone_archive
+	doc.update({"dataOne_archive":self.gstore_object.dataone_archive})
+	doc.update({"releaseDate":self.gstore_object.embargo_release_date.strftime('%Y-%m-%d')})
+
+	#Formats
+        print "Formats: " 
+        print self.gstore_object.formats
+	doc.update({"formats":self.gstore_object.formats})
+
+	#author element
+	doc.update({"author":self.gstore_object.author})
+
+        #nested category structure
+        categories = []
+        for category in self.gstore_object.categories:
+            categories.append({"theme": str(category.theme), "subtheme": str(category.subtheme), "groupname": str(category.groupname), "apps": self.gstore_object.apps_cache})
+>>>>>>> gstore/master
         doc.update({"category_facets": categories})
 
         #and the original structure just in case
         cat = self.gstore_object.categories[0]
+<<<<<<< HEAD
         doc.update({"category": {"theme": str(cat.theme), "subtheme": str(cat.subtheme), "groupname": str(cat.groupname), "apps": category.apps}})
+=======
+        doc.update({"category": {"theme": str(cat.theme), "subtheme": str(cat.subtheme), "groupname": str(cat.groupname), "apps": self.gstore_object.apps_cache}})
+>>>>>>> gstore/master
 
         if self.gstore_object.taxonomy not in ['table']:
             area, loc = self.build_location(self.gstore_object.box)
@@ -532,6 +598,12 @@ class DatasetIndexer(EsIndexer):
 
         self.document = {self.es_description['type']: doc}
 
+<<<<<<< HEAD
+=======
+	print "\nDocument contents:"
+	print doc
+
+>>>>>>> gstore/master
     def build_partial(self, keys_to_update):
         """build a partial dataset document
 
@@ -634,12 +706,21 @@ class DatasetIndexer(EsIndexer):
                 #nested category structure
                 categories = []
                 for category in self.gstore_object.categories:
+<<<<<<< HEAD
                     categories.append({"theme": str(category.theme), "subtheme": str(category.subtheme), "groupname": str(category.groupname), "apps": category.apps})
                 data_to_update.update({"category_facets": categories})
 
                 #and the original structure just in case IT IS VERY WRONG
                 cat = self.gstore_object.categories[0]
                 data_to_update.update({"category": {"theme": str(cat.theme), "subtheme": str(cat.subtheme), "groupname": str(cat.groupname), "apps": category.apps}})
+=======
+                    categories.append({"theme": str(category.theme), "subtheme": str(category.subtheme), "groupname": str(category.groupname), "apps": self.gstore_object.apps_cache})
+                data_to_update.update({"category_facets": categories})
+
+                #and the original structure just in case
+                cat = self.gstore_object.categories[0]
+                data_to_update.update({"category": {"theme": str(cat.theme), "subtheme": str(cat.subtheme), "groupname": str(cat.groupname), "apps": self.gstore_object.apps_cache}})
+>>>>>>> gstore/master
                 
             elif key == 'category_hierarchy':
                 #for the 1..3 structure not in place

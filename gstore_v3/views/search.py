@@ -491,7 +491,10 @@ def search(request):
     #TODO: add the rest of the filtering
     keyword = '%'+keyword+'%'
     geos = DBSession.query(geolookups).filter(geolookups.c.what==geolookup).filter(or_(geolookups.c.description.ilike(keyword), "array_to_string(aliases, ',') like '%s'" % keyword)).order_by(order_clause).limit(limit).offset(offset)
+<<<<<<< HEAD
 
+=======
+>>>>>>> gstore/master
     #dump the results
     #TODO: check for anything weird about the bbox (or deal with reprojection, etc)
     response = Response(json.dumps({'results': [{'text': g.description, 'box': [float(b) for b in g.box]} for g in geos]}))

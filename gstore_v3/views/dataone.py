@@ -36,7 +36,12 @@ see http://mule1.dataone.org/ArchitectureDocs-current/apis/MN_APIs.html
 some presets
 '''
 NODE = 'urn:node:EDACGSTORE'
+<<<<<<< HEAD
 SUBJECT = 'CN=gstore.unm.edu,DC=dataone,DC=org'
+=======
+#SUBJECT = 'CN=gstore.unm.edu,DC=dataone,DC=org'
+SUBJECT = 'CN=urn:node:EDACGSTORE,DC=dataone,DC=org'
+>>>>>>> gstore/master
 RIGHTSHOLDER = 'CN=gstore.unm.edu,DC=dataone,DC=org'
 #CONTACTSUBJECT = 'CN=gstore.unm.edu,O=Google,C=US,DC=cilogon,DC=org'
 

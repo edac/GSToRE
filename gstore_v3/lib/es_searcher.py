@@ -6,6 +6,11 @@ from gstore_v3.models import Base, DBSession
 from sqlalchemy import func
 
 import json
+<<<<<<< HEAD
+=======
+import datetime
+import re
+>>>>>>> gstore/master
 
 from requests.auth import HTTPBasicAuth
 
@@ -116,17 +121,35 @@ class EsSearcher():
         Raises:
             Exception: returns the es error if the status code isn't 200
         """
+<<<<<<< HEAD
 
         results = requests.post(self.es_url, data=json.dumps(self.query_data), auth=(self.user, self.password))
+=======
+        print "\nES URL:",self.es_url
+        results = requests.post(self.es_url, data=json.dumps(self.query_data), auth=(self.user, self.password))
+#	print "query_data....HERE"
+#	print query_data
+>>>>>>> gstore/master
         if results.status_code != 200:
             self.results = {}
             raise Exception(results.text)
 
         self.results = results.json()
         
+<<<<<<< HEAD
         return self.results
 
     def parse_basic_query(self, app, query_params, exclude_fields=[]):
+=======
+        print "\nResults:",self.results
+
+        return self.results
+
+    def parse_basic_query(self, app, query_params, exclude_fields=[]):
+        print "\nparse_basic_query() called..."
+        print query_params
+
+>>>>>>> gstore/master
         """build the search filter dict 
 
         Notes:
@@ -147,8 +170,16 @@ class EsSearcher():
         #category
         theme, subtheme, groupname = self.extract_category(query_params)
 
+<<<<<<< HEAD
         #keywords
         keyword = query_params.get('query', '').replace('+', '')
+=======
+	excludetheme, excludesubtheme, excludegroupname = self.extract_category_exclude(query_params)
+
+        #keywords
+        keyword = query_params.get('query', '').replace('+', '')
+        print keyword
+>>>>>>> gstore/master
 
         #date added
         start_added = query_params.get('start_time', '')
@@ -162,6 +193,22 @@ class EsSearcher():
         end_valid = query_params.get('valid_end', '')
         end_valid_date = convert_timestamp(end_valid)
 
+<<<<<<< HEAD
+=======
+	#dataOne
+	dataone_archive=query_params.get('dataone_archive','')
+	releasedsince=query_params.get('releasedsince','')
+	print "dataone_archive parameter passed as: %s" % dataone_archive
+	print "releasedsince set to: %s" % releasedsince
+
+	#author
+	author=query_params.get('author','')
+	print "author param passed as: %s" % author
+
+        #uuid
+        uuid=query_params.get('uuid','')
+        print "uuid param passed as : %s" % uuid
+>>>>>>> gstore/master
         #formats/services/data type
         format = query_params.get('format', '')
         taxonomy = query_params.get('taxonomy', '')
@@ -173,7 +220,11 @@ class EsSearcher():
         epsg = query_params.get('epsg', '')
 
         #sorting
+<<<<<<< HEAD
         sort = query_params.get('sort', 'lastupdate')
+=======
+        sort = query_params.get('sort', 'lastupdate') #sets lastupdate to default
+>>>>>>> gstore/master
         if sort not in ['lastupdate', 'description', 'geo_relevance']:
             raise Exception('Bad sort')
         sort = 'date_added' if sort == 'lastupdate' else ('title_search' if sort == 'description' else sort)
@@ -200,10 +251,21 @@ class EsSearcher():
         # the main query block
         filtered = {}
 
+<<<<<<< HEAD
         #all of the filters
         ands = [
             {"term": {"applications": app.lower()}},
             {"term": {"embargo": False}},
+=======
+        if author:
+		filtered.update({"query":{"query_string":{"query": author,"fields": ["author"]}}})
+
+
+        #all of the filters
+        ands = [
+            {"term": {"applications": app.lower()}},
+#            {"term": {"embargo": False}},
+>>>>>>> gstore/master
             {"term": {"active": True}}
         ]
 
@@ -219,18 +281,42 @@ class EsSearcher():
         if theme or subtheme or groupname:
             ands.append(self.build_category_filter(app.lower(), theme, subtheme, groupname))
 
+<<<<<<< HEAD
+=======
+        if excludetheme or excludesubtheme or excludegroupname:
+            ands.append(self.build_exclude_category_filter(app.lower(), excludetheme, excludesubtheme, excludegroupname))
+
+	if (dataone_archive and dataone_archive.lower()=='true'):
+#	    ands.append({"query": {"term": {"dataOne_archive":True}}})
+	    ands.append({"term": {"dataOne_archive":True}})
+	elif (dataone_archive and dataone_archive.lower()=='false'):
+	    ands.append({"term": {"dataOne_archive":False}})	    
+#	else:
+#	    ands.append({"term": {"dataOne_archive":False}})
+
+>>>>>>> gstore/master
         if format:
             ands.append({"query": {"term": {"formats": format.lower()}}})
         if service:
             ands.append({"query": {"term": {"services": service.lower()}}})
         if taxonomy:
             ands.append({"query": {"term": {"taxonomy": taxonomy.lower()}}})
+<<<<<<< HEAD
             
+=======
+        if uuid:
+            ands.append({"query": {"term": {"_id": uuid.lower()}}})
+
+>>>>>>> gstore/master
             #NOTE: geomtype is not currently in the indexed docs
             if geomtype and geomtype.upper() in ['POLYGON', 'POINT', 'LINESTRING', 'MULTIPOLYGON', '3D POLYGON', '3D LINESTRING']:
                 ands.append({"query": {"term": {"geomtype": geomtype.lower()}}})
         if keyword:
+<<<<<<< HEAD
             keyword_query = self.build_keyword_filter(keyword, ['aliases', 'title'])
+=======
+            keyword_query = self.build_keyword_filter(keyword, ['aliases', 'title', 'keywords', 'author'])
+>>>>>>> gstore/master
             if keyword_query:
                 ands.append(keyword_query)
         if box:
@@ -252,6 +338,23 @@ class EsSearcher():
             if range_query:
                 ands += range_query
 
+<<<<<<< HEAD
+=======
+	#Build in releaseDate to filter out datasets that have been embargoed and haven't reached their release dates
+	release_date_query=self.build_releasedate_filter()
+	print "release_date_query:", release_date_query
+	if release_date_query:
+		ands.append(release_date_query)
+		print "after adding released_date_query returns...%s" % ands
+
+#	if(releasedsince):
+	releasedsince_query=self.build_releasedsince_filter(releasedsince)
+	print "\n\nreleasedsince_query:",releasedsince_query
+	if releasedsince_query:
+		ands.append(releasedsince_query)
+		print "after adding releasedsince_query returns....%s" % ands
+
+>>>>>>> gstore/master
         if exclude_fields:
             #lazy man's handling of give me all collections (no collections in mapping) or any dataset not in a collection (in collection, has collections list in mapping)
             ands += [{"missing": {"field": e}} for e in exclude_fields]
@@ -279,6 +382,11 @@ class EsSearcher():
         #and add the sort element back in
         query_request.update(sorts)
 
+<<<<<<< HEAD
+=======
+	print "\nQuery_request....",query_request
+	
+>>>>>>> gstore/master
         #should have a nice es search
         self.query_data = query_request
 
@@ -311,6 +419,35 @@ class EsSearcher():
     '''
     build helpers
     '''
+<<<<<<< HEAD
+=======
+    def extract_category_exclude(self, query_params):
+        """parse the category triplet for the search 
+
+        Notes:
+            
+        Args:
+            query_params (dict): the query params from the gstore search request
+
+        Returns:
+            theme (str): the theme
+            subtheme (str): the subtheme
+            groupname (str): the groupname
+        
+        Raises:
+        """
+        excludetheme = query_params['excludetheme'].replace('+', ' ') if 'excludetheme' in query_params else ''
+        excludesubtheme = query_params['excludesubtheme'].replace('+', ' ') if 'excludesubtheme' in query_params else ''
+        excludegroupname = query_params['excludegroupname'].replace('+', ' ') if 'excludegroupname' in query_params else ''
+
+        return excludetheme, excludesubtheme, excludegroupname
+
+    '''
+    build helpers
+    '''
+
+
+>>>>>>> gstore/master
     def build_category_filter(self, app, theme, subtheme, groupname):
         '''
         using the category_facet set (multiple categories per doctype),
@@ -368,6 +505,82 @@ class EsSearcher():
             }
         }
     
+<<<<<<< HEAD
+=======
+    def build_exclude_category_filter(self, app, excludetheme, excludesubtheme, excludegroupname):
+        ands = [{"term": {"category_facets.apps": app}}]
+ 
+        if excludetheme:
+            excludethemelist=re.split(r',', excludetheme)
+            for excludethemeitem in excludethemelist:
+                ands.append({"not": {"query": {"match": {"category_facets.theme":{"query": excludethemeitem, "operator": "and"}}}}})
+        if excludesubtheme:
+            excludesubthemelist=re.split(r',', excludesubtheme)
+            for excludesubthemeitem in excludesubthemelist:
+                ands.append({"not": {"query": {"match": {"category_facets.subtheme":{"query": excludesubthemeitem, "operator": "and"}}}}})
+        if excludegroupname:
+            excludegroupnamelist=re.split(r',', excludegroupname)
+            for excludegroupnameitem in excludegroupnamelist:
+                ands.append({"not": {"query": {"match": {"category_facets.groupname":{"query": excludegroupnameitem, "operator": "and"}}}}})
+        return {
+            "query": {
+                "nested": {
+                    "path": "category_facets",
+                    "query": {
+                        "filtered": {
+                            "filter": {
+                                "and": ands
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    def build_releasedate_filter(self):
+        today=datetime.datetime.now().strftime(self.dfmt)
+        print "Today: %s" % today
+        ands = {"lte":today}
+	"""
+	{
+	    "sort": [
+	        {"date_added": {"order": "u'desc'"}},
+	        {"title_search": {"order": "asc"}}
+	    ],
+	    "fields": ["_id"],
+	    "query": {"filtered": {"filter": {"and": [
+	        {"term": {"applications": "u'energize'"}},
+	        {"term": {"embargo": "false"}},
+	        {"term": {"active": "true"}},
+	        {"term": {"dataone_archive":"true"}},
+	        {"range": {"releaseDate": {"lte": "2017-03-01"}}},
+	        {"range": {"releaseDate": {"gte": "2016-03-01"}}}]
+	        }}},
+	    "from": 0,
+	    "size": 15
+	}
+
+	"""
+	print "build_releasedate_filter() called with ands equal to: {'range': {'releaseDate': %s}}" % ands
+	range_query={"range": {"releaseDate": ands}}
+	print "range_query1:",range_query
+        return range_query
+
+
+    def build_releasedsince_filter(self,releasedsince):
+	if(releasedsince):
+	        print "build_releasedsince_filter() called using: %s" % releasedsince
+	else:
+		print "build_releasedsince_filter() called without date"
+		releasedsince="1970-01-01"
+        ands = {"gte":releasedsince}
+	print "...and returning {'range': {'releaseDate':%s}}" % ands
+        range_query= {"range": {"releaseDate": ands}}
+	print "range_query2:",range_query
+	return range_query
+
+
+>>>>>>> gstore/master
     def build_simple_date_filter(self, element, start_date, end_date):
         """build a date filter for an element (single date element unparsed only)
 
@@ -472,7 +685,11 @@ class EsSearcher():
         
         Raises:
         """
+<<<<<<< HEAD
         ors = [{"query": {"match": {element: {"query": keywords, "operator": "and"}}}} for element in elements]
+=======
+        ors = [{"query": {"match": {element: {"query": keywords, "operator": "or"}}}} for element in elements]
+>>>>>>> gstore/master
 
         #TODO: add the wildcard search:
         '''
@@ -777,4 +994,7 @@ class RepositorySearcher(EsSearcher):
         '''
         pass
 
+<<<<<<< HEAD
         
+=======
+>>>>>>> gstore/master

@@ -112,6 +112,7 @@ class DataoneDataObject(Base):
             DBSession.rollback()
             raise ex
 
+<<<<<<< HEAD
         sysmeta = DataoneSystemMetadata(obsolete.id)
         #TODO: not hardcode this. i hate dataone   
         sysmeta.replication_policy = False
@@ -123,6 +124,8 @@ class DataoneDataObject(Base):
             DBSession.rollback()
             raise
 
+=======
+>>>>>>> gstore/master
         return core.object_uuid, obsolete.uuid
 
     def register_dirty_object(self):
@@ -306,6 +309,7 @@ class DataoneScienceMetadataObject(Base):
             DBSession.rollback()
             raise
 
+<<<<<<< HEAD
         sysmeta = DataoneSystemMetadata(obsolete.id)
         #TODO: not hardcode this. i hate dataone   
         sysmeta.replication_policy = False
@@ -317,6 +321,8 @@ class DataoneScienceMetadataObject(Base):
             DBSession.rollback()
             raise
 
+=======
+>>>>>>> gstore/master
         return core.object_uuid, obsolete.uuid
 
     def register_dirty_object(self):
@@ -551,6 +557,7 @@ class DataoneDataPackage(Base):
             DBSession.rollback()
             raise
 
+<<<<<<< HEAD
         sysmeta = DataoneSystemMetadata(obsolete.id)
         #TODO: not hardcode this. i hate dataone   
         sysmeta.replication_policy = False
@@ -562,6 +569,8 @@ class DataoneDataPackage(Base):
             DBSession.rollback()
             raise
 
+=======
+>>>>>>> gstore/master
         return core.object_uuid, obsolete.uuid
 
     def register_dirty_object(self):
@@ -739,7 +748,11 @@ class DataoneSystemMetadata(Base):
         Column('obsolete_id', Integer, ForeignKey('gstoredata.dataone_obsoletes.id')),
         Column('replication_policy', Boolean),
         Column('access_policies', String),
+<<<<<<< HEAD
         Column('date_changed', TIMESTAMP, FetchedValue()),
+=======
+        Column('date_changed', TIMESTAMP),
+>>>>>>> gstore/master
         schema='gstoredata'
     )
 

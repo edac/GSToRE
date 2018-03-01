@@ -41,6 +41,26 @@ class gMongo:
     def close(self):
         self.conn.close()
 
+<<<<<<< HEAD
+=======
+
+    #Get the count of the datasets returned.
+    def count(self, querydict, fielddict={}, sortdict = {}, limit=None, offset=None):
+        #what to do if there's no defined collection?
+        '''
+        Just return the number of records that are available
+        '''
+
+            #do not use an empty fielddict -> it will only return the _id values
+        if fielddict:
+            c = self.collection.find(querydict, fielddict).count()
+        else:
+            #do not use an empty fielddict -> it will only return the _id values
+            c = self.collection.find(querydict).count()
+        return c
+
+
+>>>>>>> gstore/master
     #TODO: something about the possibly unknown collection info
     def query(self, querydict, fielddict={}, sortdict = {}, limit=None, offset=None):
         #what to do if there's no defined collection?
