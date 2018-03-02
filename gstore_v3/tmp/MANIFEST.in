@@ -1,2 +1,0 @@
-include *.txt *.ini *.cfg *.rst
-recursive-include gstore_v3 *.ico *.png *.css *.gif *.jpg *.pt *.txt *.mak *.mako *.js *.html *.xml
