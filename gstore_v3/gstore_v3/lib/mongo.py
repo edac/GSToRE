@@ -15,7 +15,7 @@ class gMongo:
 
     #use the mongo connection widget instead
     def __init__(self, mongo_uri):
-        self.conn = pymongo.Connection(host=mongo_uri.hostname, port=mongo_uri.port)
+        self.conn = pymongo.MongoClient(host=mongo_uri.hostname, port=mongo_uri.port)
         self.db = self.conn[mongo_uri.db]
         if mongo_uri.user and mongo_uri.password:
             #TODO: add some error handling here?
