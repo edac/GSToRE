@@ -107,6 +107,11 @@ def main(global_config, **settings):
     #config.add_static_view('static', 'static', cache_max_age=3600)
     config.add_static_view(name='xslts', path='gstore_v3:../resources/xslts')
     config.add_static_view(name='docs', path='gstore_v3:../resources/docs')
+    config.add_static_view(name='javascript', path='gstore_v3:../resources/javascript')
+    config.add_static_view(name='css', path='gstore_v3:../resources/css')
+    config.add_static_view(name='images', path='gstore_v3:../resources/images')
+    config.add_static_view(name='static', path='gstore_v3:./static')
+    config.add_static_view(name='vendors', path='gstore_v3:../resources/vendors')
 
     #TODO: comment this out for production (or don't copy the stuff that's in the sandbox dir)
     config.add_static_view(name='samples', path='gstore_v3:../resources/samples')
