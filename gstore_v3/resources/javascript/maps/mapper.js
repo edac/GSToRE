@@ -29,11 +29,10 @@ Ext.onReady(function() {
 
 	rgis_base = new OpenLayers.Layer.WMS(
 		"GSTORE Base", 
-		"/apps/" + AppId + "/datasets/base/services/ogc/wms?",
+		"http://gstore.unm.edu/apps/rgis/datasets/base/services/ogc/wms?",
 		{ 
-//                        layers: 'naturalearthsw,southwestutm,nmcounties',
-                        layers: 'nmcounties',
-		    //transparent: true,
+                       layers: 'naturalearthsw,southwestutm,nmcounties',
+
 			format: 'image/jpeg', 
 			isBaseLayer : true
 		}
