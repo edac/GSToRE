@@ -172,7 +172,7 @@ def main(global_config, **settings):
 
     config.add_route('services', '/apps/{app}/{type}/{id:\d+|[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}}/services/{service_type}/{service}', custom_predicates=(applist,servicelist,))
 
-    
+    config.add_route('test', '/test')
 
 #TODO: deprecate this (move functionality to the interfaces where it belongs)
 #to the mapper
