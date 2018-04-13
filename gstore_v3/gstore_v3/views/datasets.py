@@ -1016,12 +1016,17 @@ def update_dataset(request):
         elif key == 'formats':
             #list of formats to support
             formats = post_data['formats']
+            print "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+	    print request
+            print request.registry.settings['DEFAULT_FORMATS']
+	    print d.excluded_formats
             excluded_formats = get_all_formats(request)
+            print excluded_formats
             d.excluded_formats = [f for f in excluded_formats if f not in formats]
-
-
+            print "VVVVVVVVVVVVVVVVVVVVVVVVV"
+            print elements_to_update
             elements_to_update.append("formats")
-
+	    print elements_to_update
         elif key == 'services':
             services = post_data['services']
             excluded_services = get_all_services(request)
